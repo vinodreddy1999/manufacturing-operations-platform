@@ -1,0 +1,5 @@
+{
+  "tenantSlug": "precision-components",
+  "login": { "email": "admin@mop.local", "password": "ChangeMe123!" },
+  "enabledModules": ["INVENTORY", "WAREHOUSE", "SUPPLIER", "PROCUREMENT", "PRODUCTION", "MAINTENANCE", "QUALITY", "FORECASTING", "AI_COPILOT"]
+}
