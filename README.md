@@ -8,15 +8,31 @@ This copy is prepared as a GitHub-ready repository. See:
 
 - `GITHUB_SETUP.md` for upload, clone, Docker, and local run steps.
 - `MODULE_RUN_MAP.md` for where each module lives and how module output flows through the system.
+- `python-backend/README.md` for the Python/FastAPI backend version.
 
 ## Workspace Layout
 
 - `docs/` - architecture, ERD, API specification, roadmap, deployment guide
 - `apps/api/` - NestJS backend skeleton
 - `apps/web/` - Next.js frontend skeleton
+- `python-backend/` - Python/FastAPI backend implementation of the same business modules
 - `packages/domain/` - shared domain constants and module definitions
 - `prisma/` - Prisma schema and seed plan
 - `infra/` - Docker, Kubernetes-ready, monitoring, and CI/CD artifacts
+
+## Python Backend
+
+A runnable Python backend is available in `python-backend/`. It includes Auth, Platform, Inventory, Warehouse, Supplier, Procurement, Production, Maintenance, Quality, Reporting, AI, and Supply Chain endpoints.
+
+```bash
+cd python-backend
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
+```
+
+Open Swagger docs at `http://localhost:8000/docs`.
 
 ## Product Principles
 
