@@ -66,10 +66,12 @@ class DemoStore:
         self.work_orders: list[dict] = []
         self.inspections: list[dict] = []
 
-    def snapshot(self, value):
+    @staticmethod
+    def snapshot(value):
         return deepcopy(value)
 
-    def create_record(self, collection: list[dict], payload: dict) -> dict:
+    @staticmethod
+    def create_record(collection: list[dict], payload: dict) -> dict:
         record = {"id": str(uuid4()), "created_at": datetime.now(timezone.utc).isoformat(), **payload}
         collection.append(record)
         return record
