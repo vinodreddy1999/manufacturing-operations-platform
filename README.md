@@ -17,6 +17,12 @@ It uses FastAPI and includes runnable backend modules for manufacturing operatio
 - Supply Chain
 - AI
 
+## Diagram
+
+See the GitHub-rendered end-to-end scheme diagram here:
+
+[End-to-End Scheme Diagram](docs/end-to-end-scheme.md)
+
 ## Run Locally
 
 ```bash
