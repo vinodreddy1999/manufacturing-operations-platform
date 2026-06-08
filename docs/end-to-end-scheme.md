@@ -1,6 +1,6 @@
 # End-to-End Scheme Diagram
 
-This diagram shows the current Python-only Manufacturing Operations Platform after adding the modular platform foundation, expanded Inventory module, and separate `inventory-ai-service/` microservice.
+This diagram shows the current Python-only Manufacturing Operations Platform after adding the modular platform foundation, expanded Inventory module, external Customer Portal, external Supplier Portal, and separate `inventory-ai-service/` microservice.
 
 There are two FastAPI services:
 
@@ -26,6 +26,7 @@ flowchart LR
     PlatformAPI --> QualityRouter["Quality Router app/modules/quality.py"]
     PlatformAPI --> SalesRouter["Sales Router app/modules/sales.py"]
     PlatformAPI --> CustomerPortalRouter["Customer Portal Router app/modules/customer_portal.py"]
+    PlatformAPI --> SupplierPortalRouter["Supplier Portal Router app/modules/supplier_portal.py"]
     PlatformAPI --> GenericModules["Generic Module Routers"]
 
     Core --> Companies["Companies"]
@@ -89,6 +90,14 @@ flowchart LR
     CustomerPortalRouter --> PortalSupport["Support / Returns / Feedback"]
     CustomerPortalRouter --> PortalAI["Rule-Based Customer Portal AI"]
 
+    SupplierPortalRouter --> SupplierAuth["External Supplier Auth"]
+    SupplierPortalRouter --> SupplierProfile["Supplier Profile / Update Requests"]
+    SupplierPortalRouter --> SupplierPOs["Supplier-Owned Purchase Orders"]
+    SupplierPortalRouter --> SupplierDelivery["Acknowledgements / Delivery Confirmations / ASN"]
+    SupplierPortalRouter --> SupplierDocs["Documents / Certificates"]
+    SupplierPortalRouter --> SupplierMessages["Messages / CAPA / Notifications"]
+    SupplierPortalRouter --> SupplierAI["Rule-Based Supplier Portal AI"]
+
     InventoryRouter --> InvDashboard["Inventory Dashboard"]
     InventoryRouter --> InvItems["Items / Categories / Tracking"]
     InventoryRouter --> InvLocation["Locations / 2D Warehouse Map"]
@@ -118,6 +127,7 @@ flowchart LR
     QualityRouter --> Audit
     SalesRouter --> Audit
     CustomerPortalRouter --> Audit
+    SupplierPortalRouter --> Audit
     Audit --> AuditLogs
 
     PlatformAPI --> Jobs["Celery Jobs app/jobs.py"]
@@ -158,13 +168,14 @@ flowchart LR
 11. Quality requests go through `app/modules/quality.py`.
 12. Sales requests go through `app/modules/sales.py`.
 13. Customer Portal requests go through `app/modules/customer_portal.py`.
-14. Inventory, Production, Maintenance, Quality, Sales and Customer Portal data are validated with Pydantic schemas and returned as structured JSON.
-15. Background jobs are prepared in `app/jobs.py` using Celery and Redis.
-16. User opens the Inventory AI service Swagger at `http://127.0.0.1:8100/docs`.
-17. Inventory AI requests go through `inventory-ai-service/app/routes.py`.
-18. AI routes call rule-based logic in `ai_engine.py`, `risk_rules.py`, and `recommendations.py`.
-19. AI returns analysis, risk levels, recommendations, and draft actions only.
-20. Human approval is required before any critical operational action.
+14. Supplier Portal requests go through `app/modules/supplier_portal.py` and are scoped to the logged-in supplier.
+15. Inventory, Production, Maintenance, Quality, Sales, Customer Portal and Supplier Portal data are validated with Pydantic schemas and returned as structured JSON.
+16. Background jobs are prepared in `app/jobs.py` using Celery and Redis.
+17. User opens the Inventory AI service Swagger at `http://127.0.0.1:8100/docs`.
+18. Inventory AI requests go through `inventory-ai-service/app/routes.py`.
+19. AI routes call rule-based logic in `ai_engine.py`, `risk_rules.py`, and `recommendations.py`.
+20. AI returns analysis, risk levels, recommendations, and draft actions only.
+21. Human approval is required before any critical operational action.
 
 ## Main Platform Modules
 
@@ -201,6 +212,10 @@ flowchart LR
 | Customer Portal service | `app/modules/customer_portal_service.py` | Portal auth, customer-scoped data access, documents, reports and AI rules |
 | Customer Portal schemas | `app/modules/customer_portal_schemas.py` | Pydantic schemas for portal auth, support, returns and AI requests |
 | Customer Portal models | `app/modules/customer_portal_models.py` | SQLAlchemy table definitions for portal users, support, returns, documents and audit |
+| Supplier Portal module | `app/modules/supplier_portal.py` | External supplier portal APIs |
+| Supplier Portal service | `app/modules/supplier_portal_service.py` | Portal auth, supplier-scoped data access, PO acknowledgements, reports and AI rules |
+| Supplier Portal schemas | `app/modules/supplier_portal_schemas.py` | Pydantic schemas for supplier auth, delivery, ASN, uploads, CAPA and AI requests |
+| Supplier Portal models | `app/modules/supplier_portal_models.py` | SQLAlchemy table definitions for supplier users, PO acknowledgements, deliveries, ASN, documents, certificates, messages and AI drafts |
 | Migrations | `alembic/` | Alembic migration scaffold |
 | Docker | `docker-compose.yml` | PostgreSQL, Redis, main API and worker services |
 
@@ -215,6 +230,7 @@ flowchart LR
 | Quality | `/quality/*`, `/ai/quality/*` | Dedicated Quality Management module with QMS workflows and AI |
 | Sales | `/customers`, `/sales-orders`, `/dispatch-orders`, `/shipments`, `/returns`, `/ai/sales/*` | Dedicated Sales & Distribution module with order, allocation, dispatch, returns and AI |
 | Customer Portal | `/customer-portal/*`, `/ai/customer-portal/*` | Dedicated external customer portal with customer-scoped order, shipment, document, support and return workflows |
+| Supplier Portal | `/supplier-portal/*`, `/ai/supplier-portal/*` | Dedicated external supplier portal with supplier-scoped purchase order, delivery, ASN, document, certificate, message and CAPA workflows |
 | Inventory | `/inventory/*` | Expanded dedicated inventory module with operational views |
 | Inventory AI | `/inventory-ai/*` | Separate AI/rule-based intelligence service |
 
@@ -322,6 +338,24 @@ flowchart LR
 | Returns | `GET/POST /customer-portal/returns`, `GET /customer-portal/returns/{id}` | Customer return requests and tracking |
 | Reports | `GET /customer-portal/reports/{report_type}` | Customer-owned order, shipment, return and document reports |
 | Customer Portal AI | `/ai/customer-portal/*` | Risk center, order risk, support classification, return risk, document risk, satisfaction risk and draft actions |
+
+## Supplier Portal Views
+
+| View | Endpoint | Output |
+| --- | --- | --- |
+| Portal Auth | `POST /supplier-portal/auth/login`, `/refresh`, `/password-reset`, `/verify-email` | Isolated external supplier authentication and portal JWTs |
+| Portal Users | `GET /supplier-portal/users`, `POST /supplier-portal/users/invite`, `PUT /supplier-portal/users/{id}`, `POST /supplier-portal/users/{id}/disable` | External supplier users, roles, status and invitations |
+| Profile | `GET /supplier-portal/profile`, `PUT /supplier-portal/profile/update-request` | Supplier-owned profile and controlled update request |
+| Dashboard | `GET /supplier-portal/dashboard` | Open POs, acknowledgements, upcoming delivery, delay, document, certificate, quality, message and CAPA signals |
+| Purchase Orders | `GET /supplier-portal/purchase-orders`, `GET /supplier-portal/purchase-orders/{id}` | Supplier-owned purchase orders only, portal-friendly status and safe PO fields |
+| PO Acknowledgement | `POST /supplier-portal/purchase-orders/{id}/acknowledge` | Accepted, rejected or partial acknowledgement with confirmed quantity/date |
+| Delivery Confirmations | `GET/POST /supplier-portal/delivery-confirmations` | Supplier delivery confirmations and shipment reference details |
+| ASN | `GET/POST /supplier-portal/asn` | Advance shipment notices with item, batch, package and document details |
+| Documents | `GET /supplier-portal/documents`, `POST /supplier-portal/documents/upload` | Supplier-uploaded documents and review status |
+| Certificates | `GET /supplier-portal/certificates`, `POST /supplier-portal/certificates/upload` | Supplier certificates, verification status and expiry dates |
+| Messages and CAPA | `GET/POST /supplier-portal/messages`, `GET /supplier-portal/capa`, `POST /supplier-portal/capa/{id}/respond` | Supplier communication and CAPA response workflow |
+| Reports | `GET /supplier-portal/reports/{report_type}` | Supplier-owned purchase order, delivery, document and certificate reports |
+| Supplier Portal AI | `/ai/supplier-portal/*` | Risk center, delivery risk, document risk, certificate expiry, supplier quality risk, PO acknowledgement risk, message summary and draft actions |
 
 ## Main Inventory Module Views
 
@@ -500,6 +534,28 @@ flowchart TD
     HumanApproval --> SafeOutput
 ```
 
+## Supplier Portal Data Flow
+
+```mermaid
+flowchart TD
+    ExternalSupplier["External Supplier User"] --> SupplierRoute["Supplier Portal Router app/modules/supplier_portal.py"]
+    SupplierRoute --> SupplierSchemas["Pydantic Schemas app/modules/supplier_portal_schemas.py"]
+    SupplierSchemas --> SupplierService["Service Layer app/modules/supplier_portal_service.py"]
+    SupplierService --> Scope["Company / Supplier Scope Check"]
+    Scope --> POs["Supplier-Owned Purchase Orders"]
+    Scope --> Deliveries["Acknowledgements / Delivery Confirmations / ASN"]
+    Scope --> Docs["Supplier Documents / Certificates"]
+    Scope --> Messages["Messages / CAPA / Notifications"]
+    SupplierService --> Audit["Supplier Portal Audit Log"]
+    SupplierService --> SupplierAI["Supplier Portal AI Recommendations"]
+    SupplierAI --> HumanApproval["Human Approval Required"]
+    POs --> SafeOutput["Supplier-Safe JSON Output"]
+    Deliveries --> SafeOutput
+    Docs --> SafeOutput
+    Messages --> SafeOutput
+    HumanApproval --> SafeOutput
+```
+
 ## Inventory AI Data Flow
 
 ```mermaid
@@ -529,6 +585,7 @@ sequenceDiagram
     participant Q as Quality Router
     participant X as Sales Router
     participant CP as Customer Portal Router
+    participant SP as Supplier Portal Router
     participant S as Store / SQLAlchemy
     participant A as Inventory AI Service :8100
     participant E as AI Engine
@@ -577,6 +634,12 @@ sequenceDiagram
     S-->>CP: Return scoped portal data
     CP-->>O: Return customer-safe order tracking JSON
 
+    U->>P: Request /supplier-portal/purchase-orders
+    P->>SP: Route supplier portal request
+    SP->>S: Read portal user and supplier-owned purchase orders
+    S-->>SP: Return scoped supplier portal data
+    SP-->>O: Return supplier-safe purchase order JSON
+
     U->>A: Request /inventory-ai/risk-center
     A->>D: Load inventory signals
     D-->>A: Return SQLAlchemy rows
@@ -617,3 +680,8 @@ Customer Portal-specific AI safety:
 
 - AI can create draft customer delay emails, support responses, return review tasks, quality complaint investigations, document upload tasks and escalation tasks.
 - AI cannot approve returns, issue credit, cancel orders, promise delivery dates, release internal information or send external customer emails without approval.
+
+Supplier Portal-specific AI safety:
+
+- AI can create draft supplier follow-ups, document reminders, certificate renewal reminders, CAPA review tasks, delivery escalation tasks and message summaries.
+- AI cannot approve suppliers or certificates, change purchase orders, accept supplier delivery dates, send purchase orders, commit financial actions or replace suppliers automatically.

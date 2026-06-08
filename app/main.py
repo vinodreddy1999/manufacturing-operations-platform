@@ -18,6 +18,8 @@ from .modules.quality import ai_router as quality_ai_router
 from .modules.quality import router as quality_router
 from .modules.sales import ai_router as sales_ai_router
 from .modules.sales import router as sales_router
+from .modules.supplier_portal import ai_router as supplier_portal_ai_router
+from .modules.supplier_portal import router as supplier_portal_router
 from .platform_seed import seed_platform
 from .schemas import (
     ApiResult,
@@ -56,6 +58,8 @@ app.include_router(quality_router)
 app.include_router(quality_ai_router)
 app.include_router(sales_router)
 app.include_router(sales_ai_router)
+app.include_router(supplier_portal_router)
+app.include_router(supplier_portal_ai_router)
 app.include_router(create_module_router("warehouse", "/warehouses"))
 app.include_router(create_module_router("warehouse_zones", "/warehouses/{warehouse_id}/zones"))
 app.include_router(create_module_router("warehouse_map", "/warehouses/{warehouse_id}/map"))

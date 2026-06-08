@@ -101,3 +101,23 @@ def customer_portal_document_scan_job(company_id: str) -> dict:
 @celery_app.task
 def customer_portal_support_scan_job(company_id: str) -> dict:
     return {"company_id": company_id, "status": "CUSTOMER_PORTAL_SUPPORT_SCAN_COMPLETED"}
+
+
+@celery_app.task
+def supplier_portal_risk_scan_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "SUPPLIER_PORTAL_RISK_SCAN_COMPLETED", "actions_created": "draft_only"}
+
+
+@celery_app.task
+def supplier_portal_document_scan_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "SUPPLIER_PORTAL_DOCUMENT_SCAN_COMPLETED"}
+
+
+@celery_app.task
+def supplier_portal_certificate_scan_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "SUPPLIER_PORTAL_CERTIFICATE_SCAN_COMPLETED"}
+
+
+@celery_app.task
+def supplier_portal_delivery_scan_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "SUPPLIER_PORTAL_DELIVERY_SCAN_COMPLETED", "actions_created": "draft_only"}

@@ -39,6 +39,8 @@ The Sales & Distribution module has been expanded into a dedicated ERP-style bac
 
 The Customer Portal module has been added as a dedicated external-user backend with isolated customer authentication, profile view/update requests, customer-owned order and shipment tracking, secure document downloads, support requests, return requests, notifications, reports, audit logs, and rule-based Customer Portal AI.
 
+The Supplier Portal module has been added as a dedicated external-supplier backend with isolated supplier authentication, supplier users, supplier-owned purchase orders, acknowledgements, delivery confirmations, ASN, document/certificate uploads, messages, CAPA responses, notifications, reports, audit logs, and rule-based Supplier Portal AI.
+
 ## Diagram
 
 See the GitHub-rendered end-to-end scheme diagram here:
@@ -164,6 +166,15 @@ app/
                        Seeded Customer Portal repository
     customer_portal_service.py
                        Portal auth, customer-scoped data access, documents, reports and AI rules
+    supplier_portal.py Supplier Portal API routes
+    supplier_portal_models.py
+                       SQLAlchemy tables for supplier users, PO acknowledgements, deliveries, ASN, documents, certificates, messages and AI drafts
+    supplier_portal_schemas.py
+                       Pydantic schemas for supplier auth, deliveries, ASN, uploads, CAPA and AI requests
+    supplier_portal_repository.py
+                       Seeded Supplier Portal repository
+    supplier_portal_service.py
+                       Portal auth, supplier-scoped data access, reports and AI rules
   ai_copilot/         AIProvider, MockAIProvider and optional OpenAIProvider interface
   jobs.py             Celery jobs for reports, AI risk scans, expiry/dead stock checks
 alembic/              Migration environment and first foundation migration
@@ -263,6 +274,23 @@ Key endpoint groups:
 - Customer Portal AI: `/ai/customer-portal/risk-center`, `/order-risk`, `/support-classification`, `/return-risk`, `/document-risk`, `/satisfaction-risk`, `/draft-action`
 
 Customer Portal AI is recommendation-only. It can draft messages, support responses, return review tasks, document upload tasks and escalations; it cannot approve returns, issue credit, cancel orders, promise delivery dates, release internal information, or send external customer email without approval.
+
+## Supplier Portal Module
+
+Open `http://localhost:8000/docs` and use the `Supplier Portal` and `Supplier Portal AI` tags.
+
+Key endpoint groups:
+
+- Portal auth: `/supplier-portal/auth/login`, `/refresh`, `/password-reset`, `/verify-email`
+- Supplier users: `/supplier-portal/users`, `/supplier-portal/users/invite`, `/supplier-portal/users/{id}`, `/supplier-portal/users/{id}/disable`
+- Profile and update request: `/supplier-portal/profile`, `/supplier-portal/profile/update-request`
+- Supplier-owned purchase orders: `/supplier-portal/purchase-orders`, `/supplier-portal/purchase-orders/{id}`, `/supplier-portal/purchase-orders/{id}/acknowledge`
+- Delivery and ASN: `/supplier-portal/delivery-confirmations`, `/supplier-portal/asn`
+- Documents and certificates: `/supplier-portal/documents`, `/supplier-portal/documents/upload`, `/supplier-portal/certificates`, `/supplier-portal/certificates/upload`
+- Messages, CAPA, notifications and reports: `/supplier-portal/messages`, `/supplier-portal/capa`, `/supplier-portal/notifications`, `/supplier-portal/reports/{report_type}`
+- Supplier Portal AI: `/ai/supplier-portal/risk-center`, `/delivery-risk`, `/document-risk`, `/certificate-expiry`, `/supplier-quality-risk`, `/po-acknowledgement-risk`, `/message-summary`, `/draft-action`
+
+Supplier Portal AI is recommendation-only. It can analyze supplier delay, document, certificate, acknowledgement and quality risks, then create draft follow-ups or review tasks; it cannot approve suppliers or certificates, change purchase orders, accept delivery dates, send POs, commit financial actions, or replace suppliers automatically.
 
 ## Platform Foundation
 

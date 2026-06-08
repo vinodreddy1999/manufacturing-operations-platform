@@ -366,3 +366,92 @@ def test_customer_portal_ai_draft_action_is_safe_and_sanitized():
     assert data["requires_human_approval"] is True
     assert "Release Internal Information" in data["ai_safety"]["cannot"]
     assert "internal shortage" not in data["reason"]
+
+
+def test_supplier_portal_login_and_profile_are_supplier_scoped():
+    login = client.post("/supplier-portal/auth/login", json={"email": "apex@example.com", "password": "Supplier123!"})
+    assert login.status_code == 200
+    assert login.json()["data"]["supplier_id"] == "supplier-apex"
+
+    profile = client.get("/supplier-portal/profile")
+    assert profile.status_code == 200
+    data = profile.json()["data"]
+    assert data["supplier_id"] == "supplier-apex"
+    assert "quality_risk_score" not in data
+
+
+def test_supplier_portal_purchase_orders_hide_other_suppliers():
+    response = client.get("/supplier-portal/purchase-orders")
+    assert response.status_code == 200
+    orders = response.json()["data"]
+    assert any(order["id"] == "po-apex-001" for order in orders)
+    assert all(order["id"] != "po-other-001" for order in orders)
+    assert "supplier_status" in orders[0]
+
+
+def test_supplier_portal_acknowledgement_and_delivery_confirmation():
+    acknowledgement = client.post(
+        "/supplier-portal/purchase-orders/po-apex-001/acknowledge",
+        json={
+            "acknowledgement_status": "Accepted",
+            "confirmed_quantity": 1000,
+            "rejected_quantity": 0,
+            "confirmed_delivery_date": "2026-06-20",
+            "supplier_comments": "Confirmed",
+        },
+    )
+    assert acknowledgement.status_code == 200
+    assert acknowledgement.json()["data"]["supplier_id"] == "supplier-apex"
+
+    delivery = client.post(
+        "/supplier-portal/delivery-confirmations",
+        json={
+            "purchase_order_id": "po-apex-001",
+            "shipment_reference": "SHIP-APX-001",
+            "dispatch_date": "2026-06-16",
+            "expected_delivery_date": "2026-06-20",
+            "carrier_name": "Blue Dart",
+            "vehicle_number": "TS09AB1234",
+            "tracking_number": "TRK-001",
+            "shipped_quantity": 1000,
+            "package_count": 8,
+            "supplier_comments": "Loaded",
+        },
+    )
+    assert delivery.status_code == 200
+    assert delivery.json()["data"]["status"] == "Submitted"
+
+
+def test_supplier_portal_documents_and_certificates():
+    upload = client.post(
+        "/supplier-portal/documents/upload",
+        json={"linked_type": "Purchase Order", "linked_id": "po-apex-001", "document_type": "Invoice", "file_url": "https://example.com/invoice.pdf"},
+    )
+    assert upload.status_code == 200
+    assert upload.json()["data"]["status"] == "Pending Review"
+
+    documents = client.get("/supplier-portal/documents")
+    assert documents.status_code == 200
+    assert any(document["document_type"] == "Invoice" for document in documents.json()["data"])
+
+    certificates = client.get("/supplier-portal/certificates")
+    assert certificates.status_code == 200
+    assert any(certificate["id"] == "cert-apex-iso" for certificate in certificates.json()["data"])
+
+
+def test_supplier_portal_ai_draft_action_is_safe_and_sanitized():
+    response = client.post(
+        "/ai/supplier-portal/draft-action",
+        json={
+            "action_type": "Draft supplier follow-up",
+            "supplier_id": "supplier-apex",
+            "source_type": "Purchase Order",
+            "source_id": "po-apex-001",
+            "reason": "production shortage and inventory risk",
+        },
+    )
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["requires_human_approval"] is True
+    assert "Change PO" in data["ai_safety"]["cannot"]
+    assert "production shortage" not in data["reason"]

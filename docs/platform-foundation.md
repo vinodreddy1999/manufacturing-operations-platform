@@ -16,6 +16,7 @@ Implemented now:
 - Dedicated Quality Management module with typed routes, schemas, SQLAlchemy table definitions, seeded repository, service layer, Celery job hooks and rule-based AI
 - Dedicated Sales & Distribution module with typed routes, schemas, SQLAlchemy table definitions, seeded repository, service layer, Celery job hooks and rule-based AI
 - Dedicated Customer Portal module with external-user security, customer-scoped routes, SQLAlchemy table definitions, seeded repository, service layer, Celery job hooks and rule-based AI
+- Dedicated Supplier Portal module with external-supplier security, supplier-scoped routes, SQLAlchemy table definitions, seeded repository, service layer, Celery job hooks and rule-based AI
 - JWT/password security helpers
 - Optional AI provider interface: `AIProvider`, `MockAIProvider`, `OpenAIProvider`
 - Celery job declarations for reports, AI scans, expiry checks and dead-stock checks
@@ -171,3 +172,26 @@ AI safety boundary:
 
 - AI can analyze, recommend and create draft actions.
 - AI cannot approve returns, issue credit, cancel orders, promise delivery dates, release internal information or send external customer emails without approval.
+
+## Supplier Portal Module Depth
+
+Implemented Supplier Portal areas:
+
+- Isolated external supplier portal login and refresh token structure
+- Supplier portal user invitations, updates and disable flow
+- Supplier profile view with controlled update request workflow
+- Supplier-owned purchase order list/detail and acknowledgement
+- Delivery confirmations and advance shipment notices
+- Supplier document uploads and review status
+- Supplier certificate uploads, verification status and expiry tracking
+- Supplier messages, CAPA responses and notifications
+- Supplier-owned purchase order, delivery, document and certificate reports
+- Supplier portal audit logs
+- Strict supplier-level data filtering so one supplier cannot view another supplier's purchase orders
+- Rule-based Supplier Portal AI risk center, delivery risk, document risk, certificate expiry, supplier quality risk, PO acknowledgement risk, message summary and draft actions
+- Celery job hooks for supplier portal risk, document, certificate and delivery scans
+
+AI safety boundary:
+
+- AI can analyze, recommend and create draft actions.
+- AI cannot approve suppliers or certificates, change purchase orders, accept supplier delivery dates, send purchase orders, commit financial actions or replace suppliers automatically.
