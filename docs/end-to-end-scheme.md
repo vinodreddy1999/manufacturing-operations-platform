@@ -1,8 +1,8 @@
 # End-to-End Scheme Diagram
 
-This diagram shows the current Python-only Manufacturing Operations Platform after adding the expanded Inventory module and the separate `inventory-ai-service/` microservice.
+This diagram shows the current Python-only Manufacturing Operations Platform after adding the modular platform foundation, expanded Inventory module, and separate `inventory-ai-service/` microservice.
 
-There are now two FastAPI services:
+There are two FastAPI services:
 
 - Main platform API: `http://127.0.0.1:8000/docs`
 - Inventory AI service: `http://127.0.0.1:8100/docs`
@@ -11,85 +11,138 @@ The AI service is recommendation-only. It analyzes risk, creates draft actions, 
 
 ```mermaid
 flowchart LR
-    User["User / Operator"] --> Browser["Browser or API Client"]
-    Browser --> PlatformDocs["Platform Swagger /docs :8000"]
+    User["User / Operator / Manager"] --> Browser["Browser, Swagger, Mobile, or API Client"]
+    Browser --> PlatformDocs["Main Platform Swagger /docs :8000"]
     Browser --> AiDocs["Inventory AI Swagger /docs :8100"]
 
     PlatformDocs --> PlatformAPI["Main FastAPI App app/main.py"]
     AiDocs --> AiAPI["Inventory AI FastAPI inventory-ai-service/app/main.py"]
 
-    PlatformAPI --> Health["Health /health"]
-    PlatformAPI --> Modules["Module Registry /modules"]
-    PlatformAPI --> Auth["Auth /auth/login"]
-    Auth --> Token["JWT Demo Token"]
-    Auth --> Tenant["Tenant Context precision-components"]
-
-    PlatformAPI --> Platform["Platform Module"]
+    PlatformAPI --> Core["Core Platform Router app/core_router.py"]
+    PlatformAPI --> Auth["Auth Router app/auth_router.py"]
     PlatformAPI --> InventoryRouter["Inventory Router app/modules/inventory.py"]
-    PlatformAPI --> Warehouse["Warehouse Module"]
-    PlatformAPI --> Supplier["Supplier Module"]
-    PlatformAPI --> Procurement["Procurement Module"]
-    PlatformAPI --> Production["Production Module"]
-    PlatformAPI --> Maintenance["Maintenance Module"]
-    PlatformAPI --> Quality["Quality Module"]
-    PlatformAPI --> Reporting["Reporting Module"]
-    PlatformAPI --> SupplyChain["Supply Chain Module"]
-    PlatformAPI --> AI["General AI Module"]
+    PlatformAPI --> GenericModules["Generic Module Routers"]
 
-    InventoryRouter --> InvDashboard["Dashboard /inventory/dashboard"]
-    InventoryRouter --> InvItems["Items and Categories"]
-    InventoryRouter --> InvLocation["Locations and Warehouse Map"]
+    Core --> Companies["Companies"]
+    Core --> Plants["Plants"]
+    Core --> Departments["Departments"]
+    Core --> Users["Users"]
+    Core --> Roles["Roles"]
+    Core --> Permissions["Permissions"]
+    Core --> FeatureFlags["Feature Flags"]
+    Core --> Tasks["Tasks"]
+    Core --> Approvals["Approvals"]
+    Core --> Documents["Documents"]
+    Core --> AuditLogs["Audit Logs"]
+
+    Auth --> Jwt["JWT Access Token"]
+    Auth --> Passwords["Password Hashing"]
+    Jwt --> RBAC["RBAC-ready User / Role / Permission Scope"]
+
+    GenericModules --> Warehouse["Warehouse"]
+    GenericModules --> Procurement["Procurement"]
+    GenericModules --> Production["Production"]
+    GenericModules --> Maintenance["Maintenance"]
+    GenericModules --> Quality["Quality"]
+    GenericModules --> Sales["Sales"]
+
+    InventoryRouter --> InvDashboard["Inventory Dashboard"]
+    InventoryRouter --> InvItems["Items / Categories / Tracking"]
+    InventoryRouter --> InvLocation["Locations / 2D Warehouse Map"]
     InventoryRouter --> InvBatch["Batch and Serial Tracking"]
     InventoryRouter --> InvStatus["Status and Reservations"]
     InventoryRouter --> InvLedger["Movement Ledger and Counts"]
-    InventoryRouter --> InvAging["Expiry, Aging and Costs"]
-    InventoryRouter --> InvReports["Reports and Mobile Scan"]
+    InventoryRouter --> InvAging["Expiry, Aging, Costs, Reports"]
+    InventoryRouter --> InvMobile["Mobile Scan / Offline Sync"]
 
-    Platform --> Store["Platform Demo Store app/store.py"]
-    InventoryRouter --> Store
-    Warehouse --> Store
-    Supplier --> Store
-    Procurement --> Store
-    Production --> Store
-    Maintenance --> Store
-    Quality --> Store
-    Reporting --> Store
-    SupplyChain --> Store
-    AI --> Store
+    Core --> DB["SQLAlchemy Database Layer app/database.py"]
+    Auth --> DB
+    GenericModules --> DB
+    DB --> Models["Platform SQLAlchemy Models app/platform_models.py"]
+    Models --> PlatformDB["PostgreSQL in Docker or local SQLite fallback"]
+    PlatformDB --> Alembic["Alembic Migration Scaffold"]
+    PlatformDB --> Seed["Platform Seed Data app/platform_seed.py"]
 
-    Store --> PlatformSchemas["Platform Pydantic Schemas app/schemas.py"]
-    PlatformSchemas --> PlatformJSON["Platform JSON Output"]
-    PlatformJSON --> Browser
+    FeatureFlags --> Gate["Module Enable / Disable Gate"]
+    Gate --> GenericModules
+    Gate --> InventoryRouter
+
+    Core --> Audit["Audit Helper app/audit.py"]
+    GenericModules --> Audit
+    InventoryRouter --> Audit
+    Audit --> AuditLogs
+
+    PlatformAPI --> Jobs["Celery Jobs app/jobs.py"]
+    Jobs --> Redis["Redis Broker"]
+    Jobs --> Scheduled["Scheduled Reports / AI Risk Scan / Expiry / Dead Stock Checks"]
+
+    PlatformAPI --> Copilot["AI Copilot Provider Interface app/ai_copilot"]
+    Copilot --> MockProvider["Mock Provider by Default"]
+    Copilot --> OpenAIProvider["Optional OpenAI Provider Later"]
 
     AiAPI --> AiRoutes["AI Routes inventory-ai-service/app/routes.py"]
     AiRoutes --> AiEngine["Rule-Based AI Engine app/ai_engine.py"]
     AiEngine --> RiskRules["Risk Rules app/risk_rules.py"]
     AiEngine --> Recommendations["Draft Recommendations app/recommendations.py"]
     AiRoutes --> AiSchemas["AI Pydantic Schemas app/schemas.py"]
-    AiRoutes --> AiModels["SQLAlchemy Models app/models.py"]
-    AiModels --> AiDB["PostgreSQL via Docker or SQLite local fallback"]
-    AiDB --> Seed["Seed Data app/seed_data.py"]
-    AiEngine --> AiJSON["AI JSON Output and Draft Actions"]
+    AiRoutes --> AiModels["AI SQLAlchemy Models app/models.py"]
+    AiModels --> AiDB["AI PostgreSQL via Docker or SQLite fallback"]
+    AiDB --> AiSeed["AI Seed Data app/seed_data.py"]
+    AiEngine --> AiJSON["Risk, Recommendation, and Draft Action JSON"]
     AiJSON --> Browser
 
-    InventoryRouter -. "inventory signals / business context" .-> AiAPI
-    AiJSON -. "recommendations only" .-> InventoryRouter
+    InventoryRouter -. "inventory signals and business context" .-> AiAPI
+    AiJSON -. "recommendations only, human approval required" .-> Core
 ```
 
 ## Runtime Flow
 
 1. User opens the main platform Swagger at `http://127.0.0.1:8000/docs`.
-2. Main FastAPI receives platform requests in `app/main.py`.
-3. `app/main.py` forwards Inventory requests to `app/modules/inventory.py`.
-4. Inventory request data is validated using `app/schemas.py`.
-5. Inventory endpoints read or write demo data in `app/store.py`.
-6. Platform endpoints return structured JSON through the common `ApiResult` response model.
-7. User opens the Inventory AI service Swagger at `http://127.0.0.1:8100/docs`.
-8. Inventory AI requests go through `inventory-ai-service/app/routes.py`.
-9. AI routes call rule-based logic in `ai_engine.py`, `risk_rules.py`, and `recommendations.py`.
-10. SQLAlchemy models read seed/demo inventory signals from PostgreSQL or the local SQLite fallback.
-11. AI returns analysis, risk levels, recommendations, and draft actions only.
-12. Human approval is required before any critical operational action.
+2. `app/main.py` starts the main FastAPI service, creates SQLAlchemy tables when needed, and seeds demo platform data.
+3. Auth requests go through `app/auth_router.py` and return JWT tokens.
+4. Core platform requests go through `app/core_router.py`.
+5. Company, plant, department, user, role, permission, task, approval, document, and audit data is stored through SQLAlchemy models in `app/platform_models.py`.
+6. Feature flags decide whether module APIs are enabled.
+7. Generic module routers store warehouse, procurement, production, maintenance, quality, and sales records in `ModuleRecord`.
+8. Inventory requests go through `app/modules/inventory.py`.
+9. Inventory data is validated with Pydantic schemas and returned as structured JSON.
+10. Background jobs are prepared in `app/jobs.py` using Celery and Redis.
+11. User opens the Inventory AI service Swagger at `http://127.0.0.1:8100/docs`.
+12. Inventory AI requests go through `inventory-ai-service/app/routes.py`.
+13. AI routes call rule-based logic in `ai_engine.py`, `risk_rules.py`, and `recommendations.py`.
+14. AI returns analysis, risk levels, recommendations, and draft actions only.
+15. Human approval is required before any critical operational action.
+
+## Main Platform Modules
+
+| Area | Current Code | Purpose |
+| --- | --- | --- |
+| Application entry | `app/main.py` | Starts FastAPI, includes routers, initializes database and seed data |
+| Database layer | `app/database.py` | SQLAlchemy engine, session, base model and dependency |
+| Platform models | `app/platform_models.py` | Company, plant, department, user, role, permission, flags, tasks, approvals, documents, audit logs, module records |
+| Platform schemas | `app/platform_schemas.py` | Pydantic request/response models for core platform APIs |
+| Auth | `app/auth_router.py`, `app/security.py` | JWT, password hashing, database-backed login structure |
+| Core router | `app/core_router.py` | Core APIs and generic module router factory |
+| Feature flags | `app/feature_flags.py` | Module enable/disable checks |
+| Audit | `app/audit.py` | Audit log writer for platform actions |
+| Seed data | `app/platform_seed.py` | Demo company, plant, admin user, roles, permissions and module flags |
+| Background jobs | `app/jobs.py` | Celery jobs for reports, AI risk scans, expiry checks and dead stock checks |
+| AI copilot | `app/ai_copilot/` | Provider interface with mock provider and optional OpenAI provider |
+| Migrations | `alembic/` | Alembic migration scaffold |
+| Docker | `docker-compose.yml` | PostgreSQL, Redis, main API and worker services |
+
+## Generic Backend Applications
+
+| Application | Endpoint Family | Current Behavior |
+| --- | --- | --- |
+| Warehouse | `/warehouses`, `/warehouse-locations`, `/warehouse-movements`, `/warehouse-occupancy` | Stores module records after feature flag validation |
+| Procurement | `/suppliers`, `/purchase-requisitions`, `/purchase-orders` | Stores supplier and purchasing module records |
+| Production | `/products`, `/bom`, `/routing`, `/production-orders`, `/production-schedules` | Stores manufacturing planning and execution records |
+| Maintenance | `/machines`, `/maintenance-plans`, `/work-orders` | Stores equipment and maintenance records |
+| Quality | `/quality/inspections`, `/quality/quarantine`, `/quality/rework`, `/quality/capa` | Stores inspection, quarantine, rework and corrective action records |
+| Sales | `/customers`, `/sales-orders` | Stores customer and order records |
+| Inventory | `/inventory/*` | Expanded dedicated inventory module with operational views |
+| Inventory AI | `/inventory-ai/*` | Separate AI/rule-based intelligence service |
 
 ## Main Inventory Module Views
 
@@ -148,6 +201,21 @@ flowchart TD
     Store --> Costs["fifo_layers + unit_cost"]
 ```
 
+## Platform Data Flow
+
+```mermaid
+flowchart TD
+    Client["Swagger / Client"] --> Router["Core or Module Router"]
+    Router --> Schema["Pydantic Request Schema"]
+    Schema --> FeatureCheck["Feature Flag / Scope Check"]
+    FeatureCheck --> Session["SQLAlchemy Session"]
+    Session --> Models["Platform Models"]
+    Models --> DB["PostgreSQL or SQLite"]
+    Router --> Audit["Audit Log"]
+    Router --> Response["Pydantic / JSON Response"]
+    Response --> Client
+```
+
 ## Inventory AI Data Flow
 
 ```mermaid
@@ -170,12 +238,19 @@ flowchart TD
 sequenceDiagram
     participant U as User
     participant P as Platform API :8000
-    participant I as Inventory router
-    participant S as Platform store.py
-    participant A as Inventory AI service :8100
-    participant E as AI engine
-    participant D as AI database
+    participant C as Core Router
+    participant I as Inventory Router
+    participant S as Store / SQLAlchemy
+    participant A as Inventory AI Service :8100
+    participant E as AI Engine
+    participant D as AI Database
     participant O as JSON Output
+
+    U->>P: Login or request platform data
+    P->>C: Route core/module request
+    C->>S: Validate, check feature flag, read/write records
+    S-->>C: Return platform data
+    C-->>O: Return platform JSON
 
     U->>P: Request /inventory/dashboard
     P->>I: Route inventory request
@@ -190,4 +265,16 @@ sequenceDiagram
     E-->>A: Risks and draft actions
     A-->>O: Return AI recommendation JSON
     O-->>U: Show output in Swagger/client
+```
+
+## Human Approval Boundary
+
+```mermaid
+flowchart LR
+    AI["AI / Rule Engine"] --> Draft["Draft Recommendation"]
+    Draft --> Review["Human Review"]
+    Review --> Approve["Approve"]
+    Review --> Reject["Reject"]
+    Approve --> Execute["Operational Module Executes Action"]
+    Reject --> Archive["Keep Audit Trail"]
 ```
