@@ -22,6 +22,7 @@ flowchart LR
     PlatformAPI --> Auth["Auth Router app/auth_router.py"]
     PlatformAPI --> InventoryRouter["Inventory Router app/modules/inventory.py"]
     PlatformAPI --> ProductionRouter["Production Router app/modules/production.py"]
+    PlatformAPI --> MaintenanceRouter["Maintenance Router app/modules/maintenance.py"]
     PlatformAPI --> GenericModules["Generic Module Routers"]
 
     Core --> Companies["Companies"]
@@ -42,7 +43,6 @@ flowchart LR
 
     GenericModules --> Warehouse["Warehouse"]
     GenericModules --> Procurement["Procurement"]
-    GenericModules --> Maintenance["Maintenance"]
     GenericModules --> Quality["Quality"]
     GenericModules --> Sales["Sales"]
 
@@ -54,6 +54,15 @@ flowchart LR
     ProductionRouter --> ProdExecution["Logs / Consumption / Downtime / Completion"]
     ProductionRouter --> ProdControl["WIP / Losses / Costing / Reports"]
     ProductionRouter --> ProdAI["Rule-Based Production AI"]
+
+    MaintenanceRouter --> MaintMachines["Machine Registry and Capabilities"]
+    MaintenanceRouter --> MaintPlans["Maintenance Plans and Rules"]
+    MaintenanceRouter --> MaintWO["Work Orders and Approval Flow"]
+    MaintenanceRouter --> MaintSpares["Spare Mapping / Reservation / Consumption"]
+    MaintenanceRouter --> MaintDowntime["Downtime / Shutdown Windows"]
+    MaintenanceRouter --> MaintDocs["Attachments / Documents / History"]
+    MaintenanceRouter --> MaintReports["Dashboard / Reports / MTTR / MTBF"]
+    MaintenanceRouter --> MaintAI["Rule-Based Maintenance AI"]
 
     InventoryRouter --> InvDashboard["Inventory Dashboard"]
     InventoryRouter --> InvItems["Items / Categories / Tracking"]
@@ -80,6 +89,7 @@ flowchart LR
     GenericModules --> Audit
     InventoryRouter --> Audit
     ProductionRouter --> Audit
+    MaintenanceRouter --> Audit
     Audit --> AuditLogs
 
     PlatformAPI --> Jobs["Celery Jobs app/jobs.py"]
@@ -113,16 +123,17 @@ flowchart LR
 4. Core platform requests go through `app/core_router.py`.
 5. Company, plant, department, user, role, permission, task, approval, document, and audit data is stored through SQLAlchemy models in `app/platform_models.py`.
 6. Feature flags decide whether module APIs are enabled.
-7. Generic module routers store warehouse, procurement, maintenance, quality, and sales records in `ModuleRecord`.
+7. Generic module routers store warehouse, procurement, quality, and sales records in `ModuleRecord`.
 8. Inventory requests go through `app/modules/inventory.py`.
 9. Production requests go through `app/modules/production.py`.
-10. Inventory and Production data are validated with Pydantic schemas and returned as structured JSON.
-11. Background jobs are prepared in `app/jobs.py` using Celery and Redis.
-12. User opens the Inventory AI service Swagger at `http://127.0.0.1:8100/docs`.
-13. Inventory AI requests go through `inventory-ai-service/app/routes.py`.
-14. AI routes call rule-based logic in `ai_engine.py`, `risk_rules.py`, and `recommendations.py`.
-15. AI returns analysis, risk levels, recommendations, and draft actions only.
-16. Human approval is required before any critical operational action.
+10. Maintenance requests go through `app/modules/maintenance.py`.
+11. Inventory, Production and Maintenance data are validated with Pydantic schemas and returned as structured JSON.
+12. Background jobs are prepared in `app/jobs.py` using Celery and Redis.
+13. User opens the Inventory AI service Swagger at `http://127.0.0.1:8100/docs`.
+14. Inventory AI requests go through `inventory-ai-service/app/routes.py`.
+15. AI routes call rule-based logic in `ai_engine.py`, `risk_rules.py`, and `recommendations.py`.
+16. AI returns analysis, risk levels, recommendations, and draft actions only.
+17. Human approval is required before any critical operational action.
 
 ## Main Platform Modules
 
@@ -143,6 +154,10 @@ flowchart LR
 | Production service | `app/modules/production_service.py` | MRP, reservations, scheduling, costing, reports and Production AI rules |
 | Production schemas | `app/modules/production_schemas.py` | Pydantic schemas for Production requests |
 | Production models | `app/modules/production_models.py` | SQLAlchemy table definitions for Production Management |
+| Maintenance module | `app/modules/maintenance.py` | Dedicated Maintenance Management APIs and root aliases |
+| Maintenance service | `app/modules/maintenance_service.py` | Approvals, spares, downtime, health score, reports and Maintenance AI rules |
+| Maintenance schemas | `app/modules/maintenance_schemas.py` | Pydantic schemas for Maintenance requests |
+| Maintenance models | `app/modules/maintenance_models.py` | SQLAlchemy table definitions for Maintenance Management |
 | Migrations | `alembic/` | Alembic migration scaffold |
 | Docker | `docker-compose.yml` | PostgreSQL, Redis, main API and worker services |
 
@@ -153,7 +168,7 @@ flowchart LR
 | Warehouse | `/warehouses`, `/warehouse-locations`, `/warehouse-movements`, `/warehouse-occupancy` | Stores module records after feature flag validation |
 | Procurement | `/suppliers`, `/purchase-requisitions`, `/purchase-orders` | Stores supplier and purchasing module records |
 | Production | `/production/*` | Dedicated Production Management module with planning, execution, costing, reporting and AI |
-| Maintenance | `/machines`, `/maintenance-plans`, `/work-orders` | Stores equipment and maintenance records |
+| Maintenance | `/maintenance/*`, `/machines`, `/maintenance-plans`, `/work-orders`, `/ai/maintenance/*` | Dedicated Maintenance Management module with CMMS/EAM workflows and AI |
 | Quality | `/quality/inspections`, `/quality/quarantine`, `/quality/rework`, `/quality/capa` | Stores inspection, quarantine, rework and corrective action records |
 | Sales | `/customers`, `/sales-orders` | Stores customer and order records |
 | Inventory | `/inventory/*` | Expanded dedicated inventory module with operational views |
@@ -185,6 +200,30 @@ flowchart LR
 | Costing | `GET /production/costing`, `POST /production/orders/{order_id}/costing` | Material, machine, labor, overhead, wastage, rework and cost per unit |
 | Reports | `GET /production/reports` | Orders, daily production, shifts, consumption, variance, downtime, capacity, WIP and cost reports |
 | Production AI | `/production/ai/*` | Risk, delay, bottleneck, capacity, schedule, what-if, variance, downtime, cost and draft-action recommendations |
+
+## Maintenance Management Views
+
+| View | Endpoint | Output |
+| --- | --- | --- |
+| Maintenance Dashboard | `GET /maintenance/dashboard` | Open work orders, overdue plans, breakdown machines, spare shortages, MTTR, MTBF, downtime, cost and upcoming maintenance |
+| Machine Registry | `GET/POST /maintenance/machines`, `GET/POST /machines` | Machine master with company, plant, line, work center, status, criticality, capacity, location and capability flags |
+| Machine Detail | `GET/PUT/DELETE /maintenance/machines/{machine_id}` | Machine details, lifecycle status and capabilities |
+| Rule Engine | `GET/POST /maintenance/rules` | Calendar, runtime, production-aware, shutdown-window, manual and breakdown rules |
+| Preventive Plans | `GET/POST/PUT /maintenance/maintenance-plans`, root alias `/maintenance-plans` | Preventive maintenance plans, frequency, due dates, required spares, documents and approval requirement |
+| Work Orders | `GET/POST/PUT /maintenance/work-orders`, root alias `/work-orders` | Breakdown, preventive, runtime, inspection, calibration and compliance work orders |
+| Assignment | `POST /maintenance/work-orders/{work_order_id}/assign` | Assign technician, team, vendor or contractor |
+| Execution | `POST /maintenance/work-orders/{work_order_id}/start`, `/complete`, `/close` | Start, complete and close maintenance with status, validation, cost, history and audit trail |
+| Spare Parts | `GET/POST /maintenance/spare-parts` | Machine-specific spare mapping, compatibility, criticality, thresholds and suppliers |
+| Spare Reservation | `POST /maintenance/spare-reservations` | Check inventory, reserve spare, create shortage/procurement draft when unavailable |
+| Spare Usage | `GET /maintenance/spare-usage` | Spare consumption and cost history |
+| Downtime Events | `GET/POST /maintenance/downtime-events` | Manual categorized downtime with root cause, production loss and cost impact |
+| Shutdown Windows | `GET/POST /maintenance/shutdown-windows` | Planned shutdown windows for plant, line or machine |
+| Documentation | `GET/POST /maintenance/attachments`, `/maintenance/machine-documents` | Work order photos, documents, invoices, manuals, certificates and service reports |
+| Runtime Logs | `GET/POST /maintenance/runtime-logs` | Runtime tracking for runtime-based maintenance |
+| Vendors | `GET/POST /maintenance/vendors` | External maintenance providers, contracts and service type |
+| Costing | `GET /maintenance/costing` | Spare, labor, vendor, downtime, production loss and total maintenance cost |
+| Reports | `GET /maintenance/reports` | Schedule, work order, breakdown, downtime, spare, history, cost, MTTR, MTBF and overdue reports |
+| Maintenance AI | `/ai/maintenance/*` | Risk center, failure, downtime, spare, health, root cause, cost impact, recommendations and draft actions |
 
 ## Main Inventory Module Views
 
@@ -279,6 +318,27 @@ flowchart TD
     Approval --> Output
 ```
 
+## Maintenance Data Flow
+
+```mermaid
+flowchart TD
+    Client["Swagger / API Client"] --> MaintRoute["Maintenance Router app/modules/maintenance.py"]
+    MaintRoute --> MaintSchemas["Pydantic Schemas app/modules/maintenance_schemas.py"]
+    MaintSchemas --> MaintRepo["Seeded Repository app/modules/maintenance_repository.py"]
+    MaintRepo --> MaintService["Service Layer app/modules/maintenance_service.py"]
+    MaintService --> Approval["Risk-Based Approval Model"]
+    MaintService --> Spares["Spare Reservation / Consumption"]
+    MaintService --> Downtime["Downtime and Shutdown Window Logic"]
+    MaintService --> History["Machine History and Lifecycle"]
+    MaintService --> Costing["Maintenance Costing"]
+    MaintService --> Reports["Dashboard / Reports / MTTR / MTBF"]
+    MaintService --> MaintAI["Maintenance AI Recommendations"]
+    MaintAI --> HumanApproval["Human Approval Required"]
+    Reports --> Output["Final JSON Output"]
+    Costing --> Output
+    HumanApproval --> Output
+```
+
 ## Inventory AI Data Flow
 
 ```mermaid
@@ -304,6 +364,7 @@ sequenceDiagram
     participant C as Core Router
     participant I as Inventory Router
     participant R as Production Router
+    participant M as Maintenance Router
     participant S as Store / SQLAlchemy
     participant A as Inventory AI Service :8100
     participant E as AI Engine
@@ -328,6 +389,12 @@ sequenceDiagram
     S-->>R: Return production seed data
     R-->>O: Return MRP and shortage JSON
 
+    U->>P: Request /maintenance/dashboard
+    P->>M: Route maintenance request
+    M->>S: Read machines, plans, work orders, spares and downtime
+    S-->>M: Return maintenance seed data
+    M-->>O: Return dashboard, MTTR, MTBF and risk JSON
+
     U->>A: Request /inventory-ai/risk-center
     A->>D: Load inventory signals
     D-->>A: Return SQLAlchemy rows
@@ -348,3 +415,8 @@ flowchart LR
     Approve --> Execute["Operational Module Executes Action"]
     Reject --> Archive["Keep Audit Trail"]
 ```
+
+Maintenance-specific AI safety:
+
+- AI can create draft work orders, spare purchase requests, schedule changes, investigation tasks and vendor service requests.
+- AI cannot close work orders, approve maintenance, consume spares, change production schedules or release machines as available.

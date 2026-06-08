@@ -31,6 +31,8 @@ It now also includes a modular-monolith platform foundation with:
 
 The Production module has been expanded into a dedicated backend package with product master, BOM, routing, work centers, lines, machines, production orders, MRP, reservations, scheduling, logs, downtime, WIP, losses, costing, reports, dashboard, task/notification queues, and rule-based Production AI.
 
+The Maintenance module has also been expanded into a dedicated CMMS/EAM-style backend package with machine registry, capability configuration, maintenance plans, breakdown work orders, spare mapping/reservation/consumption, downtime, shutdown windows, assignments, vendors, documents, machine history, lifecycle, costing, reports, dashboard, MTTR/MTBF, health scoring, and rule-based Maintenance AI.
+
 ## Diagram
 
 See the GitHub-rendered end-to-end scheme diagram here:
@@ -124,6 +126,15 @@ app/
                        Seeded Production repository
     production_service.py
                        MRP, reservations, scheduling, costing, reports and AI rules
+    maintenance.py    Maintenance Management API routes
+    maintenance_models.py
+                       SQLAlchemy tables for Maintenance Management
+    maintenance_schemas.py
+                       Pydantic schemas for Maintenance requests and outputs
+    maintenance_repository.py
+                       Seeded Maintenance repository
+    maintenance_service.py
+                       Approvals, spares, downtime, health, reports and AI rules
   ai_copilot/         AIProvider, MockAIProvider and optional OpenAIProvider interface
   jobs.py             Celery jobs for reports, AI risk scans, expiry/dead stock checks
 alembic/              Migration environment and first foundation migration
@@ -153,6 +164,26 @@ Key endpoint groups:
 - Production AI: `/production/ai/risk-center`, `/production/ai/delay-prediction`, `/production/ai/material-bottlenecks`, `/production/ai/capacity-optimization`, `/production/ai/schedule-optimization`, `/production/ai/what-if`, `/production/ai/bom-variance`, `/production/ai/downtime-impact`, `/production/ai/cost-risk`, `/production/ai/draft-actions`
 
 Production AI is recommendation-only. It can analyze, recommend, and create draft actions; it cannot change schedules, consume inventory, close orders, or approve orders automatically.
+
+## Maintenance Management Module
+
+Open `http://localhost:8000/docs` and use the `Maintenance Management` and `Maintenance AI` tags.
+
+Key endpoint groups:
+
+- Machine registry: `GET/POST /maintenance/machines`, `GET/PUT/DELETE /maintenance/machines/{machine_id}`
+- Root aliases from the prompt: `GET/POST /machines`, `GET/POST/PUT /maintenance-plans`, `GET/POST /work-orders`
+- Capability and rule configuration: `/maintenance/rules`
+- Preventive plans: `/maintenance/maintenance-plans`
+- Breakdown and planned work orders: `/maintenance/work-orders`
+- Assignment/start/complete/close workflow: `/maintenance/work-orders/{work_order_id}/assign`, `/start`, `/complete`, `/close`
+- Spare mapping and reservation: `/maintenance/spare-parts`, `/maintenance/spare-reservations`, `/maintenance/spare-usage`
+- Downtime and shutdown windows: `/maintenance/downtime-events`, `/maintenance/shutdown-windows`
+- Documentation: `/maintenance/attachments`, `/maintenance/machine-documents`
+- Runtime, vendors, costing, tasks, notifications and reports: `/maintenance/runtime-logs`, `/maintenance/vendors`, `/maintenance/costing`, `/maintenance/tasks`, `/maintenance/notifications`, `/maintenance/reports`
+- Maintenance AI: `/ai/maintenance/risk-center`, `/ai/maintenance/failure-prediction`, `/ai/maintenance/downtime-prediction`, `/ai/maintenance/spare-prediction`, `/ai/maintenance/health-score`, `/ai/maintenance/root-cause`, `/ai/maintenance/cost-impact`, `/ai/maintenance/recommendations`, `/ai/maintenance/draft-action`
+
+Maintenance AI is recommendation-only. It can analyze, recommend, and create draft actions; it cannot close work orders, approve maintenance, consume spares, change production schedules, or release a machine as available.
 
 ## Platform Foundation
 

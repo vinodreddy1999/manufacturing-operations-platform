@@ -8,6 +8,9 @@ from .auth_router import router as auth_router
 from .core_router import create_module_router, router as core_router
 from .database import Base, SessionLocal, engine
 from .modules.inventory import router as inventory_router
+from .modules.maintenance import ai_router as maintenance_ai_router
+from .modules.maintenance import alias_router as maintenance_alias_router
+from .modules.maintenance import router as maintenance_router
 from .modules.production import router as production_router
 from .platform_seed import seed_platform
 from .schemas import (
@@ -15,7 +18,6 @@ from .schemas import (
     ForecastRequest,
     LoginRequest,
     LoginResponse,
-    MaintenanceWorkOrderRequest,
     ModuleKey,
     PurchaseRequisitionRequest,
     QualityInspectionRequest,
@@ -40,6 +42,9 @@ app.include_router(auth_router)
 app.include_router(core_router)
 app.include_router(inventory_router)
 app.include_router(production_router)
+app.include_router(maintenance_router)
+app.include_router(maintenance_alias_router)
+app.include_router(maintenance_ai_router)
 app.include_router(create_module_router("warehouse", "/warehouses"))
 app.include_router(create_module_router("warehouse_zones", "/warehouses/{warehouse_id}/zones"))
 app.include_router(create_module_router("warehouse_map", "/warehouses/{warehouse_id}/map"))
@@ -54,9 +59,6 @@ app.include_router(create_module_router("bom", "/bom"))
 app.include_router(create_module_router("routing", "/routing"))
 app.include_router(create_module_router("production_orders", "/production-orders"))
 app.include_router(create_module_router("production_schedules", "/production-schedules"))
-app.include_router(create_module_router("machines", "/machines"))
-app.include_router(create_module_router("maintenance_plans", "/maintenance-plans"))
-app.include_router(create_module_router("work_orders", "/work-orders"))
 app.include_router(create_module_router("quality_inspections", "/quality/inspections"))
 app.include_router(create_module_router("quality_quarantine", "/quality/quarantine"))
 app.include_router(create_module_router("quality_rework", "/quality/rework"))
@@ -144,17 +146,6 @@ def create_requisition(request: PurchaseRequisitionRequest) -> ApiResult:
 @app.get("/procurement/requisitions", response_model=ApiResult)
 def list_requisitions() -> ApiResult:
     return result(ModuleKey.PROCUREMENT, "list_requisitions", "Purchase requisition work queue.", store.snapshot(store.requisitions))
-
-
-@app.post("/maintenance/work-orders", response_model=ApiResult)
-def create_work_order(request: MaintenanceWorkOrderRequest) -> ApiResult:
-    work_order = store.create_record(store.work_orders, {**request.model_dump(), "status": "OPEN"})
-    return result(ModuleKey.MAINTENANCE, "create_work_order", "Maintenance work order opened.", work_order)
-
-
-@app.get("/maintenance/work-orders", response_model=ApiResult)
-def list_work_orders() -> ApiResult:
-    return result(ModuleKey.MAINTENANCE, "list_work_orders", "Maintenance work order queue.", store.snapshot(store.work_orders))
 
 
 @app.post("/quality/inspections", response_model=ApiResult)

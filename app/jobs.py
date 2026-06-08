@@ -27,3 +27,22 @@ def expiry_check_job(company_id: str) -> dict:
 def dead_stock_check_job(company_id: str) -> dict:
     return {"company_id": company_id, "status": "DEAD_STOCK_CHECK_COMPLETED"}
 
+
+@celery_app.task
+def maintenance_risk_scan_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "MAINTENANCE_RISK_SCAN_COMPLETED", "actions_created": "draft_only"}
+
+
+@celery_app.task
+def maintenance_overdue_scan_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "MAINTENANCE_OVERDUE_SCAN_COMPLETED"}
+
+
+@celery_app.task
+def maintenance_spare_scan_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "MAINTENANCE_SPARE_SCAN_COMPLETED", "procurement_actions": "draft_only"}
+
+
+@celery_app.task
+def maintenance_cost_scan_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "MAINTENANCE_COST_SCAN_COMPLETED"}
