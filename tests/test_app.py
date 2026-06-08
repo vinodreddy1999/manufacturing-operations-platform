@@ -86,3 +86,34 @@ def test_inventory_mobile_scan():
     )
     assert response.status_code == 200
     assert response.json()["data"]["sync_status"] == "SYNCED"
+
+
+def test_core_company_seed_available():
+    response = client.get("/companies")
+    assert response.status_code == 200
+    companies = response.json()
+    assert any(company["id"] == "company-c" for company in companies)
+
+
+def test_feature_flag_toggle():
+    response = client.post("/feature-flags/warehouse/disable")
+    assert response.status_code == 200
+    assert response.json()["enabled"] is False
+
+    response = client.post("/feature-flags/warehouse/enable")
+    assert response.status_code == 200
+    assert response.json()["enabled"] is True
+
+
+def test_generic_module_record_create():
+    response = client.post(
+        "/purchase-orders",
+        json={
+            "record_code": "PO-1001",
+            "name": "Demo purchase order",
+            "quantity": 25,
+            "payload": {"supplier_id": "supplier-apex"},
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["module_key"] == "purchase_orders"

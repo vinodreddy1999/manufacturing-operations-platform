@@ -1,0 +1,39 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: mop
+      POSTGRES_PASSWORD: mop
+      POSTGRES_DB: mop
+    ports:
+      - "5432:5432"
+    volumes:
+      - mop_postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  platform-api:
+    build: .
+    environment:
+      DATABASE_URL: postgresql+psycopg2://mop:mop@postgres:5432/mop
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+      - redis
+
+  worker:
+    build: .
+    command: celery -A app.jobs.celery_app worker --loglevel=info
+    environment:
+      DATABASE_URL: postgresql+psycopg2://mop:mop@postgres:5432/mop
+    depends_on:
+      - postgres
+      - redis
+
+volumes:
+  mop_postgres_data:
+

@@ -1,0 +1,225 @@
+from uuid import uuid4
+
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+
+from .audit import audit
+from .database import get_db
+from .feature_flags import module_enabled
+from .platform_models import Approval, Company, Department, Document, FeatureFlag, ModuleRecord, Permission, Plant, Role, Task, User
+from .platform_schemas import (
+    ApprovalDecisionRequest,
+    CreateCompanyRequest,
+    CreateDepartmentRequest,
+    CreatePermissionRequest,
+    CreatePlantRequest,
+    CreateRoleRequest,
+    CreateUserRequest,
+    DocumentRequest,
+    FeatureFlagRequest,
+    ModuleRecordRequest,
+    TaskRequest,
+)
+from .security import hash_password
+
+router = APIRouter(tags=["Core Platform"])
+
+
+def as_dict(row):
+    return {key: value for key, value in row.__dict__.items() if not key.startswith("_")}
+
+
+@router.post("/companies")
+def create_company(request: CreateCompanyRequest, db: Session = Depends(get_db)):
+    row = Company(id=f"company-{request.code.lower()}", tenant_id=request.tenant_id, name=request.name, code=request.code)
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    audit(db, action="CREATE_COMPANY", entity_type="Company", entity_id=row.id, tenant_id=request.tenant_id, company_id=row.id, new_value=as_dict(row))
+    return as_dict(row)
+
+
+@router.get("/companies")
+def list_companies(db: Session = Depends(get_db)):
+    return [as_dict(row) for row in db.query(Company).all()]
+
+
+@router.post("/plants")
+def create_plant(request: CreatePlantRequest, db: Session = Depends(get_db)):
+    row = Plant(id=f"plant-{request.code.lower()}", tenant_id=request.tenant_id, company_id=request.company_id, name=request.name, code=request.code, timezone=request.timezone)
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    audit(db, action="CREATE_PLANT", entity_type="Plant", entity_id=row.id, tenant_id=request.tenant_id, company_id=request.company_id, plant_id=row.id, new_value=as_dict(row))
+    return as_dict(row)
+
+
+@router.get("/plants")
+def list_plants(db: Session = Depends(get_db)):
+    return [as_dict(row) for row in db.query(Plant).all()]
+
+
+@router.post("/departments")
+def create_department(request: CreateDepartmentRequest, db: Session = Depends(get_db)):
+    row = Department(id=f"dept-{request.code.lower()}", tenant_id=request.tenant_id, company_id=request.company_id, plant_id=request.plant_id, name=request.name, code=request.code)
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return as_dict(row)
+
+
+@router.get("/departments")
+def list_departments(db: Session = Depends(get_db)):
+    return [as_dict(row) for row in db.query(Department).all()]
+
+
+@router.post("/users")
+def create_user(request: CreateUserRequest, db: Session = Depends(get_db)):
+    row = User(id=str(uuid4()), tenant_id=request.tenant_id, company_id=request.company_id, plant_id=request.plant_id, email=request.email, name=request.name, password_hash=hash_password(request.password))
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return as_dict(row)
+
+
+@router.get("/users")
+def list_users(db: Session = Depends(get_db)):
+    return [as_dict(row) for row in db.query(User).all()]
+
+
+@router.post("/roles")
+def create_role(request: CreateRoleRequest, db: Session = Depends(get_db)):
+    row = Role(id=str(uuid4()), tenant_id=request.tenant_id, company_id=request.company_id, name=request.name, permissions=request.permissions)
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return as_dict(row)
+
+
+@router.get("/roles")
+def list_roles(db: Session = Depends(get_db)):
+    return [as_dict(row) for row in db.query(Role).all()]
+
+
+@router.post("/permissions")
+def create_permission(request: CreatePermissionRequest, db: Session = Depends(get_db)):
+    row = Permission(id=str(uuid4()), key=request.key, description=request.description)
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return as_dict(row)
+
+
+@router.get("/permissions")
+def list_permissions(db: Session = Depends(get_db)):
+    return [as_dict(row) for row in db.query(Permission).all()]
+
+
+@router.post("/feature-flags")
+def set_feature_flag(request: FeatureFlagRequest, db: Session = Depends(get_db)):
+    row = (
+        db.query(FeatureFlag)
+        .filter(
+            FeatureFlag.tenant_id == request.tenant_id,
+            FeatureFlag.company_id == request.company_id,
+            FeatureFlag.module_key == request.module_key,
+        )
+        .first()
+    )
+    if row:
+        row.enabled = request.enabled
+        row.rules = request.rules
+    else:
+        row = FeatureFlag(id=str(uuid4()), **request.model_dump())
+        db.add(row)
+    db.commit()
+    db.refresh(row)
+    return as_dict(row)
+
+
+@router.get("/feature-flags")
+def list_feature_flags(db: Session = Depends(get_db)):
+    return [as_dict(row) for row in db.query(FeatureFlag).all()]
+
+
+@router.post("/feature-flags/{module_key}/enable")
+def enable_module(module_key: str, db: Session = Depends(get_db)):
+    return set_feature_flag(FeatureFlagRequest(module_key=module_key, enabled=True), db)
+
+
+@router.post("/feature-flags/{module_key}/disable")
+def disable_module(module_key: str, db: Session = Depends(get_db)):
+    return set_feature_flag(FeatureFlagRequest(module_key=module_key, enabled=False), db)
+
+
+@router.post("/tasks")
+def create_task(request: TaskRequest, db: Session = Depends(get_db)):
+    row = Task(id=str(uuid4()), **request.model_dump(), status="OPEN")
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return as_dict(row)
+
+
+@router.get("/tasks")
+def list_tasks(db: Session = Depends(get_db)):
+    return [as_dict(row) for row in db.query(Task).all()]
+
+
+@router.post("/approvals/{approval_id}/decision")
+def decide_approval(approval_id: str, request: ApprovalDecisionRequest, db: Session = Depends(get_db)):
+    row = db.query(Approval).filter(Approval.id == approval_id).first()
+    if not row:
+        row = Approval(id=approval_id, tenant_id="tenant-demo-001", company_id="company-c", plant_id="plant-north", entity_type="draft", entity_id=approval_id)
+        db.add(row)
+    row.status = request.status
+    row.decided_by_id = request.decided_by_id
+    row.reason = request.reason
+    db.commit()
+    db.refresh(row)
+    return as_dict(row)
+
+
+@router.get("/approvals")
+def list_approvals(db: Session = Depends(get_db)):
+    return [as_dict(row) for row in db.query(Approval).all()]
+
+
+@router.post("/documents")
+def upload_document(request: DocumentRequest, db: Session = Depends(get_db)):
+    row = Document(id=str(uuid4()), **request.model_dump())
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return as_dict(row)
+
+
+@router.get("/documents")
+def list_documents(db: Session = Depends(get_db)):
+    return [as_dict(row) for row in db.query(Document).all()]
+
+
+@router.get("/audit-logs")
+def view_audit_logs(db: Session = Depends(get_db)):
+    return [as_dict(row) for row in db.query(__import__("app.platform_models", fromlist=["AuditLog"]).AuditLog).all()]
+
+
+def create_module_router(module_key: str, prefix: str) -> APIRouter:
+    module_router = APIRouter(prefix=prefix, tags=[module_key])
+
+    @module_router.get("")
+    def list_records(db: Session = Depends(get_db)):
+        return [as_dict(row) for row in db.query(ModuleRecord).filter(ModuleRecord.module_key == module_key).all()]
+
+    @module_router.post("")
+    def create_record(request: ModuleRecordRequest, db: Session = Depends(get_db)):
+        if not module_enabled(db, request.tenant_id, request.company_id, module_key):
+            raise HTTPException(status_code=403, detail=f"{module_key} module is disabled for this company")
+        row = ModuleRecord(id=str(uuid4()), module_key=module_key, record_type=prefix.strip("/"), **request.model_dump())
+        db.add(row)
+        db.commit()
+        db.refresh(row)
+        return as_dict(row)
+
+    return module_router
+

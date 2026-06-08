@@ -4,7 +4,11 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 from jose import jwt
 
+from .auth_router import router as auth_router
+from .core_router import create_module_router, router as core_router
+from .database import Base, SessionLocal, engine
 from .modules.inventory import router as inventory_router
+from .platform_seed import seed_platform
 from .schemas import (
     ApiResult,
     ForecastRequest,
@@ -28,7 +32,36 @@ app = FastAPI(
     description="Python/FastAPI implementation of the MOP backend modules.",
 )
 
+Base.metadata.create_all(bind=engine)
+with SessionLocal() as bootstrap_db:
+    seed_platform(bootstrap_db)
+
+app.include_router(auth_router)
+app.include_router(core_router)
 app.include_router(inventory_router)
+app.include_router(create_module_router("warehouse", "/warehouses"))
+app.include_router(create_module_router("warehouse_zones", "/warehouses/{warehouse_id}/zones"))
+app.include_router(create_module_router("warehouse_map", "/warehouses/{warehouse_id}/map"))
+app.include_router(create_module_router("warehouse_locations", "/warehouse-locations"))
+app.include_router(create_module_router("warehouse_movements", "/warehouse-movements"))
+app.include_router(create_module_router("warehouse_occupancy", "/warehouse-occupancy"))
+app.include_router(create_module_router("suppliers", "/suppliers"))
+app.include_router(create_module_router("purchase_requisitions", "/purchase-requisitions"))
+app.include_router(create_module_router("purchase_orders", "/purchase-orders"))
+app.include_router(create_module_router("products", "/products"))
+app.include_router(create_module_router("bom", "/bom"))
+app.include_router(create_module_router("routing", "/routing"))
+app.include_router(create_module_router("production_orders", "/production-orders"))
+app.include_router(create_module_router("production_schedules", "/production-schedules"))
+app.include_router(create_module_router("machines", "/machines"))
+app.include_router(create_module_router("maintenance_plans", "/maintenance-plans"))
+app.include_router(create_module_router("work_orders", "/work-orders"))
+app.include_router(create_module_router("quality_inspections", "/quality/inspections"))
+app.include_router(create_module_router("quality_quarantine", "/quality/quarantine"))
+app.include_router(create_module_router("quality_rework", "/quality/rework"))
+app.include_router(create_module_router("quality_capa", "/quality/capa"))
+app.include_router(create_module_router("sales_customers", "/customers"))
+app.include_router(create_module_router("sales_orders", "/sales-orders"))
 
 
 def result(module: ModuleKey, action: str, message: str, data: dict[str, Any] | list[dict[str, Any]]) -> ApiResult:
