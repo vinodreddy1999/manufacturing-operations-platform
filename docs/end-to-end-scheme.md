@@ -1,49 +1,51 @@
 # End-to-End Scheme Diagram
 
-This diagram shows how the Python-only Manufacturing Operations Platform works after the Inventory module expansion. The API still starts in `app/main.py`, but Inventory now has its own router in `app/modules/inventory.py`.
+This diagram shows the current Python-only Manufacturing Operations Platform after adding the expanded Inventory module and the separate `inventory-ai-service/` microservice.
+
+There are now two FastAPI services:
+
+- Main platform API: `http://127.0.0.1:8000/docs`
+- Inventory AI service: `http://127.0.0.1:8100/docs`
+
+The AI service is recommendation-only. It analyzes risk, creates draft actions, and requires human approval for critical actions. It does not automatically move stock, create purchase orders, change production, write off inventory, or execute supplier actions.
 
 ```mermaid
 flowchart LR
     User["User / Operator"] --> Browser["Browser or API Client"]
-    Browser --> Docs["Swagger UI /docs"]
-    Browser --> API["FastAPI App app/main.py"]
+    Browser --> PlatformDocs["Platform Swagger /docs :8000"]
+    Browser --> AiDocs["Inventory AI Swagger /docs :8100"]
 
-    API --> Health["Health Check /health"]
-    API --> Modules["Module Registry /modules"]
-    API --> Auth["Auth /auth/login"]
+    PlatformDocs --> PlatformAPI["Main FastAPI App app/main.py"]
+    AiDocs --> AiAPI["Inventory AI FastAPI inventory-ai-service/app/main.py"]
 
+    PlatformAPI --> Health["Health /health"]
+    PlatformAPI --> Modules["Module Registry /modules"]
+    PlatformAPI --> Auth["Auth /auth/login"]
     Auth --> Token["JWT Demo Token"]
     Auth --> Tenant["Tenant Context precision-components"]
 
-    API --> Platform["Platform Module"]
-    API --> InventoryRouter["Inventory Router app/modules/inventory.py"]
-    API --> Warehouse["Warehouse Module"]
-    API --> Supplier["Supplier Module"]
-    API --> Procurement["Procurement Module"]
-    API --> Production["Production Module"]
-    API --> Maintenance["Maintenance Module"]
-    API --> Quality["Quality Module"]
-    API --> Reporting["Reporting Module"]
-    API --> SupplyChain["Supply Chain Module"]
-    API --> AI["AI Module"]
+    PlatformAPI --> Platform["Platform Module"]
+    PlatformAPI --> InventoryRouter["Inventory Router app/modules/inventory.py"]
+    PlatformAPI --> Warehouse["Warehouse Module"]
+    PlatformAPI --> Supplier["Supplier Module"]
+    PlatformAPI --> Procurement["Procurement Module"]
+    PlatformAPI --> Production["Production Module"]
+    PlatformAPI --> Maintenance["Maintenance Module"]
+    PlatformAPI --> Quality["Quality Module"]
+    PlatformAPI --> Reporting["Reporting Module"]
+    PlatformAPI --> SupplyChain["Supply Chain Module"]
+    PlatformAPI --> AI["General AI Module"]
 
     InventoryRouter --> InvDashboard["Dashboard /inventory/dashboard"]
-    InventoryRouter --> InvItems["Items and Categories /inventory/items"]
-    InventoryRouter --> InvLocation["Locations /inventory/locations"]
-    InventoryRouter --> InvMap["2D Warehouse Map /inventory/warehouse-map"]
-    InventoryRouter --> InvBatch["Batch and Serial /inventory/batches"]
-    InventoryRouter --> InvStatus["Status /inventory/status"]
-    InventoryRouter --> InvReserve["Reservations /inventory/reservations"]
-    InventoryRouter --> InvLedger["Movement Ledger /inventory/movement-ledger"]
-    InventoryRouter --> InvCounts["Stock Counts /inventory/stock-counts"]
-    InventoryRouter --> InvAging["Expiry and Aging /inventory/expiry-aging"]
-    InventoryRouter --> InvProc["Procurement Recommendations /inventory/procurement-recommendations"]
-    InventoryRouter --> InvSupplier["Supplier Links /inventory/supplier-links"]
-    InventoryRouter --> InvCost["Costs /inventory/costs"]
-    InventoryRouter --> InvReports["Reports /inventory/reports"]
-    InventoryRouter --> InvMobile["Mobile Scan /inventory/mobile/scan"]
+    InventoryRouter --> InvItems["Items and Categories"]
+    InventoryRouter --> InvLocation["Locations and Warehouse Map"]
+    InventoryRouter --> InvBatch["Batch and Serial Tracking"]
+    InventoryRouter --> InvStatus["Status and Reservations"]
+    InventoryRouter --> InvLedger["Movement Ledger and Counts"]
+    InventoryRouter --> InvAging["Expiry, Aging and Costs"]
+    InventoryRouter --> InvReports["Reports and Mobile Scan"]
 
-    Platform --> Store["In-Memory Demo Store app/store.py"]
+    Platform --> Store["Platform Demo Store app/store.py"]
     InventoryRouter --> Store
     Warehouse --> Store
     Supplier --> Store
@@ -55,21 +57,41 @@ flowchart LR
     SupplyChain --> Store
     AI --> Store
 
-    Store --> Response["Pydantic Response Models app/schemas.py"]
-    Response --> JSON["JSON API Output"]
-    JSON --> Browser
+    Store --> PlatformSchemas["Platform Pydantic Schemas app/schemas.py"]
+    PlatformSchemas --> PlatformJSON["Platform JSON Output"]
+    PlatformJSON --> Browser
+
+    AiAPI --> AiRoutes["AI Routes inventory-ai-service/app/routes.py"]
+    AiRoutes --> AiEngine["Rule-Based AI Engine app/ai_engine.py"]
+    AiEngine --> RiskRules["Risk Rules app/risk_rules.py"]
+    AiEngine --> Recommendations["Draft Recommendations app/recommendations.py"]
+    AiRoutes --> AiSchemas["AI Pydantic Schemas app/schemas.py"]
+    AiRoutes --> AiModels["SQLAlchemy Models app/models.py"]
+    AiModels --> AiDB["PostgreSQL via Docker or SQLite local fallback"]
+    AiDB --> Seed["Seed Data app/seed_data.py"]
+    AiEngine --> AiJSON["AI JSON Output and Draft Actions"]
+    AiJSON --> Browser
+
+    InventoryRouter -. "inventory signals / business context" .-> AiAPI
+    AiJSON -. "recommendations only" .-> InventoryRouter
 ```
 
 ## Runtime Flow
 
-1. User opens Swagger at `http://localhost:8000/docs` or calls the API from another client.
-2. FastAPI receives the request in `app/main.py`.
+1. User opens the main platform Swagger at `http://127.0.0.1:8000/docs`.
+2. Main FastAPI receives platform requests in `app/main.py`.
 3. `app/main.py` forwards Inventory requests to `app/modules/inventory.py`.
-4. Request data is validated using Pydantic classes from `app/schemas.py`.
-5. The selected endpoint reads or writes demo data in `app/store.py`.
-6. The API returns structured JSON output using the common `ApiResult` response model.
+4. Inventory request data is validated using `app/schemas.py`.
+5. Inventory endpoints read or write demo data in `app/store.py`.
+6. Platform endpoints return structured JSON through the common `ApiResult` response model.
+7. User opens the Inventory AI service Swagger at `http://127.0.0.1:8100/docs`.
+8. Inventory AI requests go through `inventory-ai-service/app/routes.py`.
+9. AI routes call rule-based logic in `ai_engine.py`, `risk_rules.py`, and `recommendations.py`.
+10. SQLAlchemy models read seed/demo inventory signals from PostgreSQL or the local SQLite fallback.
+11. AI returns analysis, risk levels, recommendations, and draft actions only.
+12. Human approval is required before any critical operational action.
 
-## Inventory Module Views
+## Main Inventory Module Views
 
 | View | Endpoint | Output |
 | --- | --- | --- |
@@ -90,6 +112,19 @@ flowchart LR
 | Inventory Costs | `GET /inventory/costs` | FIFO costing, valuation, wastage, damaged stock cost and expiry loss |
 | Reports | `GET /inventory/reports` | Status, aging, valuation, movement, occupancy and supplier performance reports |
 | Mobile Inventory | `POST /inventory/mobile/scan` | Receive, move, scan, count, upload photos, offline queue and sync status |
+
+## Inventory AI Service Views
+
+| AI View | Endpoint | Output |
+| --- | --- | --- |
+| Inventory Risk Center | `GET /inventory-ai/risk-center` | Low stock, stockout, supplier delay, production, expiry and dead stock risks |
+| Shortage Prediction | `GET /inventory-ai/shortage-prediction` | Available quantity, days remaining, expected stockout date and risk level |
+| Overstock Prediction | `GET /inventory-ai/overstock` | Excess quantity and overstock risk |
+| Procurement Recommendation | `GET /inventory-ai/procurement-recommendations` | Recommended order quantity/date, supplier priority and draft action |
+| Expiry Intelligence | `GET /inventory-ai/expiry-intelligence` | Days to expiry, quantity at risk and recommended action |
+| Dead Stock Detection | `GET /inventory-ai/dead-stock` | Dead stock status, days without movement and financial risk |
+| Production Impact | `GET /inventory-ai/production-impact` | Can produce, shortage items and production delay risk |
+| Inventory Optimization | `GET /inventory-ai/optimization` | Draft recommendations to increase/reduce safety stock, transfer, reorder or consume expiring batch first |
 
 ## Inventory Data Flow
 
@@ -113,23 +148,46 @@ flowchart TD
     Store --> Costs["fifo_layers + unit_cost"]
 ```
 
+## Inventory AI Data Flow
+
+```mermaid
+flowchart TD
+    Client["Swagger / API Client"] --> AIRoute["AI Route inventory-ai-service/app/routes.py"]
+    AIRoute --> AISchemas["Validate Query Parameters and Response Schemas"]
+    AIRoute --> DB["SQLAlchemy Session"]
+    DB --> Signals["InventorySignal Rows"]
+    Signals --> Engine["Rule-Based AI Engine"]
+    Engine --> Rules["Risk Rules"]
+    Engine --> Drafts["Draft Recommendations"]
+    Drafts --> HumanApproval["Human Approval Required"]
+    Engine --> AIOutput["Risk and Recommendation JSON"]
+    AIOutput --> Client
+```
+
 ## Code Flow
 
 ```mermaid
 sequenceDiagram
     participant U as User
-    participant F as FastAPI app/main.py
+    participant P as Platform API :8000
     participant I as Inventory router
-    participant S as schemas.py
-    participant D as store.py
+    participant S as Platform store.py
+    participant A as Inventory AI service :8100
+    participant E as AI engine
+    participant D as AI database
     participant O as JSON Output
 
-    U->>F: Send Inventory API request
-    F->>I: Route /inventory/* request
-    I->>S: Validate request body if POST
-    I->>D: Read or update inventory data
-    D-->>I: Return item, balance, batch, location or ledger data
-    I->>S: Format ApiResult response
-    I-->>O: Return JSON response
+    U->>P: Request /inventory/dashboard
+    P->>I: Route inventory request
+    I->>S: Read inventory data
+    S-->>I: Return balances, batches, locations
+    I-->>O: Return inventory JSON
+
+    U->>A: Request /inventory-ai/risk-center
+    A->>D: Load inventory signals
+    D-->>A: Return SQLAlchemy rows
+    A->>E: Run rule-based analysis
+    E-->>A: Risks and draft actions
+    A-->>O: Return AI recommendation JSON
     O-->>U: Show output in Swagger/client
 ```
