@@ -4,10 +4,10 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 from jose import jwt
 
+from .modules.inventory import router as inventory_router
 from .schemas import (
     ApiResult,
     ForecastRequest,
-    InventoryMovementRequest,
     LoginRequest,
     LoginResponse,
     MaintenanceWorkOrderRequest,
@@ -27,6 +27,8 @@ app = FastAPI(
     version="0.1.0",
     description="Python/FastAPI implementation of the MOP backend modules.",
 )
+
+app.include_router(inventory_router)
 
 
 def result(module: ModuleKey, action: str, message: str, data: dict[str, Any] | list[dict[str, Any]]) -> ApiResult:
@@ -87,21 +89,6 @@ def platform_overview() -> ApiResult:
         },
     )
 
-
-@app.get("/inventory/items", response_model=ApiResult)
-def inventory_items() -> ApiResult:
-    return result(ModuleKey.INVENTORY, "list_items", "Inventory item master data.", store.snapshot(store.inventory_items))
-
-
-@app.get("/inventory/balances", response_model=ApiResult)
-def inventory_balances() -> ApiResult:
-    return result(ModuleKey.INVENTORY, "stock_balances", "Current physical, reserved and available stock.", store.snapshot(store.balances))
-
-
-@app.post("/inventory/movements", response_model=ApiResult)
-def create_inventory_movement(request: InventoryMovementRequest) -> ApiResult:
-    movement = store.create_record(store.movements, request.model_dump())
-    return result(ModuleKey.INVENTORY, "create_movement", "Inventory movement recorded and ready for audit.", movement)
 
 
 @app.get("/warehouse/locations", response_model=ApiResult)

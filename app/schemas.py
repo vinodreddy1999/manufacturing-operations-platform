@@ -56,6 +56,35 @@ class InventoryMovementRequest(BaseModel):
     reason: str | None = None
 
 
+class InventoryReservationRequest(BaseModel):
+    item_id: str
+    quantity: float
+    reservation_type: str
+    reserved_for: str
+    needed_by: str | None = None
+
+
+class InventoryCountRequest(BaseModel):
+    item_id: str
+    location_id: str
+    count_type: str = "CYCLE"
+    expected_quantity: float
+    counted_quantity: float
+    variance_tolerance: float = 0
+    barcode_or_qr: str | None = None
+    blind_count: bool = False
+
+
+class InventoryMobileScanRequest(BaseModel):
+    action: str
+    item_id: str | None = None
+    location_id: str | None = None
+    barcode_or_qr: str | None = None
+    quantity: float | None = None
+    photo_urls: list[str] = Field(default_factory=list)
+    offline: bool = False
+
+
 class PurchaseRequisitionRequest(BaseModel):
     item_id: str
     quantity: float

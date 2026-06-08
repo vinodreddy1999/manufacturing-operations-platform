@@ -38,3 +38,51 @@ def test_inventory_balances():
     response = client.get("/inventory/balances")
     assert response.status_code == 200
     assert response.json()["module"] == "INVENTORY"
+
+
+
+def test_inventory_dashboard():
+    response = client.get("/inventory/dashboard")
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["total_inventory_value"] > 0
+    assert "low_stock_risks" in data
+    assert "warehouse_occupancy" in data
+
+
+def test_inventory_items_by_category():
+    response = client.get("/inventory/items/by-category")
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert "RAW_MATERIALS" in data
+    assert "FINISHED_GOODS" in data
+
+
+def test_inventory_warehouse_map_highlight():
+    response = client.get("/inventory/warehouse-map?search_item_id=item-steel")
+    assert response.status_code == 200
+    bins = response.json()["data"]["bins"]
+    assert any(item["highlight"] for item in bins)
+
+
+def test_inventory_reservation_create():
+    response = client.post(
+        "/inventory/reservations",
+        json={
+            "item_id": "item-steel",
+            "quantity": 100,
+            "reservation_type": "TRANSFER",
+            "reserved_for": "Transfer request TR-100",
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["data"]["status"] == "ACTIVE"
+
+
+def test_inventory_mobile_scan():
+    response = client.post(
+        "/inventory/mobile/scan",
+        json={"action": "SCAN_BIN", "location_id": "bin-a-01-01", "barcode_or_qr": "BIN:A-01-01"},
+    )
+    assert response.status_code == 200
+    assert response.json()["data"]["sync_status"] == "SYNCED"
