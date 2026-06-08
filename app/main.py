@@ -12,6 +12,8 @@ from .modules.maintenance import ai_router as maintenance_ai_router
 from .modules.maintenance import alias_router as maintenance_alias_router
 from .modules.maintenance import router as maintenance_router
 from .modules.production import router as production_router
+from .modules.quality import ai_router as quality_ai_router
+from .modules.quality import router as quality_router
 from .platform_seed import seed_platform
 from .schemas import (
     ApiResult,
@@ -20,7 +22,6 @@ from .schemas import (
     LoginResponse,
     ModuleKey,
     PurchaseRequisitionRequest,
-    QualityInspectionRequest,
     RecommendationRequest,
 )
 from .store import MODULES, store
@@ -45,6 +46,8 @@ app.include_router(production_router)
 app.include_router(maintenance_router)
 app.include_router(maintenance_alias_router)
 app.include_router(maintenance_ai_router)
+app.include_router(quality_router)
+app.include_router(quality_ai_router)
 app.include_router(create_module_router("warehouse", "/warehouses"))
 app.include_router(create_module_router("warehouse_zones", "/warehouses/{warehouse_id}/zones"))
 app.include_router(create_module_router("warehouse_map", "/warehouses/{warehouse_id}/map"))
@@ -59,10 +62,6 @@ app.include_router(create_module_router("bom", "/bom"))
 app.include_router(create_module_router("routing", "/routing"))
 app.include_router(create_module_router("production_orders", "/production-orders"))
 app.include_router(create_module_router("production_schedules", "/production-schedules"))
-app.include_router(create_module_router("quality_inspections", "/quality/inspections"))
-app.include_router(create_module_router("quality_quarantine", "/quality/quarantine"))
-app.include_router(create_module_router("quality_rework", "/quality/rework"))
-app.include_router(create_module_router("quality_capa", "/quality/capa"))
 app.include_router(create_module_router("sales_customers", "/customers"))
 app.include_router(create_module_router("sales_orders", "/sales-orders"))
 
@@ -146,17 +145,6 @@ def create_requisition(request: PurchaseRequisitionRequest) -> ApiResult:
 @app.get("/procurement/requisitions", response_model=ApiResult)
 def list_requisitions() -> ApiResult:
     return result(ModuleKey.PROCUREMENT, "list_requisitions", "Purchase requisition work queue.", store.snapshot(store.requisitions))
-
-
-@app.post("/quality/inspections", response_model=ApiResult)
-def create_quality_inspection(request: QualityInspectionRequest) -> ApiResult:
-    inspection = store.create_record(store.inspections, request.model_dump())
-    return result(ModuleKey.QUALITY, "create_inspection", "Quality inspection result captured.", inspection)
-
-
-@app.get("/quality/inspections", response_model=ApiResult)
-def list_quality_inspections() -> ApiResult:
-    return result(ModuleKey.QUALITY, "list_inspections", "Quality inspection history.", store.snapshot(store.inspections))
 
 
 @app.get("/reporting/kpis", response_model=ApiResult)

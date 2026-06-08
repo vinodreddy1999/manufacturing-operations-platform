@@ -13,6 +13,7 @@ Implemented now:
 - Generic module-record routers for warehouse, procurement, production, maintenance, quality and sales endpoints
 - Dedicated Production Management module with typed routes, schemas, SQLAlchemy table definitions, seeded repository, service layer and rule-based AI
 - Dedicated Maintenance Management module with typed routes, schemas, SQLAlchemy table definitions, seeded repository, service layer, Celery job hooks and rule-based AI
+- Dedicated Quality Management module with typed routes, schemas, SQLAlchemy table definitions, seeded repository, service layer, Celery job hooks and rule-based AI
 - JWT/password security helpers
 - Optional AI provider interface: `AIProvider`, `MockAIProvider`, `OpenAIProvider`
 - Celery job declarations for reports, AI scans, expiry checks and dead-stock checks
@@ -20,7 +21,7 @@ Implemented now:
 
 The existing expanded Inventory module and separate Inventory AI service remain intact. Production has now moved beyond the generic record layer into a dedicated module package under `app/modules/`.
 
-Next module-depth phases should replace the remaining generic `ModuleRecord` endpoints with dedicated typed models/services for Warehouse, Procurement, Quality and Sales.
+Next module-depth phases should replace the remaining generic `ModuleRecord` endpoints with dedicated typed models/services for Warehouse, Procurement and Sales.
 
 ## Production Module Depth
 
@@ -86,3 +87,33 @@ AI safety boundary:
 
 - AI can analyze, recommend and create draft actions.
 - AI cannot close work orders, approve maintenance, consume spares, change production schedules or release machines as available.
+
+## Quality Module Depth
+
+Implemented Quality Management areas:
+
+- Optional quality module behavior documented through service output
+- Quality plans
+- Checklist-based inspections
+- Sampling rules
+- Inspection lots from receiving, production, WIP, returns, rework and manual requests
+- Inspection execution with checklist responses, measurements, pass/fail, defects, comments and signatures
+- Defect management
+- Configurable failure handling to quarantine or rework
+- Quarantine, rework, rejection and scrap workflows
+- Quality approval trail for inspection/quarantine decisions
+- CAPA management
+- Supplier quality metrics
+- Production quality metrics
+- Customer return quality report structure
+- Cost of poor quality calculation
+- Quality task and notification queues
+- Dashboard, reports and KPIs
+- Rule-based Quality AI risk center, defect prediction, trends, supplier risk, production risk, root cause and cost risk
+- Draft-only Quality AI actions
+- Celery job hooks for quality risk, CAPA overdue, supplier and cost scans
+
+AI safety boundary:
+
+- AI can analyze, recommend and create draft actions.
+- AI cannot approve releases, scrap inventory, release quarantine, close CAPA, reject suppliers or dispatch affected goods.

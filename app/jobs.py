@@ -46,3 +46,23 @@ def maintenance_spare_scan_job(company_id: str) -> dict:
 @celery_app.task
 def maintenance_cost_scan_job(company_id: str) -> dict:
     return {"company_id": company_id, "status": "MAINTENANCE_COST_SCAN_COMPLETED"}
+
+
+@celery_app.task
+def quality_risk_scan_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "QUALITY_RISK_SCAN_COMPLETED", "actions_created": "draft_only"}
+
+
+@celery_app.task
+def quality_capa_overdue_scan_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "QUALITY_CAPA_OVERDUE_SCAN_COMPLETED"}
+
+
+@celery_app.task
+def quality_supplier_scan_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "QUALITY_SUPPLIER_SCAN_COMPLETED"}
+
+
+@celery_app.task
+def quality_cost_scan_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "QUALITY_COST_SCAN_COMPLETED"}

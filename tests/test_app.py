@@ -201,3 +201,61 @@ def test_maintenance_ai_draft_action_is_safe():
     data = response.json()["data"]
     assert data["requires_human_approval"] is True
     assert "Close Work Order" in data["ai_safety"]["cannot"]
+
+
+def test_quality_dashboard():
+    response = client.get("/quality/dashboard")
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["quality_enabled"] is True
+    assert "pending_inspections" in data
+    assert "cost_of_poor_quality" in data
+
+
+def test_quality_inspection_failure_creates_quarantine():
+    start = client.post("/quality/inspection-lots/lot-incoming-001/start")
+    assert start.status_code == 200
+    assert start.json()["data"]["status"] == "In Inspection"
+
+    submit = client.post(
+        "/quality/inspection-lots/lot-incoming-001/submit",
+        json={
+            "inspected_by": "qa-user",
+            "results": [
+                {
+                    "checklist_item_id": "chk-item-thickness",
+                    "measured_value": "10.8",
+                    "result_status": "Failed",
+                    "defect_code": "VIS-SCRATCH",
+                    "comments": "Out of tolerance",
+                }
+            ],
+        },
+    )
+    assert submit.status_code == 200
+    assert submit.json()["data"]["inspection_lot"]["status"] == "Quarantine"
+
+    quarantine = client.get("/quality/quarantine")
+    assert quarantine.status_code == 200
+    assert len(quarantine.json()["data"]) >= 1
+
+
+def test_quality_kpis_and_reports():
+    kpis = client.get("/quality/kpis")
+    assert kpis.status_code == 200
+    assert "first_pass_yield" in kpis.json()["data"]
+
+    reports = client.get("/quality/reports")
+    assert reports.status_code == 200
+    assert "inspection_report" in reports.json()["data"]
+
+
+def test_quality_ai_draft_action_is_safe():
+    response = client.post(
+        "/ai/quality/draft-action",
+        json={"action_type": "Draft CAPA", "source_type": "Defect", "source_id": "defect-visual-001", "reason": "Repeated supplier defect"},
+    )
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["requires_human_approval"] is True
+    assert "Scrap Inventory" in data["ai_safety"]["cannot"]

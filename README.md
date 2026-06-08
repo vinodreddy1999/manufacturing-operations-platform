@@ -33,6 +33,8 @@ The Production module has been expanded into a dedicated backend package with pr
 
 The Maintenance module has also been expanded into a dedicated CMMS/EAM-style backend package with machine registry, capability configuration, maintenance plans, breakdown work orders, spare mapping/reservation/consumption, downtime, shutdown windows, assignments, vendors, documents, machine history, lifecycle, costing, reports, dashboard, MTTR/MTBF, health scoring, and rule-based Maintenance AI.
 
+The Quality module has been expanded into a dedicated QMS-style backend package with quality plans, checklists, sampling rules, inspection lots, inspection execution, defects, quarantine, rework, rejection, scrap, CAPA, KPIs, reports, quality tasks/notifications, and rule-based Quality AI.
+
 ## Diagram
 
 See the GitHub-rendered end-to-end scheme diagram here:
@@ -135,6 +137,14 @@ app/
                        Seeded Maintenance repository
     maintenance_service.py
                        Approvals, spares, downtime, health, reports and AI rules
+    quality.py         Quality Management API routes
+    quality_models.py SQLAlchemy tables for Quality Management
+    quality_schemas.py
+                       Pydantic schemas for Quality requests and outputs
+    quality_repository.py
+                       Seeded Quality repository
+    quality_service.py
+                       Inspection execution, failure handling, KPIs, reports and AI rules
   ai_copilot/         AIProvider, MockAIProvider and optional OpenAIProvider interface
   jobs.py             Celery jobs for reports, AI risk scans, expiry/dead stock checks
 alembic/              Migration environment and first foundation migration
@@ -184,6 +194,22 @@ Key endpoint groups:
 - Maintenance AI: `/ai/maintenance/risk-center`, `/ai/maintenance/failure-prediction`, `/ai/maintenance/downtime-prediction`, `/ai/maintenance/spare-prediction`, `/ai/maintenance/health-score`, `/ai/maintenance/root-cause`, `/ai/maintenance/cost-impact`, `/ai/maintenance/recommendations`, `/ai/maintenance/draft-action`
 
 Maintenance AI is recommendation-only. It can analyze, recommend, and create draft actions; it cannot close work orders, approve maintenance, consume spares, change production schedules, or release a machine as available.
+
+## Quality Management Module
+
+Open `http://localhost:8000/docs` and use the `Quality Management` and `Quality AI` tags.
+
+Key endpoint groups:
+
+- Quality plans: `/quality/plans`
+- Checklists and sampling rules: `/quality/checklists`, `/quality/sampling-rules`
+- Inspection lots and execution: `/quality/inspection-lots`, `/quality/inspection-lots/{lot_id}/start`, `/submit`, `/approve`, `/reject`
+- Defects and failure handling: `/quality/defects`, `/quality/quarantine`, `/quality/rework`, `/quality/rejections`, `/quality/scrap`
+- CAPA: `/quality/capa`
+- KPIs, reports, tasks and notifications: `/quality/kpis`, `/quality/reports`, `/quality/tasks`, `/quality/notifications`
+- Quality AI: `/ai/quality/risk-center`, `/ai/quality/defect-prediction`, `/ai/quality/trends`, `/ai/quality/supplier-risk`, `/ai/quality/production-risk`, `/ai/quality/root-cause`, `/ai/quality/cost-risk`, `/ai/quality/draft-action`
+
+Quality AI is recommendation-only. It can analyze, recommend, and create draft actions; it cannot approve releases, scrap inventory, release quarantine, close CAPA, reject suppliers, or dispatch affected goods.
 
 ## Platform Foundation
 

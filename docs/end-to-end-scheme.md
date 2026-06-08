@@ -23,6 +23,7 @@ flowchart LR
     PlatformAPI --> InventoryRouter["Inventory Router app/modules/inventory.py"]
     PlatformAPI --> ProductionRouter["Production Router app/modules/production.py"]
     PlatformAPI --> MaintenanceRouter["Maintenance Router app/modules/maintenance.py"]
+    PlatformAPI --> QualityRouter["Quality Router app/modules/quality.py"]
     PlatformAPI --> GenericModules["Generic Module Routers"]
 
     Core --> Companies["Companies"]
@@ -43,7 +44,6 @@ flowchart LR
 
     GenericModules --> Warehouse["Warehouse"]
     GenericModules --> Procurement["Procurement"]
-    GenericModules --> Quality["Quality"]
     GenericModules --> Sales["Sales"]
 
     ProductionRouter --> ProdMaster["Product Master"]
@@ -63,6 +63,14 @@ flowchart LR
     MaintenanceRouter --> MaintDocs["Attachments / Documents / History"]
     MaintenanceRouter --> MaintReports["Dashboard / Reports / MTTR / MTBF"]
     MaintenanceRouter --> MaintAI["Rule-Based Maintenance AI"]
+
+    QualityRouter --> QualPlans["Quality Plans / Checklists / Sampling"]
+    QualityRouter --> QualLots["Inspection Lots and Execution"]
+    QualityRouter --> QualDefects["Defects and Failure Handling"]
+    QualityRouter --> QualBlocked["Quarantine / Rework / Rejection / Scrap"]
+    QualityRouter --> QualCapa["CAPA and RCA"]
+    QualityRouter --> QualMetrics["KPIs / Reports / Cost of Poor Quality"]
+    QualityRouter --> QualAI["Rule-Based Quality AI"]
 
     InventoryRouter --> InvDashboard["Inventory Dashboard"]
     InventoryRouter --> InvItems["Items / Categories / Tracking"]
@@ -90,6 +98,7 @@ flowchart LR
     InventoryRouter --> Audit
     ProductionRouter --> Audit
     MaintenanceRouter --> Audit
+    QualityRouter --> Audit
     Audit --> AuditLogs
 
     PlatformAPI --> Jobs["Celery Jobs app/jobs.py"]
@@ -123,17 +132,18 @@ flowchart LR
 4. Core platform requests go through `app/core_router.py`.
 5. Company, plant, department, user, role, permission, task, approval, document, and audit data is stored through SQLAlchemy models in `app/platform_models.py`.
 6. Feature flags decide whether module APIs are enabled.
-7. Generic module routers store warehouse, procurement, quality, and sales records in `ModuleRecord`.
+7. Generic module routers store warehouse, procurement, and sales records in `ModuleRecord`.
 8. Inventory requests go through `app/modules/inventory.py`.
 9. Production requests go through `app/modules/production.py`.
 10. Maintenance requests go through `app/modules/maintenance.py`.
-11. Inventory, Production and Maintenance data are validated with Pydantic schemas and returned as structured JSON.
-12. Background jobs are prepared in `app/jobs.py` using Celery and Redis.
-13. User opens the Inventory AI service Swagger at `http://127.0.0.1:8100/docs`.
-14. Inventory AI requests go through `inventory-ai-service/app/routes.py`.
-15. AI routes call rule-based logic in `ai_engine.py`, `risk_rules.py`, and `recommendations.py`.
-16. AI returns analysis, risk levels, recommendations, and draft actions only.
-17. Human approval is required before any critical operational action.
+11. Quality requests go through `app/modules/quality.py`.
+12. Inventory, Production, Maintenance and Quality data are validated with Pydantic schemas and returned as structured JSON.
+13. Background jobs are prepared in `app/jobs.py` using Celery and Redis.
+14. User opens the Inventory AI service Swagger at `http://127.0.0.1:8100/docs`.
+15. Inventory AI requests go through `inventory-ai-service/app/routes.py`.
+16. AI routes call rule-based logic in `ai_engine.py`, `risk_rules.py`, and `recommendations.py`.
+17. AI returns analysis, risk levels, recommendations, and draft actions only.
+18. Human approval is required before any critical operational action.
 
 ## Main Platform Modules
 
@@ -158,6 +168,10 @@ flowchart LR
 | Maintenance service | `app/modules/maintenance_service.py` | Approvals, spares, downtime, health score, reports and Maintenance AI rules |
 | Maintenance schemas | `app/modules/maintenance_schemas.py` | Pydantic schemas for Maintenance requests |
 | Maintenance models | `app/modules/maintenance_models.py` | SQLAlchemy table definitions for Maintenance Management |
+| Quality module | `app/modules/quality.py` | Dedicated Quality Management APIs |
+| Quality service | `app/modules/quality_service.py` | Inspection execution, failure handling, KPIs, reports and Quality AI rules |
+| Quality schemas | `app/modules/quality_schemas.py` | Pydantic schemas for Quality requests |
+| Quality models | `app/modules/quality_models.py` | SQLAlchemy table definitions for Quality Management |
 | Migrations | `alembic/` | Alembic migration scaffold |
 | Docker | `docker-compose.yml` | PostgreSQL, Redis, main API and worker services |
 
@@ -169,7 +183,7 @@ flowchart LR
 | Procurement | `/suppliers`, `/purchase-requisitions`, `/purchase-orders` | Stores supplier and purchasing module records |
 | Production | `/production/*` | Dedicated Production Management module with planning, execution, costing, reporting and AI |
 | Maintenance | `/maintenance/*`, `/machines`, `/maintenance-plans`, `/work-orders`, `/ai/maintenance/*` | Dedicated Maintenance Management module with CMMS/EAM workflows and AI |
-| Quality | `/quality/inspections`, `/quality/quarantine`, `/quality/rework`, `/quality/capa` | Stores inspection, quarantine, rework and corrective action records |
+| Quality | `/quality/*`, `/ai/quality/*` | Dedicated Quality Management module with QMS workflows and AI |
 | Sales | `/customers`, `/sales-orders` | Stores customer and order records |
 | Inventory | `/inventory/*` | Expanded dedicated inventory module with operational views |
 | Inventory AI | `/inventory-ai/*` | Separate AI/rule-based intelligence service |
@@ -224,6 +238,26 @@ flowchart LR
 | Costing | `GET /maintenance/costing` | Spare, labor, vendor, downtime, production loss and total maintenance cost |
 | Reports | `GET /maintenance/reports` | Schedule, work order, breakdown, downtime, spare, history, cost, MTTR, MTBF and overdue reports |
 | Maintenance AI | `/ai/maintenance/*` | Risk center, failure, downtime, spare, health, root cause, cost impact, recommendations and draft actions |
+
+## Quality Management Views
+
+| View | Endpoint | Output |
+| --- | --- | --- |
+| Quality Dashboard | `GET /quality/dashboard` | Pending inspections, failed inspections, quarantine, rework, rejection rate, defect trend, supplier issues, CAPA, FPY and cost of poor quality |
+| Quality Plans | `GET/POST/PUT /quality/plans` | Configurable plans by company, plant, product, material, supplier, customer, process, line, machine and criticality |
+| Checklists | `GET/POST /quality/checklists` | Checklist definitions, items, parameters, tolerances, photos and document requirements |
+| Sampling Rules | `GET/POST /quality/sampling-rules` | Lot size, sample size, acceptance/rejection quantity, inspection level and severity |
+| Inspection Lots | `GET/POST /quality/inspection-lots` | Lots from goods receipt, production completion, WIP, customer return, rework and manual quality requests |
+| Inspection Execution | `POST /quality/inspection-lots/{lot_id}/start`, `/submit`, `/approve`, `/reject` | Checklist responses, measurements, pass/fail, defects, comments, signatures and approvals |
+| Defects | `GET/POST /quality/defects` | Defect category, severity, source, affected quantity, photos and status |
+| Quarantine | `GET/POST /quality/quarantine`, `POST /quality/quarantine/{id}/release` | Failed or blocked inventory movement to quarantine and controlled release |
+| Rework | `GET/POST /quality/rework` | Rework workflow from failed inspection through reinspection |
+| Rejections | `GET/POST /quality/rejections` | Rejected stock blocked from use with cost impact |
+| Scrap | `GET/POST /quality/scrap` | Scrap workflow with estimated loss and approval requirement |
+| CAPA | `GET/POST/PUT /quality/capa` | Corrective and preventive action, root cause, owner, due date and effectiveness checks |
+| KPIs | `GET /quality/kpis` | FPY, defect rate, rework rate, scrap rate, supplier rejection, customer return, CAPA closure and COPQ |
+| Reports | `GET /quality/reports` | Inspection, defect, quarantine, rework, rejection, scrap, CAPA, supplier, production, customer return and COPQ reports |
+| Quality AI | `/ai/quality/*` | Risk center, defect prediction, trends, supplier risk, production risk, root cause, cost risk and draft actions |
 
 ## Main Inventory Module Views
 
@@ -339,6 +373,28 @@ flowchart TD
     HumanApproval --> Output
 ```
 
+## Quality Data Flow
+
+```mermaid
+flowchart TD
+    Client["Swagger / API Client"] --> QualRoute["Quality Router app/modules/quality.py"]
+    QualRoute --> QualSchemas["Pydantic Schemas app/modules/quality_schemas.py"]
+    QualSchemas --> QualRepo["Seeded Repository app/modules/quality_repository.py"]
+    QualRepo --> QualService["Service Layer app/modules/quality_service.py"]
+    QualService --> Plans["Plans / Checklists / Sampling"]
+    QualService --> Inspection["Inspection Execution"]
+    Inspection --> Decision["Pass / Fail Decision"]
+    Decision --> Release["Approve / Release"]
+    Decision --> Blocked["Quarantine / Rework / Reject / Scrap"]
+    QualService --> Capa["CAPA / RCA"]
+    QualService --> Metrics["KPIs / Reports / Cost of Poor Quality"]
+    QualService --> QualAI["Quality AI Recommendations"]
+    QualAI --> HumanApproval["Human Approval Required"]
+    Metrics --> Output["Final JSON Output"]
+    Blocked --> Output
+    HumanApproval --> Output
+```
+
 ## Inventory AI Data Flow
 
 ```mermaid
@@ -365,6 +421,7 @@ sequenceDiagram
     participant I as Inventory Router
     participant R as Production Router
     participant M as Maintenance Router
+    participant Q as Quality Router
     participant S as Store / SQLAlchemy
     participant A as Inventory AI Service :8100
     participant E as AI Engine
@@ -395,6 +452,12 @@ sequenceDiagram
     S-->>M: Return maintenance seed data
     M-->>O: Return dashboard, MTTR, MTBF and risk JSON
 
+    U->>P: Request /quality/inspection-lots/lot-incoming-001/submit
+    P->>Q: Route quality request
+    Q->>S: Read lot, checklist, defects and quality rules
+    S-->>Q: Return quality seed data
+    Q-->>O: Return inspection decision and quarantine/rework JSON
+
     U->>A: Request /inventory-ai/risk-center
     A->>D: Load inventory signals
     D-->>A: Return SQLAlchemy rows
@@ -420,3 +483,8 @@ Maintenance-specific AI safety:
 
 - AI can create draft work orders, spare purchase requests, schedule changes, investigation tasks and vendor service requests.
 - AI cannot close work orders, approve maintenance, consume spares, change production schedules or release machines as available.
+
+Quality-specific AI safety:
+
+- AI can create draft CAPA, defect investigation tasks, supplier quality reviews, rework tasks, quarantine reviews and customer quality responses.
+- AI cannot approve releases, scrap inventory, release quarantine, close CAPA, reject suppliers or dispatch affected goods.
