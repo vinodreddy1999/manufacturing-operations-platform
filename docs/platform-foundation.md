@@ -14,6 +14,7 @@ Implemented now:
 - Dedicated Production Management module with typed routes, schemas, SQLAlchemy table definitions, seeded repository, service layer and rule-based AI
 - Dedicated Maintenance Management module with typed routes, schemas, SQLAlchemy table definitions, seeded repository, service layer, Celery job hooks and rule-based AI
 - Dedicated Quality Management module with typed routes, schemas, SQLAlchemy table definitions, seeded repository, service layer, Celery job hooks and rule-based AI
+- Dedicated Sales & Distribution module with typed routes, schemas, SQLAlchemy table definitions, seeded repository, service layer, Celery job hooks and rule-based AI
 - JWT/password security helpers
 - Optional AI provider interface: `AIProvider`, `MockAIProvider`, `OpenAIProvider`
 - Celery job declarations for reports, AI scans, expiry checks and dead-stock checks
@@ -21,7 +22,7 @@ Implemented now:
 
 The existing expanded Inventory module and separate Inventory AI service remain intact. Production has now moved beyond the generic record layer into a dedicated module package under `app/modules/`.
 
-Next module-depth phases should replace the remaining generic `ModuleRecord` endpoints with dedicated typed models/services for Warehouse, Procurement and Sales.
+Next module-depth phases should replace the remaining generic `ModuleRecord` endpoints with dedicated typed models/services for Warehouse and Procurement.
 
 ## Production Module Depth
 
@@ -117,3 +118,30 @@ AI safety boundary:
 
 - AI can analyze, recommend and create draft actions.
 - AI cannot approve releases, scrap inventory, release quarantine, close CAPA, reject suppliers or dispatch affected goods.
+
+## Sales & Distribution Module Depth
+
+Implemented Sales & Distribution areas:
+
+- Customer master
+- Customer hierarchy seed data
+- Region and territory management
+- Plant representative allocation model
+- Sales order and sales order items
+- Finished goods availability formula
+- Customer reservation and protected allocation rules
+- Partial allocation with production recommendation
+- Dispatch order and FEFO/FIFO pick list
+- Shipment tracking
+- Customer returns
+- Credit profile structure
+- Sales tasks and email-first notification queue
+- Dashboard, reports and KPIs
+- Rule-based Sales AI risk center, demand forecast, order risk, allocation recommendation, regional demand, expiry-aware sales, customer profitability, dispatch optimization and returns analysis
+- Draft-only Sales AI actions
+- Celery job hooks for sales risk, demand forecast, dispatch and returns scans
+
+AI safety boundary:
+
+- AI can analyze, recommend and create draft actions.
+- AI cannot confirm sales orders, reassign protected inventory, dispatch goods, approve returns, issue credit or change customer pricing.

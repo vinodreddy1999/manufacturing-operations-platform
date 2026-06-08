@@ -259,3 +259,52 @@ def test_quality_ai_draft_action_is_safe():
     data = response.json()["data"]
     assert data["requires_human_approval"] is True
     assert "Scrap Inventory" in data["ai_safety"]["cannot"]
+
+
+def test_sales_dashboard_and_customers():
+    dashboard = client.get("/sales/dashboard")
+    assert dashboard.status_code == 200
+    assert dashboard.json()["data"]["sales_enabled"] is True
+
+    customers = client.get("/customers")
+    assert customers.status_code == 200
+    assert customers.json()["module"] == "SALES"
+    assert any(customer["customer_id"] == "cust-apollo" for customer in customers.json()["data"])
+
+
+def test_sales_reserve_order_partial_allocation():
+    response = client.post("/sales-orders/so-001/reserve")
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["order"]["status"] in {"Partially Reserved", "Fully Reserved", "Production Required"}
+    assert "production_recommendation" in data
+
+
+def test_sales_protected_allocation_requires_override_approval():
+    response = client.post(
+        "/allocations",
+        json={"sales_order_id": "so-001", "item_id": "fg-pump-900", "quantity": 50, "override_protected": True},
+    )
+    assert response.status_code == 200
+    assert response.json()["data"]["status"] == "Override Approval Required"
+
+
+def test_sales_dispatch_and_kpis():
+    dispatch = client.post("/sales-orders/so-001/dispatch")
+    assert dispatch.status_code == 200
+    assert "pick_list" in dispatch.json()["data"]["dispatch_order"]
+
+    kpis = client.get("/sales/kpis")
+    assert kpis.status_code == 200
+    assert "fill_rate" in kpis.json()["data"]
+
+
+def test_sales_ai_draft_action_is_safe():
+    response = client.post(
+        "/ai/sales/draft-action",
+        json={"action_type": "Draft production request", "source_type": "Sales Order", "source_id": "so-001", "reason": "Insufficient finished goods"},
+    )
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["requires_human_approval"] is True
+    assert "Dispatch Goods" in data["ai_safety"]["cannot"]

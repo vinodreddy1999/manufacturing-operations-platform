@@ -24,6 +24,7 @@ flowchart LR
     PlatformAPI --> ProductionRouter["Production Router app/modules/production.py"]
     PlatformAPI --> MaintenanceRouter["Maintenance Router app/modules/maintenance.py"]
     PlatformAPI --> QualityRouter["Quality Router app/modules/quality.py"]
+    PlatformAPI --> SalesRouter["Sales Router app/modules/sales.py"]
     PlatformAPI --> GenericModules["Generic Module Routers"]
 
     Core --> Companies["Companies"]
@@ -44,7 +45,6 @@ flowchart LR
 
     GenericModules --> Warehouse["Warehouse"]
     GenericModules --> Procurement["Procurement"]
-    GenericModules --> Sales["Sales"]
 
     ProductionRouter --> ProdMaster["Product Master"]
     ProductionRouter --> ProdBom["BOM and Routing"]
@@ -71,6 +71,14 @@ flowchart LR
     QualityRouter --> QualCapa["CAPA and RCA"]
     QualityRouter --> QualMetrics["KPIs / Reports / Cost of Poor Quality"]
     QualityRouter --> QualAI["Rule-Based Quality AI"]
+
+    SalesRouter --> SalesCustomer["Customers / Hierarchy / Regions"]
+    SalesRouter --> SalesOrders["Sales Orders and Items"]
+    SalesRouter --> SalesAllocation["FG Availability / Reservation / Allocation"]
+    SalesRouter --> SalesDispatch["Dispatch / Pick / Pack / Shipments"]
+    SalesRouter --> SalesReturns["Returns"]
+    SalesRouter --> SalesMetrics["Dashboard / KPIs / Reports"]
+    SalesRouter --> SalesAI["Rule-Based Sales AI"]
 
     InventoryRouter --> InvDashboard["Inventory Dashboard"]
     InventoryRouter --> InvItems["Items / Categories / Tracking"]
@@ -99,6 +107,7 @@ flowchart LR
     ProductionRouter --> Audit
     MaintenanceRouter --> Audit
     QualityRouter --> Audit
+    SalesRouter --> Audit
     Audit --> AuditLogs
 
     PlatformAPI --> Jobs["Celery Jobs app/jobs.py"]
@@ -132,18 +141,19 @@ flowchart LR
 4. Core platform requests go through `app/core_router.py`.
 5. Company, plant, department, user, role, permission, task, approval, document, and audit data is stored through SQLAlchemy models in `app/platform_models.py`.
 6. Feature flags decide whether module APIs are enabled.
-7. Generic module routers store warehouse, procurement, and sales records in `ModuleRecord`.
+7. Generic module routers store warehouse and procurement records in `ModuleRecord`.
 8. Inventory requests go through `app/modules/inventory.py`.
 9. Production requests go through `app/modules/production.py`.
 10. Maintenance requests go through `app/modules/maintenance.py`.
 11. Quality requests go through `app/modules/quality.py`.
-12. Inventory, Production, Maintenance and Quality data are validated with Pydantic schemas and returned as structured JSON.
-13. Background jobs are prepared in `app/jobs.py` using Celery and Redis.
-14. User opens the Inventory AI service Swagger at `http://127.0.0.1:8100/docs`.
-15. Inventory AI requests go through `inventory-ai-service/app/routes.py`.
-16. AI routes call rule-based logic in `ai_engine.py`, `risk_rules.py`, and `recommendations.py`.
-17. AI returns analysis, risk levels, recommendations, and draft actions only.
-18. Human approval is required before any critical operational action.
+12. Sales requests go through `app/modules/sales.py`.
+13. Inventory, Production, Maintenance, Quality and Sales data are validated with Pydantic schemas and returned as structured JSON.
+14. Background jobs are prepared in `app/jobs.py` using Celery and Redis.
+15. User opens the Inventory AI service Swagger at `http://127.0.0.1:8100/docs`.
+16. Inventory AI requests go through `inventory-ai-service/app/routes.py`.
+17. AI routes call rule-based logic in `ai_engine.py`, `risk_rules.py`, and `recommendations.py`.
+18. AI returns analysis, risk levels, recommendations, and draft actions only.
+19. Human approval is required before any critical operational action.
 
 ## Main Platform Modules
 
@@ -172,6 +182,10 @@ flowchart LR
 | Quality service | `app/modules/quality_service.py` | Inspection execution, failure handling, KPIs, reports and Quality AI rules |
 | Quality schemas | `app/modules/quality_schemas.py` | Pydantic schemas for Quality requests |
 | Quality models | `app/modules/quality_models.py` | SQLAlchemy table definitions for Quality Management |
+| Sales module | `app/modules/sales.py` | Dedicated Sales & Distribution APIs |
+| Sales service | `app/modules/sales_service.py` | Availability, reservations, allocation, dispatch, KPIs, reports and Sales AI rules |
+| Sales schemas | `app/modules/sales_schemas.py` | Pydantic schemas for Sales requests |
+| Sales models | `app/modules/sales_models.py` | SQLAlchemy table definitions for Sales & Distribution |
 | Migrations | `alembic/` | Alembic migration scaffold |
 | Docker | `docker-compose.yml` | PostgreSQL, Redis, main API and worker services |
 
@@ -184,7 +198,7 @@ flowchart LR
 | Production | `/production/*` | Dedicated Production Management module with planning, execution, costing, reporting and AI |
 | Maintenance | `/maintenance/*`, `/machines`, `/maintenance-plans`, `/work-orders`, `/ai/maintenance/*` | Dedicated Maintenance Management module with CMMS/EAM workflows and AI |
 | Quality | `/quality/*`, `/ai/quality/*` | Dedicated Quality Management module with QMS workflows and AI |
-| Sales | `/customers`, `/sales-orders` | Stores customer and order records |
+| Sales | `/customers`, `/sales-orders`, `/dispatch-orders`, `/shipments`, `/returns`, `/ai/sales/*` | Dedicated Sales & Distribution module with order, allocation, dispatch, returns and AI |
 | Inventory | `/inventory/*` | Expanded dedicated inventory module with operational views |
 | Inventory AI | `/inventory-ai/*` | Separate AI/rule-based intelligence service |
 
@@ -258,6 +272,24 @@ flowchart LR
 | KPIs | `GET /quality/kpis` | FPY, defect rate, rework rate, scrap rate, supplier rejection, customer return, CAPA closure and COPQ |
 | Reports | `GET /quality/reports` | Inspection, defect, quarantine, rework, rejection, scrap, CAPA, supplier, production, customer return and COPQ reports |
 | Quality AI | `/ai/quality/*` | Risk center, defect prediction, trends, supplier risk, production risk, root cause, cost risk and draft actions |
+
+## Sales & Distribution Views
+
+| View | Endpoint | Output |
+| --- | --- | --- |
+| Sales Dashboard | `GET /sales/dashboard` | Open orders, approval queue, shortages, production requirement, dispatch delays, regional sales, returns and finished goods availability |
+| Customer Master | `GET/POST/PUT/DELETE /customers` | Customer records, region, territory, sales rep, plant assignment and active status |
+| Regions and Territories | `GET/POST /regions`, `GET/POST /territories` | Regional sales mapping for demand, allocation and dispatch planning |
+| Plant Representatives | `GET/POST /plant-representatives` | Plant representative allocation authority and limits |
+| Sales Orders | `GET/POST/PUT /sales-orders` | Customer order header and line items |
+| Order Workflow | `POST /sales-orders/{id}/submit`, `/approve`, `/reserve`, `/dispatch`, `/close` | Approval, inventory check, reservation, dispatch and closure |
+| Allocation | `GET/POST /allocations` | Customer allocation, protected reservation check and override approval requirement |
+| Dispatch Orders | `GET/POST /dispatch-orders` | Dispatch order, pick list, FEFO/FIFO location and packing status |
+| Shipments | `GET/POST/PUT /shipments` | Carrier, vehicle, tracking, driver, status, delivery dates and proof of delivery |
+| Returns | `GET/POST/PUT /returns` | Return request, approval, received, quality pending, restock, rework, scrap, replace or credit |
+| KPIs | `GET /sales/kpis` | Fulfillment, delivery, fill rate, backorder, returns, demand growth, delay and profitability |
+| Reports | `GET /sales/reports` | Orders, customers, regional sales, allocation, dispatch, shipment delay, returns, profitability, demand and inventory reports |
+| Sales AI | `/ai/sales/*` | Risk center, demand forecast, order risk, allocation, regional demand, expiry-aware sales, profitability, dispatch, returns and draft actions |
 
 ## Main Inventory Module Views
 
@@ -395,6 +427,27 @@ flowchart TD
     HumanApproval --> Output
 ```
 
+## Sales Data Flow
+
+```mermaid
+flowchart TD
+    Client["Swagger / API Client"] --> SalesRoute["Sales Router app/modules/sales.py"]
+    SalesRoute --> SalesSchemas["Pydantic Schemas app/modules/sales_schemas.py"]
+    SalesSchemas --> SalesRepo["Seeded Repository app/modules/sales_repository.py"]
+    SalesRepo --> SalesService["Service Layer app/modules/sales_service.py"]
+    SalesService --> Availability["Finished Goods Availability Formula"]
+    Availability --> Reservation["Customer Reservation / Protected Allocation"]
+    Reservation --> Partial["Partial Allocation / Production Recommendation"]
+    SalesService --> Dispatch["Dispatch Order / Pick List / Shipment"]
+    SalesService --> Returns["Returns / Quality Inspection Link"]
+    SalesService --> Metrics["KPIs / Reports / Dashboard"]
+    SalesService --> SalesAI["Sales AI Recommendations"]
+    SalesAI --> HumanApproval["Human Approval Required"]
+    Metrics --> Output["Final JSON Output"]
+    Dispatch --> Output
+    HumanApproval --> Output
+```
+
 ## Inventory AI Data Flow
 
 ```mermaid
@@ -422,6 +475,7 @@ sequenceDiagram
     participant R as Production Router
     participant M as Maintenance Router
     participant Q as Quality Router
+    participant X as Sales Router
     participant S as Store / SQLAlchemy
     participant A as Inventory AI Service :8100
     participant E as AI Engine
@@ -458,6 +512,12 @@ sequenceDiagram
     S-->>Q: Return quality seed data
     Q-->>O: Return inspection decision and quarantine/rework JSON
 
+    U->>P: Request /sales-orders/so-001/reserve
+    P->>X: Route sales request
+    X->>S: Read order, line items, finished goods and protected reservations
+    S-->>X: Return sales seed data
+    X-->>O: Return reservation, partial allocation and production recommendation JSON
+
     U->>A: Request /inventory-ai/risk-center
     A->>D: Load inventory signals
     D-->>A: Return SQLAlchemy rows
@@ -488,3 +548,8 @@ Quality-specific AI safety:
 
 - AI can create draft CAPA, defect investigation tasks, supplier quality reviews, rework tasks, quarantine reviews and customer quality responses.
 - AI cannot approve releases, scrap inventory, release quarantine, close CAPA, reject suppliers or dispatch affected goods.
+
+Sales-specific AI safety:
+
+- AI can create draft production requests, inventory transfer requests, customer delay emails, dispatch priority tasks, return investigation tasks and demand forecast reports.
+- AI cannot confirm sales orders, reassign protected inventory, dispatch goods, approve returns, issue credit or change customer pricing.

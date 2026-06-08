@@ -14,6 +14,8 @@ from .modules.maintenance import router as maintenance_router
 from .modules.production import router as production_router
 from .modules.quality import ai_router as quality_ai_router
 from .modules.quality import router as quality_router
+from .modules.sales import ai_router as sales_ai_router
+from .modules.sales import router as sales_router
 from .platform_seed import seed_platform
 from .schemas import (
     ApiResult,
@@ -48,6 +50,8 @@ app.include_router(maintenance_alias_router)
 app.include_router(maintenance_ai_router)
 app.include_router(quality_router)
 app.include_router(quality_ai_router)
+app.include_router(sales_router)
+app.include_router(sales_ai_router)
 app.include_router(create_module_router("warehouse", "/warehouses"))
 app.include_router(create_module_router("warehouse_zones", "/warehouses/{warehouse_id}/zones"))
 app.include_router(create_module_router("warehouse_map", "/warehouses/{warehouse_id}/map"))
@@ -62,8 +66,6 @@ app.include_router(create_module_router("bom", "/bom"))
 app.include_router(create_module_router("routing", "/routing"))
 app.include_router(create_module_router("production_orders", "/production-orders"))
 app.include_router(create_module_router("production_schedules", "/production-schedules"))
-app.include_router(create_module_router("sales_customers", "/customers"))
-app.include_router(create_module_router("sales_orders", "/sales-orders"))
 
 
 def result(module: ModuleKey, action: str, message: str, data: dict[str, Any] | list[dict[str, Any]]) -> ApiResult:

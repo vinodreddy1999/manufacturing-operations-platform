@@ -35,6 +35,8 @@ The Maintenance module has also been expanded into a dedicated CMMS/EAM-style ba
 
 The Quality module has been expanded into a dedicated QMS-style backend package with quality plans, checklists, sampling rules, inspection lots, inspection execution, defects, quarantine, rework, rejection, scrap, CAPA, KPIs, reports, quality tasks/notifications, and rule-based Quality AI.
 
+The Sales & Distribution module has been expanded into a dedicated ERP-style backend package with customer master, regions, territories, plant representatives, sales orders, finished goods availability, protected customer reservations, partial allocation, dispatch orders, shipments, returns, KPIs, reports, tasks/notifications, and rule-based Sales AI.
+
 ## Diagram
 
 See the GitHub-rendered end-to-end scheme diagram here:
@@ -145,6 +147,12 @@ app/
                        Seeded Quality repository
     quality_service.py
                        Inspection execution, failure handling, KPIs, reports and AI rules
+    sales.py           Sales & Distribution API routes
+    sales_models.py    SQLAlchemy tables for Sales & Distribution
+    sales_schemas.py   Pydantic schemas for Sales requests and outputs
+    sales_repository.py
+                       Seeded Sales repository
+    sales_service.py   Availability, allocation, dispatch, KPIs, reports and AI rules
   ai_copilot/         AIProvider, MockAIProvider and optional OpenAIProvider interface
   jobs.py             Celery jobs for reports, AI risk scans, expiry/dead stock checks
 alembic/              Migration environment and first foundation migration
@@ -210,6 +218,23 @@ Key endpoint groups:
 - Quality AI: `/ai/quality/risk-center`, `/ai/quality/defect-prediction`, `/ai/quality/trends`, `/ai/quality/supplier-risk`, `/ai/quality/production-risk`, `/ai/quality/root-cause`, `/ai/quality/cost-risk`, `/ai/quality/draft-action`
 
 Quality AI is recommendation-only. It can analyze, recommend, and create draft actions; it cannot approve releases, scrap inventory, release quarantine, close CAPA, reject suppliers, or dispatch affected goods.
+
+## Sales & Distribution Module
+
+Open `http://localhost:8000/docs` and use the `Sales & Distribution` and `Sales AI` tags.
+
+Key endpoint groups:
+
+- Customer master: `/customers`
+- Regions and territories: `/regions`, `/territories`
+- Plant representatives: `/plant-representatives`
+- Sales orders: `/sales-orders`, `/sales-orders/{order_id}/submit`, `/approve`, `/reserve`, `/dispatch`, `/close`
+- Finished goods allocation: `/allocations`
+- Dispatch, shipments and returns: `/dispatch-orders`, `/shipments`, `/returns`
+- KPIs, reports, tasks and notifications: `/sales/kpis`, `/sales/reports`, `/sales/tasks`, `/sales/notifications`
+- Sales AI: `/ai/sales/risk-center`, `/ai/sales/demand-forecast`, `/ai/sales/order-risk`, `/ai/sales/allocation-recommendation`, `/ai/sales/regional-demand`, `/ai/sales/expiry-aware-sales`, `/ai/sales/customer-profitability`, `/ai/sales/dispatch-optimization`, `/ai/sales/returns-analysis`, `/ai/sales/draft-action`
+
+Sales AI is recommendation-only. It can analyze, recommend, and create draft actions; it cannot confirm sales orders, reassign protected inventory, dispatch goods, approve returns, issue credit, or change customer pricing.
 
 ## Platform Foundation
 
