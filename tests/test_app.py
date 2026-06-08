@@ -308,3 +308,61 @@ def test_sales_ai_draft_action_is_safe():
     data = response.json()["data"]
     assert data["requires_human_approval"] is True
     assert "Dispatch Goods" in data["ai_safety"]["cannot"]
+
+
+def test_customer_portal_login_and_profile_are_customer_scoped():
+    login = client.post("/customer-portal/auth/login", json={"email": "meera@example.com", "password": "Portal123!"})
+    assert login.status_code == 200
+    assert login.json()["data"]["customer_id"] == "cust-apollo"
+
+    profile = client.get("/customer-portal/profile")
+    assert profile.status_code == 200
+    data = profile.json()["data"]
+    assert data["customer_id"] == "cust-apollo"
+    assert "region_id" not in data
+
+
+def test_customer_portal_orders_hide_internal_details():
+    response = client.get("/customer-portal/orders")
+    assert response.status_code == 200
+    orders = response.json()["data"]
+    assert all(order["id"] == "so-001" for order in orders)
+    assert "portal_status" in orders[0]
+    assert "priority" not in orders[0]
+
+
+def test_customer_portal_support_and_return_requests():
+    support = client.post(
+        "/customer-portal/support-requests",
+        json={"sales_order_id": "so-001", "request_type": "Delivery issue", "subject": "Need delivery update", "description": "Please update expected delivery."},
+    )
+    assert support.status_code == 200
+    assert support.json()["data"]["customer_id"] == "cust-apollo"
+
+    return_request = client.post(
+        "/customer-portal/returns",
+        json={"sales_order_id": "so-001", "reason": "Damaged item", "quantity": 1},
+    )
+    assert return_request.status_code == 200
+    assert return_request.json()["data"]["status"] == "Submitted"
+
+
+def test_customer_portal_document_download_is_scoped():
+    response = client.get("/customer-portal/documents/doc-invoice-001/download")
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["document_id"] == "doc-invoice-001"
+    assert "secure_download_token" in data
+    assert "file_url" not in data
+
+
+def test_customer_portal_ai_draft_action_is_safe_and_sanitized():
+    response = client.post(
+        "/ai/customer-portal/draft-action",
+        json={"action_type": "Draft customer delay email", "customer_id": "cust-apollo", "source_type": "Sales Order", "source_id": "so-001", "reason": "internal shortage in plant"},
+    )
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["requires_human_approval"] is True
+    assert "Release Internal Information" in data["ai_safety"]["cannot"]
+    assert "internal shortage" not in data["reason"]

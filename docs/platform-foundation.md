@@ -15,6 +15,7 @@ Implemented now:
 - Dedicated Maintenance Management module with typed routes, schemas, SQLAlchemy table definitions, seeded repository, service layer, Celery job hooks and rule-based AI
 - Dedicated Quality Management module with typed routes, schemas, SQLAlchemy table definitions, seeded repository, service layer, Celery job hooks and rule-based AI
 - Dedicated Sales & Distribution module with typed routes, schemas, SQLAlchemy table definitions, seeded repository, service layer, Celery job hooks and rule-based AI
+- Dedicated Customer Portal module with external-user security, customer-scoped routes, SQLAlchemy table definitions, seeded repository, service layer, Celery job hooks and rule-based AI
 - JWT/password security helpers
 - Optional AI provider interface: `AIProvider`, `MockAIProvider`, `OpenAIProvider`
 - Celery job declarations for reports, AI scans, expiry checks and dead-stock checks
@@ -145,3 +146,28 @@ AI safety boundary:
 
 - AI can analyze, recommend and create draft actions.
 - AI cannot confirm sales orders, reassign protected inventory, dispatch goods, approve returns, issue credit or change customer pricing.
+
+## Customer Portal Module Depth
+
+Implemented Customer Portal areas:
+
+- Isolated external customer portal login and refresh token structure
+- Customer portal user invitations and disable flow
+- Customer profile view with restricted fields
+- Profile update request workflow
+- Customer-owned order tracking with portal-friendly statuses
+- Customer-owned shipment tracking
+- Secure document listing and download token generation
+- Support requests, comments and attachments
+- Return requests with quality-required status
+- Notifications, reports and feedback
+- Customer portal audit logs
+- Strict customer-level data filtering
+- No internal inventory, costing, supplier or production detail leakage
+- Rule-based Customer Portal AI risk center, order risk, support classification, return risk, document risk, satisfaction risk and draft actions
+- Celery job hooks for portal risk, document and support scans
+
+AI safety boundary:
+
+- AI can analyze, recommend and create draft actions.
+- AI cannot approve returns, issue credit, cancel orders, promise delivery dates, release internal information or send external customer emails without approval.

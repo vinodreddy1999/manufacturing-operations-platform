@@ -86,3 +86,18 @@ def sales_dispatch_scan_job(company_id: str) -> dict:
 @celery_app.task
 def sales_returns_scan_job(company_id: str) -> dict:
     return {"company_id": company_id, "status": "SALES_RETURNS_SCAN_COMPLETED"}
+
+
+@celery_app.task
+def customer_portal_risk_scan_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "CUSTOMER_PORTAL_RISK_SCAN_COMPLETED", "actions_created": "draft_only"}
+
+
+@celery_app.task
+def customer_portal_document_scan_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "CUSTOMER_PORTAL_DOCUMENT_SCAN_COMPLETED"}
+
+
+@celery_app.task
+def customer_portal_support_scan_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "CUSTOMER_PORTAL_SUPPORT_SCAN_COMPLETED"}

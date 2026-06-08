@@ -25,6 +25,7 @@ flowchart LR
     PlatformAPI --> MaintenanceRouter["Maintenance Router app/modules/maintenance.py"]
     PlatformAPI --> QualityRouter["Quality Router app/modules/quality.py"]
     PlatformAPI --> SalesRouter["Sales Router app/modules/sales.py"]
+    PlatformAPI --> CustomerPortalRouter["Customer Portal Router app/modules/customer_portal.py"]
     PlatformAPI --> GenericModules["Generic Module Routers"]
 
     Core --> Companies["Companies"]
@@ -80,6 +81,14 @@ flowchart LR
     SalesRouter --> SalesMetrics["Dashboard / KPIs / Reports"]
     SalesRouter --> SalesAI["Rule-Based Sales AI"]
 
+    CustomerPortalRouter --> PortalAuth["External Customer Auth"]
+    CustomerPortalRouter --> PortalProfile["Profile / Address Update Requests"]
+    CustomerPortalRouter --> PortalOrders["Customer-Owned Orders"]
+    CustomerPortalRouter --> PortalShipments["Customer-Owned Shipments"]
+    CustomerPortalRouter --> PortalDocs["Secure Shared Documents"]
+    CustomerPortalRouter --> PortalSupport["Support / Returns / Feedback"]
+    CustomerPortalRouter --> PortalAI["Rule-Based Customer Portal AI"]
+
     InventoryRouter --> InvDashboard["Inventory Dashboard"]
     InventoryRouter --> InvItems["Items / Categories / Tracking"]
     InventoryRouter --> InvLocation["Locations / 2D Warehouse Map"]
@@ -108,6 +117,7 @@ flowchart LR
     MaintenanceRouter --> Audit
     QualityRouter --> Audit
     SalesRouter --> Audit
+    CustomerPortalRouter --> Audit
     Audit --> AuditLogs
 
     PlatformAPI --> Jobs["Celery Jobs app/jobs.py"]
@@ -147,13 +157,14 @@ flowchart LR
 10. Maintenance requests go through `app/modules/maintenance.py`.
 11. Quality requests go through `app/modules/quality.py`.
 12. Sales requests go through `app/modules/sales.py`.
-13. Inventory, Production, Maintenance, Quality and Sales data are validated with Pydantic schemas and returned as structured JSON.
-14. Background jobs are prepared in `app/jobs.py` using Celery and Redis.
-15. User opens the Inventory AI service Swagger at `http://127.0.0.1:8100/docs`.
-16. Inventory AI requests go through `inventory-ai-service/app/routes.py`.
-17. AI routes call rule-based logic in `ai_engine.py`, `risk_rules.py`, and `recommendations.py`.
-18. AI returns analysis, risk levels, recommendations, and draft actions only.
-19. Human approval is required before any critical operational action.
+13. Customer Portal requests go through `app/modules/customer_portal.py`.
+14. Inventory, Production, Maintenance, Quality, Sales and Customer Portal data are validated with Pydantic schemas and returned as structured JSON.
+15. Background jobs are prepared in `app/jobs.py` using Celery and Redis.
+16. User opens the Inventory AI service Swagger at `http://127.0.0.1:8100/docs`.
+17. Inventory AI requests go through `inventory-ai-service/app/routes.py`.
+18. AI routes call rule-based logic in `ai_engine.py`, `risk_rules.py`, and `recommendations.py`.
+19. AI returns analysis, risk levels, recommendations, and draft actions only.
+20. Human approval is required before any critical operational action.
 
 ## Main Platform Modules
 
@@ -186,6 +197,10 @@ flowchart LR
 | Sales service | `app/modules/sales_service.py` | Availability, reservations, allocation, dispatch, KPIs, reports and Sales AI rules |
 | Sales schemas | `app/modules/sales_schemas.py` | Pydantic schemas for Sales requests |
 | Sales models | `app/modules/sales_models.py` | SQLAlchemy table definitions for Sales & Distribution |
+| Customer Portal module | `app/modules/customer_portal.py` | External customer portal APIs |
+| Customer Portal service | `app/modules/customer_portal_service.py` | Portal auth, customer-scoped data access, documents, reports and AI rules |
+| Customer Portal schemas | `app/modules/customer_portal_schemas.py` | Pydantic schemas for portal auth, support, returns and AI requests |
+| Customer Portal models | `app/modules/customer_portal_models.py` | SQLAlchemy table definitions for portal users, support, returns, documents and audit |
 | Migrations | `alembic/` | Alembic migration scaffold |
 | Docker | `docker-compose.yml` | PostgreSQL, Redis, main API and worker services |
 
@@ -199,6 +214,7 @@ flowchart LR
 | Maintenance | `/maintenance/*`, `/machines`, `/maintenance-plans`, `/work-orders`, `/ai/maintenance/*` | Dedicated Maintenance Management module with CMMS/EAM workflows and AI |
 | Quality | `/quality/*`, `/ai/quality/*` | Dedicated Quality Management module with QMS workflows and AI |
 | Sales | `/customers`, `/sales-orders`, `/dispatch-orders`, `/shipments`, `/returns`, `/ai/sales/*` | Dedicated Sales & Distribution module with order, allocation, dispatch, returns and AI |
+| Customer Portal | `/customer-portal/*`, `/ai/customer-portal/*` | Dedicated external customer portal with customer-scoped order, shipment, document, support and return workflows |
 | Inventory | `/inventory/*` | Expanded dedicated inventory module with operational views |
 | Inventory AI | `/inventory-ai/*` | Separate AI/rule-based intelligence service |
 
@@ -290,6 +306,22 @@ flowchart LR
 | KPIs | `GET /sales/kpis` | Fulfillment, delivery, fill rate, backorder, returns, demand growth, delay and profitability |
 | Reports | `GET /sales/reports` | Orders, customers, regional sales, allocation, dispatch, shipment delay, returns, profitability, demand and inventory reports |
 | Sales AI | `/ai/sales/*` | Risk center, demand forecast, order risk, allocation, regional demand, expiry-aware sales, profitability, dispatch, returns and draft actions |
+
+## Customer Portal Views
+
+| View | Endpoint | Output |
+| --- | --- | --- |
+| Portal Auth | `POST /customer-portal/auth/login`, `/refresh`, `/password-reset`, `/verify-email` | Isolated external customer authentication and portal JWTs |
+| Portal Users | `GET /customer-portal/users`, `POST /customer-portal/users/invite`, `PUT /customer-portal/users/{id}`, `POST /customer-portal/users/{id}/disable` | External customer users, roles, status and invitations |
+| Profile | `GET /customer-portal/profile`, `PUT /customer-portal/profile/update-request` | Customer-owned profile and controlled update request |
+| Dashboard | `GET /customer-portal/dashboard` | Open orders, production orders, ready dispatch, shipments, delivered orders, support, returns, documents and notifications |
+| Order Tracking | `GET /customer-portal/orders`, `GET /customer-portal/orders/{id}` | Customer-owned orders only, portal-friendly statuses and safe line item fields |
+| Shipment Tracking | `GET /customer-portal/shipments`, `GET /customer-portal/shipments/{id}` | Customer-owned shipment status and proof of delivery |
+| Documents | `GET /customer-portal/documents`, `GET /customer-portal/documents/{id}/download` | Explicitly shared customer documents and secure download token |
+| Support | `GET/POST /customer-portal/support-requests`, comments and attachments | Customer support requests and customer-visible updates |
+| Returns | `GET/POST /customer-portal/returns`, `GET /customer-portal/returns/{id}` | Customer return requests and tracking |
+| Reports | `GET /customer-portal/reports/{report_type}` | Customer-owned order, shipment, return and document reports |
+| Customer Portal AI | `/ai/customer-portal/*` | Risk center, order risk, support classification, return risk, document risk, satisfaction risk and draft actions |
 
 ## Main Inventory Module Views
 
@@ -448,6 +480,26 @@ flowchart TD
     HumanApproval --> Output
 ```
 
+## Customer Portal Data Flow
+
+```mermaid
+flowchart TD
+    ExternalUser["External Customer User"] --> PortalRoute["Customer Portal Router app/modules/customer_portal.py"]
+    PortalRoute --> PortalSchemas["Pydantic Schemas app/modules/customer_portal_schemas.py"]
+    PortalSchemas --> PortalService["Service Layer app/modules/customer_portal_service.py"]
+    PortalService --> Scope["Tenant / Company / Customer Scope Check"]
+    Scope --> SalesData["Sales Orders / Shipments / Returns"]
+    Scope --> Docs["Shared Customer Documents Only"]
+    Scope --> Support["Support / Return Requests"]
+    PortalService --> Audit["Customer Portal Audit Log"]
+    PortalService --> PortalAI["Customer Portal AI Recommendations"]
+    PortalAI --> HumanApproval["Human Approval Required"]
+    SalesData --> SafeOutput["Customer-Safe JSON Output"]
+    Docs --> SafeOutput
+    Support --> SafeOutput
+    HumanApproval --> SafeOutput
+```
+
 ## Inventory AI Data Flow
 
 ```mermaid
@@ -476,6 +528,7 @@ sequenceDiagram
     participant M as Maintenance Router
     participant Q as Quality Router
     participant X as Sales Router
+    participant CP as Customer Portal Router
     participant S as Store / SQLAlchemy
     participant A as Inventory AI Service :8100
     participant E as AI Engine
@@ -518,6 +571,12 @@ sequenceDiagram
     S-->>X: Return sales seed data
     X-->>O: Return reservation, partial allocation and production recommendation JSON
 
+    U->>P: Request /customer-portal/orders
+    P->>CP: Route customer portal request
+    CP->>S: Read portal user and customer-owned sales orders
+    S-->>CP: Return scoped portal data
+    CP-->>O: Return customer-safe order tracking JSON
+
     U->>A: Request /inventory-ai/risk-center
     A->>D: Load inventory signals
     D-->>A: Return SQLAlchemy rows
@@ -553,3 +612,8 @@ Sales-specific AI safety:
 
 - AI can create draft production requests, inventory transfer requests, customer delay emails, dispatch priority tasks, return investigation tasks and demand forecast reports.
 - AI cannot confirm sales orders, reassign protected inventory, dispatch goods, approve returns, issue credit or change customer pricing.
+
+Customer Portal-specific AI safety:
+
+- AI can create draft customer delay emails, support responses, return review tasks, quality complaint investigations, document upload tasks and escalation tasks.
+- AI cannot approve returns, issue credit, cancel orders, promise delivery dates, release internal information or send external customer emails without approval.

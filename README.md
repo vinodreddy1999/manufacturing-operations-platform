@@ -37,6 +37,8 @@ The Quality module has been expanded into a dedicated QMS-style backend package 
 
 The Sales & Distribution module has been expanded into a dedicated ERP-style backend package with customer master, regions, territories, plant representatives, sales orders, finished goods availability, protected customer reservations, partial allocation, dispatch orders, shipments, returns, KPIs, reports, tasks/notifications, and rule-based Sales AI.
 
+The Customer Portal module has been added as a dedicated external-user backend with isolated customer authentication, profile view/update requests, customer-owned order and shipment tracking, secure document downloads, support requests, return requests, notifications, reports, audit logs, and rule-based Customer Portal AI.
+
 ## Diagram
 
 See the GitHub-rendered end-to-end scheme diagram here:
@@ -153,6 +155,15 @@ app/
     sales_repository.py
                        Seeded Sales repository
     sales_service.py   Availability, allocation, dispatch, KPIs, reports and AI rules
+    customer_portal.py Customer Portal API routes
+    customer_portal_models.py
+                       SQLAlchemy tables for external portal users, support, returns, documents and audit
+    customer_portal_schemas.py
+                       Pydantic schemas for portal auth, support, returns and AI requests
+    customer_portal_repository.py
+                       Seeded Customer Portal repository
+    customer_portal_service.py
+                       Portal auth, customer-scoped data access, documents, reports and AI rules
   ai_copilot/         AIProvider, MockAIProvider and optional OpenAIProvider interface
   jobs.py             Celery jobs for reports, AI risk scans, expiry/dead stock checks
 alembic/              Migration environment and first foundation migration
@@ -235,6 +246,23 @@ Key endpoint groups:
 - Sales AI: `/ai/sales/risk-center`, `/ai/sales/demand-forecast`, `/ai/sales/order-risk`, `/ai/sales/allocation-recommendation`, `/ai/sales/regional-demand`, `/ai/sales/expiry-aware-sales`, `/ai/sales/customer-profitability`, `/ai/sales/dispatch-optimization`, `/ai/sales/returns-analysis`, `/ai/sales/draft-action`
 
 Sales AI is recommendation-only. It can analyze, recommend, and create draft actions; it cannot confirm sales orders, reassign protected inventory, dispatch goods, approve returns, issue credit, or change customer pricing.
+
+## Customer Portal Module
+
+Open `http://localhost:8000/docs` and use the `Customer Portal` and `Customer Portal AI` tags.
+
+Key endpoint groups:
+
+- Portal auth: `/customer-portal/auth/login`, `/refresh`, `/password-reset`, `/verify-email`
+- Portal users: `/customer-portal/users`, `/customer-portal/users/invite`, `/customer-portal/users/{id}/disable`
+- Profile and update request: `/customer-portal/profile`, `/customer-portal/profile/update-request`
+- Customer-owned order and shipment tracking: `/customer-portal/orders`, `/customer-portal/shipments`
+- Secure shared documents: `/customer-portal/documents`, `/customer-portal/documents/{id}/download`
+- Support and returns: `/customer-portal/support-requests`, `/customer-portal/returns`
+- Notifications and reports: `/customer-portal/notifications`, `/customer-portal/reports/{report_type}`
+- Customer Portal AI: `/ai/customer-portal/risk-center`, `/order-risk`, `/support-classification`, `/return-risk`, `/document-risk`, `/satisfaction-risk`, `/draft-action`
+
+Customer Portal AI is recommendation-only. It can draft messages, support responses, return review tasks, document upload tasks and escalations; it cannot approve returns, issue credit, cancel orders, promise delivery dates, release internal information, or send external customer email without approval.
 
 ## Platform Foundation
 

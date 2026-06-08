@@ -7,6 +7,8 @@ from jose import jwt
 from .auth_router import router as auth_router
 from .core_router import create_module_router, router as core_router
 from .database import Base, SessionLocal, engine
+from .modules.customer_portal import ai_router as customer_portal_ai_router
+from .modules.customer_portal import router as customer_portal_router
 from .modules.inventory import router as inventory_router
 from .modules.maintenance import ai_router as maintenance_ai_router
 from .modules.maintenance import alias_router as maintenance_alias_router
@@ -43,6 +45,8 @@ with SessionLocal() as bootstrap_db:
 
 app.include_router(auth_router)
 app.include_router(core_router)
+app.include_router(customer_portal_router)
+app.include_router(customer_portal_ai_router)
 app.include_router(inventory_router)
 app.include_router(production_router)
 app.include_router(maintenance_router)
