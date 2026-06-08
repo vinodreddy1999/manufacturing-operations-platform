@@ -8,6 +8,7 @@ from .auth_router import router as auth_router
 from .core_router import create_module_router, router as core_router
 from .database import Base, SessionLocal, engine
 from .modules.inventory import router as inventory_router
+from .modules.production import router as production_router
 from .platform_seed import seed_platform
 from .schemas import (
     ApiResult,
@@ -16,7 +17,6 @@ from .schemas import (
     LoginResponse,
     MaintenanceWorkOrderRequest,
     ModuleKey,
-    ProductionOrderRequest,
     PurchaseRequisitionRequest,
     QualityInspectionRequest,
     RecommendationRequest,
@@ -39,6 +39,7 @@ with SessionLocal() as bootstrap_db:
 app.include_router(auth_router)
 app.include_router(core_router)
 app.include_router(inventory_router)
+app.include_router(production_router)
 app.include_router(create_module_router("warehouse", "/warehouses"))
 app.include_router(create_module_router("warehouse_zones", "/warehouses/{warehouse_id}/zones"))
 app.include_router(create_module_router("warehouse_map", "/warehouses/{warehouse_id}/map"))
@@ -143,17 +144,6 @@ def create_requisition(request: PurchaseRequisitionRequest) -> ApiResult:
 @app.get("/procurement/requisitions", response_model=ApiResult)
 def list_requisitions() -> ApiResult:
     return result(ModuleKey.PROCUREMENT, "list_requisitions", "Purchase requisition work queue.", store.snapshot(store.requisitions))
-
-
-@app.post("/production/orders", response_model=ApiResult)
-def create_production_order(request: ProductionOrderRequest) -> ApiResult:
-    order = store.create_record(store.production_orders, {**request.model_dump(), "status": "SCHEDULED"})
-    return result(ModuleKey.PRODUCTION, "create_order", "Production order scheduled for the requested work center.", order)
-
-
-@app.get("/production/orders", response_model=ApiResult)
-def list_production_orders() -> ApiResult:
-    return result(ModuleKey.PRODUCTION, "list_orders", "Production order schedule.", store.snapshot(store.production_orders))
 
 
 @app.post("/maintenance/work-orders", response_model=ApiResult)

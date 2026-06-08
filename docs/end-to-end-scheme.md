@@ -21,6 +21,7 @@ flowchart LR
     PlatformAPI --> Core["Core Platform Router app/core_router.py"]
     PlatformAPI --> Auth["Auth Router app/auth_router.py"]
     PlatformAPI --> InventoryRouter["Inventory Router app/modules/inventory.py"]
+    PlatformAPI --> ProductionRouter["Production Router app/modules/production.py"]
     PlatformAPI --> GenericModules["Generic Module Routers"]
 
     Core --> Companies["Companies"]
@@ -41,10 +42,18 @@ flowchart LR
 
     GenericModules --> Warehouse["Warehouse"]
     GenericModules --> Procurement["Procurement"]
-    GenericModules --> Production["Production"]
     GenericModules --> Maintenance["Maintenance"]
     GenericModules --> Quality["Quality"]
     GenericModules --> Sales["Sales"]
+
+    ProductionRouter --> ProdMaster["Product Master"]
+    ProductionRouter --> ProdBom["BOM and Routing"]
+    ProductionRouter --> ProdResources["Work Centers / Lines / Machines"]
+    ProductionRouter --> ProdOrders["Production Orders"]
+    ProductionRouter --> ProdPlanning["MRP / Reservations / Scheduling"]
+    ProductionRouter --> ProdExecution["Logs / Consumption / Downtime / Completion"]
+    ProductionRouter --> ProdControl["WIP / Losses / Costing / Reports"]
+    ProductionRouter --> ProdAI["Rule-Based Production AI"]
 
     InventoryRouter --> InvDashboard["Inventory Dashboard"]
     InventoryRouter --> InvItems["Items / Categories / Tracking"]
@@ -70,6 +79,7 @@ flowchart LR
     Core --> Audit["Audit Helper app/audit.py"]
     GenericModules --> Audit
     InventoryRouter --> Audit
+    ProductionRouter --> Audit
     Audit --> AuditLogs
 
     PlatformAPI --> Jobs["Celery Jobs app/jobs.py"]
@@ -103,15 +113,16 @@ flowchart LR
 4. Core platform requests go through `app/core_router.py`.
 5. Company, plant, department, user, role, permission, task, approval, document, and audit data is stored through SQLAlchemy models in `app/platform_models.py`.
 6. Feature flags decide whether module APIs are enabled.
-7. Generic module routers store warehouse, procurement, production, maintenance, quality, and sales records in `ModuleRecord`.
+7. Generic module routers store warehouse, procurement, maintenance, quality, and sales records in `ModuleRecord`.
 8. Inventory requests go through `app/modules/inventory.py`.
-9. Inventory data is validated with Pydantic schemas and returned as structured JSON.
-10. Background jobs are prepared in `app/jobs.py` using Celery and Redis.
-11. User opens the Inventory AI service Swagger at `http://127.0.0.1:8100/docs`.
-12. Inventory AI requests go through `inventory-ai-service/app/routes.py`.
-13. AI routes call rule-based logic in `ai_engine.py`, `risk_rules.py`, and `recommendations.py`.
-14. AI returns analysis, risk levels, recommendations, and draft actions only.
-15. Human approval is required before any critical operational action.
+9. Production requests go through `app/modules/production.py`.
+10. Inventory and Production data are validated with Pydantic schemas and returned as structured JSON.
+11. Background jobs are prepared in `app/jobs.py` using Celery and Redis.
+12. User opens the Inventory AI service Swagger at `http://127.0.0.1:8100/docs`.
+13. Inventory AI requests go through `inventory-ai-service/app/routes.py`.
+14. AI routes call rule-based logic in `ai_engine.py`, `risk_rules.py`, and `recommendations.py`.
+15. AI returns analysis, risk levels, recommendations, and draft actions only.
+16. Human approval is required before any critical operational action.
 
 ## Main Platform Modules
 
@@ -128,6 +139,10 @@ flowchart LR
 | Seed data | `app/platform_seed.py` | Demo company, plant, admin user, roles, permissions and module flags |
 | Background jobs | `app/jobs.py` | Celery jobs for reports, AI risk scans, expiry checks and dead stock checks |
 | AI copilot | `app/ai_copilot/` | Provider interface with mock provider and optional OpenAI provider |
+| Production module | `app/modules/production.py` | Dedicated Production Management APIs |
+| Production service | `app/modules/production_service.py` | MRP, reservations, scheduling, costing, reports and Production AI rules |
+| Production schemas | `app/modules/production_schemas.py` | Pydantic schemas for Production requests |
+| Production models | `app/modules/production_models.py` | SQLAlchemy table definitions for Production Management |
 | Migrations | `alembic/` | Alembic migration scaffold |
 | Docker | `docker-compose.yml` | PostgreSQL, Redis, main API and worker services |
 
@@ -137,12 +152,39 @@ flowchart LR
 | --- | --- | --- |
 | Warehouse | `/warehouses`, `/warehouse-locations`, `/warehouse-movements`, `/warehouse-occupancy` | Stores module records after feature flag validation |
 | Procurement | `/suppliers`, `/purchase-requisitions`, `/purchase-orders` | Stores supplier and purchasing module records |
-| Production | `/products`, `/bom`, `/routing`, `/production-orders`, `/production-schedules` | Stores manufacturing planning and execution records |
+| Production | `/production/*` | Dedicated Production Management module with planning, execution, costing, reporting and AI |
 | Maintenance | `/machines`, `/maintenance-plans`, `/work-orders` | Stores equipment and maintenance records |
 | Quality | `/quality/inspections`, `/quality/quarantine`, `/quality/rework`, `/quality/capa` | Stores inspection, quarantine, rework and corrective action records |
 | Sales | `/customers`, `/sales-orders` | Stores customer and order records |
 | Inventory | `/inventory/*` | Expanded dedicated inventory module with operational views |
 | Inventory AI | `/inventory-ai/*` | Separate AI/rule-based intelligence service |
+
+## Production Management Views
+
+| View | Endpoint | Output |
+| --- | --- | --- |
+| Production Dashboard | `GET /production/dashboard` | Active orders, risk count, shortages, utilization, downtime, shift output, planned vs actual, WIP and completed orders |
+| Product Master | `GET/POST/PUT/DELETE /production/products` | Finished products, semi-finished products, sub-assemblies and by-products |
+| BOM Management | `GET/POST/PUT /production/bom`, `POST /production/bom/{bom_id}/approve` | Multi-level BOM, versioning, approval workflow, material lines and consumption type |
+| Routing Management | `GET/POST/PUT /production/routing` | Operations, sequence, work center, line, setup/run time, labor, machine and quality checks |
+| Work Centers | `GET/POST /production/work-centers` | Capacity, plant, department, operating calendar and active status |
+| Production Lines | `GET/POST /production/lines` | Line capacity, shift calendar and active/maintenance/unavailable status |
+| Machines | `GET/POST /production/machines` | Machine registry with status, runtime, downtime and capacity |
+| Production Orders | `GET/POST/PUT /production/orders` | Production source, product, BOM/routing, quantity, dates, priority, line, work center and status |
+| Material Planning | `POST /production/orders/{order_id}/material-requirements` | Required quantity from BOM and production quantity |
+| Reservations | `POST /production/orders/{order_id}/reserve-materials` | Required, available, reserved and shortage quantities |
+| Time-Aware Plan | `GET /production/orders/{order_id}/time-aware-plan` | Current inventory, incoming inventory, supplier lead time and procurement requirement |
+| Scheduling | `GET/POST /production/schedules` | Schedules with line, machine, maintenance, inventory, capacity and shift conflict detection |
+| Shifts | `GET/POST /production/shifts` | Morning, evening, night and custom shifts |
+| Daily Logs | `GET/POST /production/logs` | Planned/actual output, material consumed, downtime, wastage and remarks |
+| Consumption | `GET/POST /production/material-consumption` | Reserve-first material consumption and variance tracking |
+| Downtime | `GET/POST /production/downtime` | Mechanical, electrical, material, operator, quality, maintenance and other downtime |
+| Completion | `POST /production/completion` | Final output, consumption finalization, unused reservation release, variance, cost and quality handoff |
+| WIP | `GET/POST /production/wip` | Raw material to WIP to finished goods stages |
+| Losses | `GET/POST /production/losses` | Waste, scrap, rework, rejection and over-consumption |
+| Costing | `GET /production/costing`, `POST /production/orders/{order_id}/costing` | Material, machine, labor, overhead, wastage, rework and cost per unit |
+| Reports | `GET /production/reports` | Orders, daily production, shifts, consumption, variance, downtime, capacity, WIP and cost reports |
+| Production AI | `/production/ai/*` | Risk, delay, bottleneck, capacity, schedule, what-if, variance, downtime, cost and draft-action recommendations |
 
 ## Main Inventory Module Views
 
@@ -216,6 +258,27 @@ flowchart TD
     Response --> Client
 ```
 
+## Production Data Flow
+
+```mermaid
+flowchart TD
+    Client["Swagger / API Client"] --> ProdRoute["Production Router app/modules/production.py"]
+    ProdRoute --> ProdSchemas["Pydantic Schemas app/modules/production_schemas.py"]
+    ProdSchemas --> ProdRepo["Seeded Repository app/modules/production_repository.py"]
+    ProdRepo --> ProdService["Service Layer app/modules/production_service.py"]
+    ProdService --> MRP["MRP Calculation"]
+    ProdService --> Reservation["Partial Reservation and Shortage Tracking"]
+    ProdService --> Schedule["Scheduling and Conflict Detection"]
+    ProdService --> Execution["Logs, Consumption, Downtime and Completion"]
+    ProdService --> Costing["Costing and Variance"]
+    ProdService --> Reports["Reports and Dashboard"]
+    ProdService --> ProdAI["Production AI Recommendations"]
+    ProdAI --> Approval["Human Approval Required"]
+    Reports --> Output["Final JSON Output"]
+    Costing --> Output
+    Approval --> Output
+```
+
 ## Inventory AI Data Flow
 
 ```mermaid
@@ -240,6 +303,7 @@ sequenceDiagram
     participant P as Platform API :8000
     participant C as Core Router
     participant I as Inventory Router
+    participant R as Production Router
     participant S as Store / SQLAlchemy
     participant A as Inventory AI Service :8100
     participant E as AI Engine
@@ -257,6 +321,12 @@ sequenceDiagram
     I->>S: Read inventory data
     S-->>I: Return balances, batches, locations
     I-->>O: Return inventory JSON
+
+    U->>P: Request /production/orders/po-demo-001/material-requirements
+    P->>R: Route production request
+    R->>S: Read order, BOM and inventory signals
+    S-->>R: Return production seed data
+    R-->>O: Return MRP and shortage JSON
 
     U->>A: Request /inventory-ai/risk-center
     A->>D: Load inventory signals

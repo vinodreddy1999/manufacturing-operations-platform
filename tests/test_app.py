@@ -117,3 +117,36 @@ def test_generic_module_record_create():
     )
     assert response.status_code == 200
     assert response.json()["module_key"] == "purchase_orders"
+
+
+def test_production_dashboard():
+    response = client.get("/production/dashboard")
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["active_orders"] >= 1
+    assert "material_shortages" in data
+    assert "line_utilization" in data
+
+
+def test_production_material_requirements():
+    response = client.post("/production/orders/po-demo-001/material-requirements")
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert any(item["material_item"] == "item-steel" for item in data)
+    assert all("shortage_quantity" in item for item in data)
+
+
+def test_production_reserve_materials_tracks_shortage():
+    response = client.post("/production/orders/po-demo-001/reserve-materials")
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert "reservations" in data
+    assert data["production_order"]["status"] in {"Material Reserved", "Material Shortage"}
+
+
+def test_production_ai_draft_actions_are_safe():
+    response = client.get("/production/ai/draft-actions")
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert all(action["requires_human_approval"] for action in data["drafts"])
+    assert "Change Schedule" in data["ai_safety"]["cannot"]
