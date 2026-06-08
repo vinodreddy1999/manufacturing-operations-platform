@@ -50,6 +50,44 @@ Use `POST /auth/login` with:
 }
 ```
 
+
+## Inventory AI Service
+
+A separate Python FastAPI microservice is available here:
+
+```text
+inventory-ai-service/
+```
+
+It provides rule-based inventory intelligence APIs for:
+
+- risk center
+- shortage prediction
+- overstock prediction
+- procurement recommendations
+- expiry intelligence
+- dead stock detection
+- production impact
+- optimization draft actions
+
+Run it with:
+
+```bash
+cd inventory-ai-service
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8100
+```
+
+Open:
+
+```text
+http://127.0.0.1:8100/docs
+```
+
+The AI service is recommendation-only. It creates draft actions and requires human approval for critical actions.
+
 ## Project Layout
 
 ```text
