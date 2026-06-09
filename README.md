@@ -39,7 +39,7 @@ The Sales & Distribution module has been expanded into a dedicated ERP-style bac
 
 The Customer Portal module has been added as a dedicated external-user backend with isolated customer authentication, profile view/update requests, customer-owned order and shipment tracking, secure document downloads, support requests, return requests, notifications, reports, audit logs, and rule-based Customer Portal AI.
 
-The Supplier Portal module has been added as a dedicated external-supplier backend with isolated supplier authentication, supplier users, supplier-owned purchase orders, acknowledgements, delivery confirmations, ASN, document/certificate uploads, messages, CAPA responses, notifications, reports, audit logs, and rule-based Supplier Portal AI.
+The Supplier Portal module has been added as a dedicated external-supplier backend with isolated supplier authentication, company-level portal enablement flags, supplier users/RBAC, supplier-owned purchase orders, acknowledgements, delivery confirmations, ASN, document/certificate uploads, supplier performance visibility, supplier-facing tasks, messages, CAPA responses, notifications, reports, audit logs, and rule-based Supplier Portal AI.
 
 ## Diagram
 
@@ -284,10 +284,11 @@ Key endpoint groups:
 - Portal auth: `/supplier-portal/auth/login`, `/refresh`, `/password-reset`, `/verify-email`
 - Supplier users: `/supplier-portal/users`, `/supplier-portal/users/invite`, `/supplier-portal/users/{id}`, `/supplier-portal/users/{id}/disable`
 - Profile and update request: `/supplier-portal/profile`, `/supplier-portal/profile/update-request`
+- Enablement and permissions: `/supplier-portal/enablement`
 - Supplier-owned purchase orders: `/supplier-portal/purchase-orders`, `/supplier-portal/purchase-orders/{id}`, `/supplier-portal/purchase-orders/{id}/acknowledge`
 - Delivery and ASN: `/supplier-portal/delivery-confirmations`, `/supplier-portal/asn`
 - Documents and certificates: `/supplier-portal/documents`, `/supplier-portal/documents/upload`, `/supplier-portal/certificates`, `/supplier-portal/certificates/upload`
-- Messages, CAPA, notifications and reports: `/supplier-portal/messages`, `/supplier-portal/capa`, `/supplier-portal/notifications`, `/supplier-portal/reports/{report_type}`
+- Messages, CAPA, notifications, performance, tasks and reports: `/supplier-portal/messages`, `/supplier-portal/capa`, `/supplier-portal/notifications`, `/supplier-portal/performance`, `/supplier-portal/tasks`, `/supplier-portal/reports/{report_type}`
 - Supplier Portal AI: `/ai/supplier-portal/risk-center`, `/delivery-risk`, `/document-risk`, `/certificate-expiry`, `/supplier-quality-risk`, `/po-acknowledgement-risk`, `/message-summary`, `/draft-action`
 
 Supplier Portal AI is recommendation-only. It can analyze supplier delay, document, certificate, acknowledgement and quality risks, then create draft follow-ups or review tasks; it cannot approve suppliers or certificates, change purchase orders, accept delivery dates, send POs, commit financial actions, or replace suppliers automatically.

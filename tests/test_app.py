@@ -439,6 +439,23 @@ def test_supplier_portal_documents_and_certificates():
     assert any(certificate["id"] == "cert-apex-iso" for certificate in certificates.json()["data"])
 
 
+def test_supplier_portal_enablement_performance_and_tasks():
+    enablement = client.get("/supplier-portal/enablement")
+    assert enablement.status_code == 200
+    data = enablement.json()["data"]
+    assert data["feature_flags"]["supplier_portal_enabled"] is True
+    assert "po:acknowledge" in data["permissions"]
+
+    performance = client.get("/supplier-portal/performance")
+    assert performance.status_code == 200
+    assert performance.json()["data"]["visible"] is True
+    assert performance.json()["data"]["metrics"]["supplier_id"] == "supplier-apex"
+
+    tasks = client.get("/supplier-portal/tasks")
+    assert tasks.status_code == 200
+    assert any(task["task_type"] == "Acknowledge PO" for task in tasks.json()["data"])
+
+
 def test_supplier_portal_ai_draft_action_is_safe_and_sanitized():
     response = client.post(
         "/ai/supplier-portal/draft-action",

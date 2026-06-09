@@ -178,6 +178,8 @@ AI safety boundary:
 Implemented Supplier Portal areas:
 
 - Isolated external supplier portal login and refresh token structure
+- Company-level supplier portal enablement flags for disabled, PO-only and full portal modes
+- Supplier portal RBAC role and permission structures
 - Supplier portal user invitations, updates and disable flow
 - Supplier profile view with controlled update request workflow
 - Supplier-owned purchase order list/detail and acknowledgement
@@ -185,6 +187,8 @@ Implemented Supplier Portal areas:
 - Supplier document uploads and review status
 - Supplier certificate uploads, verification status and expiry tracking
 - Supplier messages, CAPA responses and notifications
+- Configurable supplier performance visibility
+- Supplier-facing task queue for PO acknowledgement, certificate upload, delivery confirmation, CAPA and document actions
 - Supplier-owned purchase order, delivery, document and certificate reports
 - Supplier portal audit logs
 - Strict supplier-level data filtering so one supplier cannot view another supplier's purchase orders

@@ -26,6 +26,49 @@ class SupplierPortalUser(Base):
     invitation_status: Mapped[str] = mapped_column(String(80), default="Pending")
 
 
+class SupplierPortalRole(Base):
+    __tablename__ = "supplier_portal_roles"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    company_id: Mapped[str] = mapped_column(String(80), index=True)
+    role_name: Mapped[str] = mapped_column(String(80), index=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class SupplierPortalPermission(Base):
+    __tablename__ = "supplier_portal_permissions"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    role_id: Mapped[str] = mapped_column(String(64), index=True)
+    permission_key: Mapped[str] = mapped_column(String(120), index=True)
+    allowed: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class SupplierPortalSession(Base):
+    __tablename__ = "supplier_portal_sessions"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    supplier_portal_user_id: Mapped[str] = mapped_column(String(80), index=True)
+    refresh_token: Mapped[str] = mapped_column(String(180), unique=True, index=True)
+    mfa_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    status: Mapped[str] = mapped_column(String(80), default="Active")
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class SupplierPortalInvitation(Base):
+    __tablename__ = "supplier_portal_invitations"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    company_id: Mapped[str] = mapped_column(String(80), index=True)
+    supplier_id: Mapped[str] = mapped_column(String(80), index=True)
+    email: Mapped[str] = mapped_column(String(180), index=True)
+    invitation_token: Mapped[str] = mapped_column(String(180), unique=True)
+    invited_by: Mapped[str] = mapped_column(String(120))
+    status: Mapped[str] = mapped_column(String(80), default="Pending")
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
 class SupplierProfileUpdateRequest(Base):
     __tablename__ = "supplier_profile_update_requests"
 
@@ -90,6 +133,17 @@ class AdvanceShipmentNotice(Base):
     status: Mapped[str] = mapped_column(String(80), default="Submitted")
 
 
+class AdvanceShipmentNoticeItem(Base):
+    __tablename__ = "advance_shipment_notice_items"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    asn_id: Mapped[str] = mapped_column(String(64), index=True)
+    item_id: Mapped[str] = mapped_column(String(80), index=True)
+    batch_number: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    shipped_quantity: Mapped[float] = mapped_column(Float)
+    uom: Mapped[str] = mapped_column(String(40), default="EA")
+
+
 class SupplierUploadedDocument(Base):
     __tablename__ = "supplier_uploaded_documents"
 
@@ -128,6 +182,65 @@ class SupplierMessage(Base):
     message: Mapped[str] = mapped_column(Text)
     attachments: Mapped[list] = mapped_column(JSON, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class SupplierCapaResponse(Base):
+    __tablename__ = "supplier_capa_responses"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    capa_id: Mapped[str] = mapped_column(String(80), index=True)
+    supplier_id: Mapped[str] = mapped_column(String(80), index=True)
+    root_cause: Mapped[str] = mapped_column(Text)
+    corrective_action: Mapped[str] = mapped_column(Text)
+    preventive_action: Mapped[str] = mapped_column(Text)
+    target_date: Mapped[date] = mapped_column(Date)
+    attachments: Mapped[list] = mapped_column(JSON, default=list)
+    status: Mapped[str] = mapped_column(String(80), default="Submitted")
+
+
+class SupplierPortalNotification(Base):
+    __tablename__ = "supplier_portal_notifications"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    supplier_id: Mapped[str] = mapped_column(String(80), index=True)
+    notification_type: Mapped[str] = mapped_column(String(120))
+    message: Mapped[str] = mapped_column(Text)
+    channel: Mapped[str] = mapped_column(String(40), default="Email")
+    status: Mapped[str] = mapped_column(String(80), default="Unread")
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class SupplierDocumentAccess(Base):
+    __tablename__ = "supplier_document_access"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    supplier_id: Mapped[str] = mapped_column(String(80), index=True)
+    document_id: Mapped[str] = mapped_column(String(80), index=True)
+    access_level: Mapped[str] = mapped_column(String(80), default="View")
+    granted_by: Mapped[str] = mapped_column(String(120))
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class SupplierPortalAuditLog(Base):
+    __tablename__ = "supplier_portal_audit_logs"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    supplier_portal_user_id: Mapped[str] = mapped_column(String(80), index=True)
+    action: Mapped[str] = mapped_column(String(120), index=True)
+    details: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class SupplierPortalAIRisk(Base):
+    __tablename__ = "supplier_portal_ai_risks"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    supplier_id: Mapped[str] = mapped_column(String(80), index=True)
+    risk_type: Mapped[str] = mapped_column(String(120))
+    risk_level: Mapped[str] = mapped_column(String(40))
+    reason: Mapped[str] = mapped_column(Text)
+    recommended_action: Mapped[str] = mapped_column(Text)
+    requires_human_approval: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
 class SupplierPortalRecommendation(Base):

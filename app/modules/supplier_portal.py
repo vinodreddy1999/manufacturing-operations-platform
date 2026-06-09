@@ -98,6 +98,11 @@ def profile() -> SupplierPortalApiResult:
     return result("profile", "Supplier-owned profile view.", supplier_portal_service.profile(user()))
 
 
+@router.get("/enablement", response_model=SupplierPortalApiResult)
+def enablement() -> SupplierPortalApiResult:
+    return result("enablement", "Supplier portal company feature flags and role permissions.", supplier_portal_service.enablement(user()))
+
+
 @router.put("/profile/update-request", response_model=SupplierPortalApiResult)
 def profile_update(request: SupplierProfileUpdateRequest) -> SupplierPortalApiResult:
     update = supplier_portal_repo.add(supplier_portal_repo.profile_update_requests, {"supplier_id": user()["supplier_id"], "requested_by": user()["supplier_portal_user_id"], "status": "Pending Review", **request.model_dump()}, "sp-profile")
@@ -200,6 +205,16 @@ def respond_capa(capa_id: str, request: SupplierCapaResponseRequest) -> Supplier
 @router.get("/notifications", response_model=SupplierPortalApiResult)
 def notifications() -> SupplierPortalApiResult:
     return result("notifications", "Supplier notifications.", [row for row in supplier_portal_repo.notifications if row["supplier_id"] == user()["supplier_id"]])
+
+
+@router.get("/performance", response_model=SupplierPortalApiResult)
+def performance() -> SupplierPortalApiResult:
+    return result("performance", "Supplier-visible performance metrics.", supplier_portal_service.performance(user()))
+
+
+@router.get("/tasks", response_model=SupplierPortalApiResult)
+def tasks() -> SupplierPortalApiResult:
+    return result("tasks", "Supplier-facing task queue.", supplier_portal_service.tasks(user()))
 
 
 @router.get("/reports/{report_type}", response_model=SupplierPortalApiResult)

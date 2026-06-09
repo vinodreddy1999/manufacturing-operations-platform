@@ -91,11 +91,13 @@ flowchart LR
     CustomerPortalRouter --> PortalAI["Rule-Based Customer Portal AI"]
 
     SupplierPortalRouter --> SupplierAuth["External Supplier Auth"]
+    SupplierPortalRouter --> SupplierEnablement["Company Feature Flags / Supplier RBAC"]
     SupplierPortalRouter --> SupplierProfile["Supplier Profile / Update Requests"]
     SupplierPortalRouter --> SupplierPOs["Supplier-Owned Purchase Orders"]
     SupplierPortalRouter --> SupplierDelivery["Acknowledgements / Delivery Confirmations / ASN"]
     SupplierPortalRouter --> SupplierDocs["Documents / Certificates"]
     SupplierPortalRouter --> SupplierMessages["Messages / CAPA / Notifications"]
+    SupplierPortalRouter --> SupplierTasks["Performance / Supplier Tasks"]
     SupplierPortalRouter --> SupplierAI["Rule-Based Supplier Portal AI"]
 
     InventoryRouter --> InvDashboard["Inventory Dashboard"]
@@ -215,7 +217,7 @@ flowchart LR
 | Supplier Portal module | `app/modules/supplier_portal.py` | External supplier portal APIs |
 | Supplier Portal service | `app/modules/supplier_portal_service.py` | Portal auth, supplier-scoped data access, PO acknowledgements, reports and AI rules |
 | Supplier Portal schemas | `app/modules/supplier_portal_schemas.py` | Pydantic schemas for supplier auth, delivery, ASN, uploads, CAPA and AI requests |
-| Supplier Portal models | `app/modules/supplier_portal_models.py` | SQLAlchemy table definitions for supplier users, PO acknowledgements, deliveries, ASN, documents, certificates, messages and AI drafts |
+| Supplier Portal models | `app/modules/supplier_portal_models.py` | SQLAlchemy table definitions for supplier users, roles, permissions, sessions, invitations, PO acknowledgements, deliveries, ASN, documents, certificates, messages, CAPA, notifications, document access, audit, AI risks and AI drafts |
 | Migrations | `alembic/` | Alembic migration scaffold |
 | Docker | `docker-compose.yml` | PostgreSQL, Redis, main API and worker services |
 
@@ -230,7 +232,7 @@ flowchart LR
 | Quality | `/quality/*`, `/ai/quality/*` | Dedicated Quality Management module with QMS workflows and AI |
 | Sales | `/customers`, `/sales-orders`, `/dispatch-orders`, `/shipments`, `/returns`, `/ai/sales/*` | Dedicated Sales & Distribution module with order, allocation, dispatch, returns and AI |
 | Customer Portal | `/customer-portal/*`, `/ai/customer-portal/*` | Dedicated external customer portal with customer-scoped order, shipment, document, support and return workflows |
-| Supplier Portal | `/supplier-portal/*`, `/ai/supplier-portal/*` | Dedicated external supplier portal with supplier-scoped purchase order, delivery, ASN, document, certificate, message and CAPA workflows |
+| Supplier Portal | `/supplier-portal/*`, `/ai/supplier-portal/*` | Dedicated external supplier portal with company enablement flags, supplier-scoped purchase order, delivery, ASN, document, certificate, message, CAPA, performance and task workflows |
 | Inventory | `/inventory/*` | Expanded dedicated inventory module with operational views |
 | Inventory AI | `/inventory-ai/*` | Separate AI/rule-based intelligence service |
 
@@ -346,6 +348,7 @@ flowchart LR
 | Portal Auth | `POST /supplier-portal/auth/login`, `/refresh`, `/password-reset`, `/verify-email` | Isolated external supplier authentication and portal JWTs |
 | Portal Users | `GET /supplier-portal/users`, `POST /supplier-portal/users/invite`, `PUT /supplier-portal/users/{id}`, `POST /supplier-portal/users/{id}/disable` | External supplier users, roles, status and invitations |
 | Profile | `GET /supplier-portal/profile`, `PUT /supplier-portal/profile/update-request` | Supplier-owned profile and controlled update request |
+| Enablement | `GET /supplier-portal/enablement` | Company-level portal feature flags and supplier role permissions |
 | Dashboard | `GET /supplier-portal/dashboard` | Open POs, acknowledgements, upcoming delivery, delay, document, certificate, quality, message and CAPA signals |
 | Purchase Orders | `GET /supplier-portal/purchase-orders`, `GET /supplier-portal/purchase-orders/{id}` | Supplier-owned purchase orders only, portal-friendly status and safe PO fields |
 | PO Acknowledgement | `POST /supplier-portal/purchase-orders/{id}/acknowledge` | Accepted, rejected or partial acknowledgement with confirmed quantity/date |
@@ -354,6 +357,7 @@ flowchart LR
 | Documents | `GET /supplier-portal/documents`, `POST /supplier-portal/documents/upload` | Supplier-uploaded documents and review status |
 | Certificates | `GET /supplier-portal/certificates`, `POST /supplier-portal/certificates/upload` | Supplier certificates, verification status and expiry dates |
 | Messages and CAPA | `GET/POST /supplier-portal/messages`, `GET /supplier-portal/capa`, `POST /supplier-portal/capa/{id}/respond` | Supplier communication and CAPA response workflow |
+| Performance and Tasks | `GET /supplier-portal/performance`, `GET /supplier-portal/tasks` | Configurable supplier-visible scorecards and supplier-facing action queue |
 | Reports | `GET /supplier-portal/reports/{report_type}` | Supplier-owned purchase order, delivery, document and certificate reports |
 | Supplier Portal AI | `/ai/supplier-portal/*` | Risk center, delivery risk, document risk, certificate expiry, supplier quality risk, PO acknowledgement risk, message summary and draft actions |
 
@@ -541,11 +545,13 @@ flowchart TD
     ExternalSupplier["External Supplier User"] --> SupplierRoute["Supplier Portal Router app/modules/supplier_portal.py"]
     SupplierRoute --> SupplierSchemas["Pydantic Schemas app/modules/supplier_portal_schemas.py"]
     SupplierSchemas --> SupplierService["Service Layer app/modules/supplier_portal_service.py"]
-    SupplierService --> Scope["Company / Supplier Scope Check"]
+    SupplierService --> Enablement["Company Feature Flags / Supplier RBAC"]
+    Enablement --> Scope["Company / Supplier Scope Check"]
     Scope --> POs["Supplier-Owned Purchase Orders"]
     Scope --> Deliveries["Acknowledgements / Delivery Confirmations / ASN"]
     Scope --> Docs["Supplier Documents / Certificates"]
     Scope --> Messages["Messages / CAPA / Notifications"]
+    Scope --> ScoreTasks["Performance / Supplier Tasks"]
     SupplierService --> Audit["Supplier Portal Audit Log"]
     SupplierService --> SupplierAI["Supplier Portal AI Recommendations"]
     SupplierAI --> HumanApproval["Human Approval Required"]
@@ -553,6 +559,7 @@ flowchart TD
     Deliveries --> SafeOutput
     Docs --> SafeOutput
     Messages --> SafeOutput
+    ScoreTasks --> SafeOutput
     HumanApproval --> SafeOutput
 ```
 

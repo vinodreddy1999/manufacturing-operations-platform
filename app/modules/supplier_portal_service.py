@@ -37,6 +37,11 @@ class SupplierPortalService:
         supplier = next(row for row in self.repo.suppliers if row["supplier_id"] == user["supplier_id"])
         return {key: supplier.get(key) for key in ["supplier_id", "supplier_code", "supplier_name", "address", "tax_id", "contact", "payment_terms", "active_status"]}
 
+    def enablement(self, user: dict[str, Any]) -> dict[str, Any]:
+        flags = self.repo.company_feature_flags.get(user["company_id"], {"supplier_portal_enabled": False})
+        role = next((role for role in self.repo.roles if role["company_id"] == user["company_id"] and role["role_name"] == user["role"]), None)
+        return {"company_id": user["company_id"], "supplier_id": user["supplier_id"], "feature_flags": flags, "role": user["role"], "permissions": role["permissions"] if role else []}
+
     def purchase_orders(self, user: dict[str, Any]) -> list[dict[str, Any]]:
         return [self.portal_po(po) for po in self.repo.purchase_orders if po["supplier_id"] == user["supplier_id"]]
 
@@ -63,14 +68,14 @@ class SupplierPortalService:
 
     def dashboard(self, user: dict[str, Any]) -> dict[str, Any]:
         pos = self.purchase_orders(user)
-        return {"open_pos": [po for po in pos if po["supplier_status"] not in {"Closed", "Cancelled"}], "pos_awaiting_acknowledgement": [po for po in pos if po["supplier_status"] == "Received"], "upcoming_deliveries": [po for po in pos if po["delivery_date"] >= str(date.today())], "delayed_deliveries": self.delivery_risk()["delayed_deliveries"], "documents_pending_upload": ["Test certificate"], "certificates_expiring": self.certificate_expiry()["expiring_soon"], "quality_issues": [], "messages": self.messages(user), "capa_actions": self.capa(user)}
+        return {"feature_flags": self.enablement(user)["feature_flags"], "open_pos": [po for po in pos if po["supplier_status"] not in {"Closed", "Cancelled"}], "pos_awaiting_acknowledgement": [po for po in pos if po["supplier_status"] == "Received"], "upcoming_deliveries": [po for po in pos if po["delivery_date"] >= str(date.today())], "delayed_deliveries": self.delivery_risk()["delayed_deliveries"], "documents_pending_upload": ["Test certificate"], "certificates_expiring": self.certificate_expiry()["expiring_soon"], "quality_issues": [], "messages": self.messages(user), "capa_actions": self.capa(user), "tasks": self.tasks(user)}
 
     def reports(self, user: dict[str, Any], report_type: str) -> dict[str, Any]:
         data = {"purchase-orders": self.purchase_orders(user), "deliveries": [row for row in self.repo.delivery_confirmations if row["supplier_id"] == user["supplier_id"]], "documents": [row for row in self.repo.documents if row["supplier_id"] == user["supplier_id"]], "certificates": [row for row in self.repo.certificates if row["supplier_id"] == user["supplier_id"]]}
         return {"report_type": report_type, "formats": ["PDF", "Excel", "CSV"], "data": data.get(report_type, [])}
 
     def risk_center(self) -> dict[str, Any]:
-        risks = []
+        risks = [risk for risk in self.repo.ai_risks if risk["supplier_id"] == "supplier-apex"]
         risks.extend(self.delivery_risk()["risks"])
         risks.extend(self.document_risk()["risks"])
         risks.extend(self.certificate_expiry()["risks"])
@@ -110,6 +115,16 @@ class SupplierPortalService:
 
     def capa(self, user: dict[str, Any]) -> list[dict[str, Any]]:
         return [row for row in self.repo.capa_responses if row["supplier_id"] == user["supplier_id"]]
+
+    def performance(self, user: dict[str, Any]) -> dict[str, Any]:
+        flags = self.enablement(user)["feature_flags"]
+        if not flags.get("performance_visible", False):
+            return {"visible": False, "message": "Supplier performance sharing is disabled for this company."}
+        metrics = next((row for row in self.repo.performance if row["supplier_id"] == user["supplier_id"]), {})
+        return {"visible": True, "metrics": metrics}
+
+    def tasks(self, user: dict[str, Any]) -> list[dict[str, Any]]:
+        return [row for row in self.repo.tasks if row["supplier_id"] == user["supplier_id"]]
 
     def current_user(self) -> dict[str, Any]:
         return self.repo.users[0]
