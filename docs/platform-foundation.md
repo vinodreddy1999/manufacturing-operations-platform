@@ -17,6 +17,7 @@ Implemented now:
 - Dedicated Sales & Distribution module with typed routes, schemas, SQLAlchemy table definitions, seeded repository, service layer, Celery job hooks and rule-based AI
 - Dedicated Customer Portal module with external-user security, customer-scoped routes, SQLAlchemy table definitions, seeded repository, service layer, Celery job hooks and rule-based AI
 - Dedicated Supplier Portal module with external-supplier security, supplier-scoped routes, SQLAlchemy table definitions, seeded repository, service layer, Celery job hooks and rule-based AI
+- Dedicated Reporting & Analytics module with report catalog, scoped report execution, exports, saved/scheduled reports, dashboards, KPI snapshots, cross-module analytics, Celery job hooks and rule-based AI
 - JWT/password security helpers
 - Optional AI provider interface: `AIProvider`, `MockAIProvider`, `OpenAIProvider`
 - Celery job declarations for reports, AI scans, expiry checks and dead-stock checks
@@ -199,3 +200,24 @@ AI safety boundary:
 
 - AI can analyze, recommend and create draft actions.
 - AI cannot approve suppliers or certificates, change purchase orders, accept supplier delivery dates, send purchase orders, commit financial actions or replace suppliers automatically.
+
+## Reporting & Analytics Module Depth
+
+Implemented Reporting & Analytics areas:
+
+- Company-level reporting feature flags for standard reports, custom reports, schedules, exports, dashboards and AI insights
+- Standard report catalog across Inventory, Warehouse, Procurement, Production, Maintenance, Quality, Sales, Costing, Executive, Audit and AI Insights
+- Role-scoped report execution with tenant/company access-policy markers
+- CSV export using Pandas and Excel/PDF-ready export responses
+- Saved reports with filters, columns, sorting, grouping, chart config and visibility
+- Scheduled email-first report definitions
+- Dashboard definitions and widgets for KPI cards, tables, trend lines, risk cards and action cards
+- KPI definitions and KPI snapshot calculation
+- Trend analysis, cross-module analytics and action-oriented insights
+- Rule-based Reporting AI risk center, executive summary, root cause, anomalies, KPI insights, report narrative and draft actions
+- Celery job hooks for scheduled report generation, email delivery, KPI calculation, trend recalculation, cross-module insights, AI risk scans and executive summaries
+
+AI safety boundary:
+
+- AI can analyze, summarize, recommend and create draft actions.
+- AI cannot approve decisions, change source data, send external email without approval, modify financial records, release inventory or dispatch goods.

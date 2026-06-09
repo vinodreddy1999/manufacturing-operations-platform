@@ -16,6 +16,8 @@ from .modules.maintenance import router as maintenance_router
 from .modules.production import router as production_router
 from .modules.quality import ai_router as quality_ai_router
 from .modules.quality import router as quality_router
+from .modules.reporting import ai_router as reporting_ai_router
+from .modules.reporting import router as reporting_router
 from .modules.sales import ai_router as sales_ai_router
 from .modules.sales import router as sales_router
 from .modules.supplier_portal import ai_router as supplier_portal_ai_router
@@ -56,6 +58,8 @@ app.include_router(maintenance_alias_router)
 app.include_router(maintenance_ai_router)
 app.include_router(quality_router)
 app.include_router(quality_ai_router)
+app.include_router(reporting_router)
+app.include_router(reporting_ai_router)
 app.include_router(sales_router)
 app.include_router(sales_ai_router)
 app.include_router(supplier_portal_router)

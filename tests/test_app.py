@@ -472,3 +472,65 @@ def test_supplier_portal_ai_draft_action_is_safe_and_sanitized():
     assert data["requires_human_approval"] is True
     assert "Change PO" in data["ai_safety"]["cannot"]
     assert "production shortage" not in data["reason"]
+
+
+def test_reporting_catalog_run_and_export():
+    catalog = client.get("/reports/catalog?category=Inventory")
+    assert catalog.status_code == 200
+    reports = catalog.json()["data"]
+    assert any(report["report_code"] == "INVENTORY_STATUS_REPORT" for report in reports)
+
+    run = client.post("/reports/run", json={"report_code": "INVENTORY_STATUS_REPORT", "filters": {"risk_level": "HIGH"}, "user_role": "Executive"})
+    assert run.status_code == 200
+    data = run.json()["data"]
+    assert data["run"]["status"] == "Completed"
+    assert data["access_policy"] == "tenant/company/role scoped"
+
+    export = client.post("/reports/export", json={"report_code": "INVENTORY_STATUS_REPORT", "export_format": "CSV", "user_role": "Executive"})
+    assert export.status_code == 200
+    assert export.json()["data"]["export_format"] == "CSV"
+
+
+def test_reporting_saved_schedule_dashboard_and_kpi():
+    saved = client.post(
+        "/reports/saved",
+        json={"report_name": "My weekly inventory risk", "report_type": "Standard", "owner_user_id": "admin-user", "company_id": "company-c", "columns_json": ["name", "risk_level"], "visibility": "Private"},
+    )
+    assert saved.status_code == 200
+    saved_id = saved.json()["data"]["id"]
+    assert client.get(f"/reports/saved/{saved_id}").status_code == 200
+
+    schedule = client.post(
+        "/reports/schedules",
+        json={"report_id": "report-inventory_status_report", "frequency": "Weekly", "recipients": ["ops@example.com"], "format": "Excel", "active_status": True},
+    )
+    assert schedule.status_code == 200
+    assert schedule.json()["data"]["frequency"] == "Weekly"
+
+    dashboard = client.get("/dashboards/EXECUTIVE")
+    assert dashboard.status_code == 200
+    assert len(dashboard.json()["data"]["widgets"]) >= 1
+
+    kpi = client.post("/kpis/kpi-fpy/calculate")
+    assert kpi.status_code == 200
+    assert kpi.json()["data"]["status"] in {"Good", "Warning", "Critical"}
+
+
+def test_reporting_analytics_and_ai_are_draft_only():
+    cross = client.get("/analytics/cross-module")
+    assert cross.status_code == 200
+    assert cross.json()["data"][0]["risk_level"] == "HIGH"
+
+    summary = client.get("/ai/reporting/executive-summary")
+    assert summary.status_code == 200
+    assert "recommended_actions" in summary.json()["data"]
+
+    draft = client.post(
+        "/ai/reporting/draft-action",
+        json={"action_type": "Draft investigation", "source_type": "KPI", "source_id": "kpi-fpy", "reason": "financial record risk and release inventory concern", "owner": "quality-manager"},
+    )
+    assert draft.status_code == 200
+    data = draft.json()["data"]
+    assert data["requires_human_approval"] is True
+    assert "Modify Financial Records" in data["ai_safety"]["cannot"]
+    assert "financial record" not in data["reason"]

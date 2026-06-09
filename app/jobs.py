@@ -121,3 +121,38 @@ def supplier_portal_certificate_scan_job(company_id: str) -> dict:
 @celery_app.task
 def supplier_portal_delivery_scan_job(company_id: str) -> dict:
     return {"company_id": company_id, "status": "SUPPLIER_PORTAL_DELIVERY_SCAN_COMPLETED", "actions_created": "draft_only"}
+
+
+@celery_app.task
+def reporting_scheduled_report_job(company_id: str, schedule_id: str) -> dict:
+    return {"company_id": company_id, "schedule_id": schedule_id, "status": "REPORTING_SCHEDULED_REPORT_COMPLETED", "delivery": "email_first"}
+
+
+@celery_app.task
+def reporting_email_delivery_job(company_id: str, report_run_id: str) -> dict:
+    return {"company_id": company_id, "report_run_id": report_run_id, "status": "REPORTING_EMAIL_DELIVERY_QUEUED"}
+
+
+@celery_app.task
+def reporting_kpi_calculation_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "REPORTING_KPI_CALCULATION_COMPLETED"}
+
+
+@celery_app.task
+def reporting_trend_recalculation_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "REPORTING_TREND_RECALCULATION_COMPLETED"}
+
+
+@celery_app.task
+def reporting_cross_module_insight_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "REPORTING_CROSS_MODULE_INSIGHTS_COMPLETED", "actions_created": "draft_only"}
+
+
+@celery_app.task
+def reporting_ai_risk_scan_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "REPORTING_AI_RISK_SCAN_COMPLETED", "actions_created": "draft_only"}
+
+
+@celery_app.task
+def reporting_executive_summary_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "REPORTING_EXECUTIVE_SUMMARY_COMPLETED", "actions_created": "draft_only"}

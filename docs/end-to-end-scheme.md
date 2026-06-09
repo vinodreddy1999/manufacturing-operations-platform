@@ -1,6 +1,6 @@
 # End-to-End Scheme Diagram
 
-This diagram shows the current Python-only Manufacturing Operations Platform after adding the modular platform foundation, expanded Inventory module, external Customer Portal, external Supplier Portal, and separate `inventory-ai-service/` microservice.
+This diagram shows the current Python-only Manufacturing Operations Platform after adding the modular platform foundation, expanded Inventory module, external Customer Portal, external Supplier Portal, Reporting & Analytics, and separate `inventory-ai-service/` microservice.
 
 There are two FastAPI services:
 
@@ -24,6 +24,7 @@ flowchart LR
     PlatformAPI --> ProductionRouter["Production Router app/modules/production.py"]
     PlatformAPI --> MaintenanceRouter["Maintenance Router app/modules/maintenance.py"]
     PlatformAPI --> QualityRouter["Quality Router app/modules/quality.py"]
+    PlatformAPI --> ReportingRouter["Reporting Router app/modules/reporting.py"]
     PlatformAPI --> SalesRouter["Sales Router app/modules/sales.py"]
     PlatformAPI --> CustomerPortalRouter["Customer Portal Router app/modules/customer_portal.py"]
     PlatformAPI --> SupplierPortalRouter["Supplier Portal Router app/modules/supplier_portal.py"]
@@ -73,6 +74,14 @@ flowchart LR
     QualityRouter --> QualCapa["CAPA and RCA"]
     QualityRouter --> QualMetrics["KPIs / Reports / Cost of Poor Quality"]
     QualityRouter --> QualAI["Rule-Based Quality AI"]
+
+    ReportingRouter --> ReportCatalog["Report Catalog"]
+    ReportingRouter --> ReportRun["Scoped Report Run / Export"]
+    ReportingRouter --> SavedScheduled["Saved / Scheduled Reports"]
+    ReportingRouter --> Dashboards["Dashboards / Widgets"]
+    ReportingRouter --> Kpis["KPI Definitions / Snapshots"]
+    ReportingRouter --> Analytics["Trends / Cross-Module / Action Insights"]
+    ReportingRouter --> ReportingAI["Rule-Based Reporting AI"]
 
     SalesRouter --> SalesCustomer["Customers / Hierarchy / Regions"]
     SalesRouter --> SalesOrders["Sales Orders and Items"]
@@ -127,6 +136,7 @@ flowchart LR
     ProductionRouter --> Audit
     MaintenanceRouter --> Audit
     QualityRouter --> Audit
+    ReportingRouter --> Audit
     SalesRouter --> Audit
     CustomerPortalRouter --> Audit
     SupplierPortalRouter --> Audit
@@ -168,16 +178,17 @@ flowchart LR
 9. Production requests go through `app/modules/production.py`.
 10. Maintenance requests go through `app/modules/maintenance.py`.
 11. Quality requests go through `app/modules/quality.py`.
-12. Sales requests go through `app/modules/sales.py`.
-13. Customer Portal requests go through `app/modules/customer_portal.py`.
-14. Supplier Portal requests go through `app/modules/supplier_portal.py` and are scoped to the logged-in supplier.
-15. Inventory, Production, Maintenance, Quality, Sales, Customer Portal and Supplier Portal data are validated with Pydantic schemas and returned as structured JSON.
-16. Background jobs are prepared in `app/jobs.py` using Celery and Redis.
-17. User opens the Inventory AI service Swagger at `http://127.0.0.1:8100/docs`.
-18. Inventory AI requests go through `inventory-ai-service/app/routes.py`.
-19. AI routes call rule-based logic in `ai_engine.py`, `risk_rules.py`, and `recommendations.py`.
-20. AI returns analysis, risk levels, recommendations, and draft actions only.
-21. Human approval is required before any critical operational action.
+12. Reporting requests go through `app/modules/reporting.py`.
+13. Sales requests go through `app/modules/sales.py`.
+14. Customer Portal requests go through `app/modules/customer_portal.py`.
+15. Supplier Portal requests go through `app/modules/supplier_portal.py` and are scoped to the logged-in supplier.
+16. Inventory, Production, Maintenance, Quality, Reporting, Sales, Customer Portal and Supplier Portal data are validated with Pydantic schemas and returned as structured JSON.
+17. Background jobs are prepared in `app/jobs.py` using Celery and Redis.
+18. User opens the Inventory AI service Swagger at `http://127.0.0.1:8100/docs`.
+19. Inventory AI requests go through `inventory-ai-service/app/routes.py`.
+20. AI routes call rule-based logic in `ai_engine.py`, `risk_rules.py`, and `recommendations.py`.
+21. AI returns analysis, risk levels, recommendations, and draft actions only.
+22. Human approval is required before any critical operational action.
 
 ## Main Platform Modules
 
@@ -206,6 +217,10 @@ flowchart LR
 | Quality service | `app/modules/quality_service.py` | Inspection execution, failure handling, KPIs, reports and Quality AI rules |
 | Quality schemas | `app/modules/quality_schemas.py` | Pydantic schemas for Quality requests |
 | Quality models | `app/modules/quality_models.py` | SQLAlchemy table definitions for Quality Management |
+| Reporting module | `app/modules/reporting.py` | Dedicated Reporting & Analytics APIs |
+| Reporting service | `app/modules/reporting_service.py` | Report execution, exports, dashboards, KPIs, analytics and AI rules |
+| Reporting schemas | `app/modules/reporting_schemas.py` | Pydantic schemas for report runs, exports, schedules, dashboards, KPIs and AI requests |
+| Reporting models | `app/modules/reporting_models.py` | SQLAlchemy table definitions for catalog, saved/scheduled reports, runs, files, recipients, dashboards, KPIs, trends, insights, AI risks, summaries and anomalies |
 | Sales module | `app/modules/sales.py` | Dedicated Sales & Distribution APIs |
 | Sales service | `app/modules/sales_service.py` | Availability, reservations, allocation, dispatch, KPIs, reports and Sales AI rules |
 | Sales schemas | `app/modules/sales_schemas.py` | Pydantic schemas for Sales requests |
@@ -230,6 +245,7 @@ flowchart LR
 | Production | `/production/*` | Dedicated Production Management module with planning, execution, costing, reporting and AI |
 | Maintenance | `/maintenance/*`, `/machines`, `/maintenance-plans`, `/work-orders`, `/ai/maintenance/*` | Dedicated Maintenance Management module with CMMS/EAM workflows and AI |
 | Quality | `/quality/*`, `/ai/quality/*` | Dedicated Quality Management module with QMS workflows and AI |
+| Reporting | `/reports/*`, `/dashboards/*`, `/kpis/*`, `/analytics/*`, `/ai/reporting/*` | Dedicated Reporting & Analytics module with catalog, exports, schedules, dashboards, KPIs, cross-module analytics and AI insights |
 | Sales | `/customers`, `/sales-orders`, `/dispatch-orders`, `/shipments`, `/returns`, `/ai/sales/*` | Dedicated Sales & Distribution module with order, allocation, dispatch, returns and AI |
 | Customer Portal | `/customer-portal/*`, `/ai/customer-portal/*` | Dedicated external customer portal with customer-scoped order, shipment, document, support and return workflows |
 | Supplier Portal | `/supplier-portal/*`, `/ai/supplier-portal/*` | Dedicated external supplier portal with company enablement flags, supplier-scoped purchase order, delivery, ASN, document, certificate, message, CAPA, performance and task workflows |
@@ -360,6 +376,21 @@ flowchart LR
 | Performance and Tasks | `GET /supplier-portal/performance`, `GET /supplier-portal/tasks` | Configurable supplier-visible scorecards and supplier-facing action queue |
 | Reports | `GET /supplier-portal/reports/{report_type}` | Supplier-owned purchase order, delivery, document and certificate reports |
 | Supplier Portal AI | `/ai/supplier-portal/*` | Risk center, delivery risk, document risk, certificate expiry, supplier quality risk, PO acknowledgement risk, message summary and draft actions |
+
+## Reporting & Analytics Views
+
+| View | Endpoint | Output |
+| --- | --- | --- |
+| Enablement | `GET /reports/enablement` | Company-level reporting flags for standard, custom, scheduled, export, dashboard and AI capabilities |
+| Report Catalog | `GET /reports/catalog`, `GET /reports/catalog/{id}` | Standard reports across Inventory, Warehouse, Procurement, Production, Maintenance, Quality, Sales, Costing, Executive, Audit and AI Insights |
+| Report Run | `POST /reports/run` | Role-scoped report rows, selected columns, summary and access-policy marker |
+| Report Export | `POST /reports/export` | CSV, Excel or PDF export response with report run file metadata |
+| Saved Reports | `GET/POST /reports/saved`, `GET/PUT/DELETE /reports/saved/{id}` | Saved report filters, columns, sorting, grouping, chart config and visibility |
+| Scheduled Reports | `GET/POST /reports/schedules`, `PUT/DELETE /reports/schedules/{id}` | Email-first scheduled report definitions and recipients |
+| Dashboards | `GET/POST /dashboards`, `GET/PUT /dashboards/{id}` | Dashboard definitions with KPI, trend, risk and action widgets |
+| KPIs | `GET/POST /kpis`, `GET /kpis/{id}`, `POST /kpis/{id}/calculate` | KPI definitions and calculated snapshots |
+| Analytics | `GET /analytics/trends`, `/cross-module`, `/action-insights` | Trend analysis, cross-module risk chains and owner/action recommendations |
+| Reporting AI | `/ai/reporting/*` | Risk center, executive summary, root cause, anomalies, KPI insights, narrative and draft actions |
 
 ## Main Inventory Module Views
 
@@ -563,6 +594,31 @@ flowchart TD
     HumanApproval --> SafeOutput
 ```
 
+## Reporting & Analytics Data Flow
+
+```mermaid
+flowchart TD
+    Client["Swagger / API Client"] --> ReportingRoute["Reporting Router app/modules/reporting.py"]
+    ReportingRoute --> ReportingSchemas["Pydantic Schemas app/modules/reporting_schemas.py"]
+    ReportingSchemas --> ReportingService["Service Layer app/modules/reporting_service.py"]
+    ReportingService --> FeatureFlags["Company Reporting Feature Flags"]
+    FeatureFlags --> Access["Tenant / Company / Role Access Check"]
+    Access --> Catalog["Report Catalog"]
+    Access --> Runner["Report Run Engine"]
+    Runner --> Export["CSV / Excel / PDF Export Flow"]
+    Runner --> Saved["Saved / Scheduled Reports"]
+    ReportingService --> Dashboards["Dashboards / Widgets"]
+    ReportingService --> Kpis["KPI Calculation / Snapshots"]
+    ReportingService --> Analytics["Trends / Cross-Module / Action Insights"]
+    ReportingService --> ReportingAI["Reporting AI Recommendations"]
+    ReportingAI --> HumanApproval["Human Approval Required"]
+    Catalog --> Output["Final JSON Output"]
+    Export --> Output
+    Kpis --> Output
+    Analytics --> Output
+    HumanApproval --> Output
+```
+
 ## Inventory AI Data Flow
 
 ```mermaid
@@ -590,6 +646,7 @@ sequenceDiagram
     participant R as Production Router
     participant M as Maintenance Router
     participant Q as Quality Router
+    participant B as Reporting Router
     participant X as Sales Router
     participant CP as Customer Portal Router
     participant SP as Supplier Portal Router
@@ -628,6 +685,12 @@ sequenceDiagram
     Q->>S: Read lot, checklist, defects and quality rules
     S-->>Q: Return quality seed data
     Q-->>O: Return inspection decision and quarantine/rework JSON
+
+    U->>P: Request /reports/run
+    P->>B: Route reporting request
+    B->>S: Read catalog, feature flags, KPIs and analytics data
+    S-->>B: Return scoped reporting seed data
+    B-->>O: Return report rows, summary and export metadata
 
     U->>P: Request /sales-orders/so-001/reserve
     P->>X: Route sales request
@@ -692,3 +755,8 @@ Supplier Portal-specific AI safety:
 
 - AI can create draft supplier follow-ups, document reminders, certificate renewal reminders, CAPA review tasks, delivery escalation tasks and message summaries.
 - AI cannot approve suppliers or certificates, change purchase orders, accept supplier delivery dates, send purchase orders, commit financial actions or replace suppliers automatically.
+
+Reporting-specific AI safety:
+
+- AI can create draft tasks, draft approval requests, draft investigations, draft email summaries and draft report notes.
+- AI cannot approve decisions, change source data, send external email without approval, modify financial records, release inventory or dispatch goods.

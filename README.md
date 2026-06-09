@@ -41,6 +41,8 @@ The Customer Portal module has been added as a dedicated external-user backend w
 
 The Supplier Portal module has been added as a dedicated external-supplier backend with isolated supplier authentication, company-level portal enablement flags, supplier users/RBAC, supplier-owned purchase orders, acknowledgements, delivery confirmations, ASN, document/certificate uploads, supplier performance visibility, supplier-facing tasks, messages, CAPA responses, notifications, reports, audit logs, and rule-based Supplier Portal AI.
 
+The Reporting & Analytics module has been added as a dedicated BI-style backend with standard report catalog, scoped report execution, CSV/Excel/PDF export flow, saved reports, scheduled email reports, dashboards, KPI definitions/snapshots, trend analytics, cross-module insights, action insights, and rule-based Reporting AI.
+
 ## Diagram
 
 See the GitHub-rendered end-to-end scheme diagram here:
@@ -175,6 +177,15 @@ app/
                        Seeded Supplier Portal repository
     supplier_portal_service.py
                        Portal auth, supplier-scoped data access, reports and AI rules
+    reporting.py       Reporting & Analytics API routes
+    reporting_models.py
+                       SQLAlchemy tables for catalog, saved/scheduled reports, dashboards, KPIs, trends, insights, AI risks and anomalies
+    reporting_schemas.py
+                       Pydantic schemas for report runs, exports, schedules, dashboards, KPIs and AI requests
+    reporting_repository.py
+                       Seeded Reporting repository
+    reporting_service.py
+                       Report execution, exports, dashboards, KPI calculation, analytics and AI rules
   ai_copilot/         AIProvider, MockAIProvider and optional OpenAIProvider interface
   jobs.py             Celery jobs for reports, AI risk scans, expiry/dead stock checks
 alembic/              Migration environment and first foundation migration
@@ -292,6 +303,23 @@ Key endpoint groups:
 - Supplier Portal AI: `/ai/supplier-portal/risk-center`, `/delivery-risk`, `/document-risk`, `/certificate-expiry`, `/supplier-quality-risk`, `/po-acknowledgement-risk`, `/message-summary`, `/draft-action`
 
 Supplier Portal AI is recommendation-only. It can analyze supplier delay, document, certificate, acknowledgement and quality risks, then create draft follow-ups or review tasks; it cannot approve suppliers or certificates, change purchase orders, accept delivery dates, send POs, commit financial actions, or replace suppliers automatically.
+
+## Reporting & Analytics Module
+
+Open `http://localhost:8000/docs` and use the `Reporting & Analytics` and `Reporting AI` tags.
+
+Key endpoint groups:
+
+- Feature flags and catalog: `/reports/enablement`, `/reports/catalog`, `/reports/catalog/{id}`
+- Report execution and exports: `/reports/run`, `/reports/export`
+- Saved reports: `/reports/saved`, `/reports/saved/{id}`
+- Scheduled reports: `/reports/schedules`, `/reports/schedules/{id}`
+- Dashboards: `/dashboards`, `/dashboards/{id}`
+- KPIs: `/kpis`, `/kpis/{id}`, `/kpis/{id}/calculate`
+- Analytics: `/analytics/trends`, `/analytics/cross-module`, `/analytics/action-insights`
+- Reporting AI: `/ai/reporting/risk-center`, `/executive-summary`, `/root-cause`, `/anomalies`, `/kpi-insights`, `/report-narrative`, `/draft-action`
+
+Reporting AI is recommendation-only. It can analyze, summarize, recommend and create draft tasks or report notes; it cannot approve decisions, change source data, send external email without approval, modify financial records, release inventory, or dispatch goods.
 
 ## Platform Foundation
 
