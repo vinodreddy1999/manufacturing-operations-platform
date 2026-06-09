@@ -686,3 +686,72 @@ def test_mobile_workflows_uploads_and_ai_are_safe():
     data = draft.json()["data"]
     assert data["requires_human_approval"] is True
     assert "release inventory" not in data["reason"]
+
+
+def test_integrations_provider_config_credentials_and_webhook():
+    providers = client.get("/integrations/providers")
+    assert providers.status_code == 200
+    assert any(provider["provider_code"] == "DEMO_ERP" for provider in providers.json()["data"])
+
+    configs = client.get("/integrations/configs")
+    assert configs.status_code == 200
+    assert configs.json()["data"][0]["auth_config_encrypted"]["masked"] is True
+
+    credential = client.post("/integrations/credentials", json={"integration_config_id": "config-demo-erp", "credential_type": "API key", "secret_value": "super-secret-1234"})
+    assert credential.status_code == 200
+    assert credential.json()["data"]["masked_value"] == "****-1234"
+    assert "super-secret" not in str(credential.json())
+
+    webhook = client.post("/integrations/webhooks/webhook-inventory-moved/test")
+    assert webhook.status_code == 200
+    assert webhook.json()["data"]["status"] == "Queued"
+
+
+def test_integrations_inbound_idempotency_import_export_and_sync():
+    inbound_payload = {"company_id": "company-c", "source_module": "External", "event_type": "Supplier delivery update", "entity_type": "Delivery", "entity_id": "EXT-DEL-1", "payload_json": {"status": "In Transit"}, "idempotency_key": "inbound-key-001"}
+    first = client.post("/integrations/inbound/DEMO_ERP", json=inbound_payload)
+    assert first.status_code == 200
+    duplicate = client.post("/integrations/inbound/DEMO_ERP", json=inbound_payload)
+    assert duplicate.status_code == 200
+    assert duplicate.json()["data"]["status"] == "Ignored"
+
+    import_job = client.post("/integrations/import/file", json={"company_id": "company-c", "import_type": "Inventory opening balance", "file_format": "CSV", "records": [{"external_record_id": "EXT-ITEM-1", "quantity": 10}]})
+    assert import_job.status_code == 200
+    import_id = import_job.json()["data"]["id"]
+    assert client.get(f"/integrations/import/{import_id}/preview").status_code == 200
+    assert client.post(f"/integrations/import/{import_id}/approve").json()["data"]["status"] == "Approved"
+    assert client.post(f"/integrations/import/{import_id}/commit").json()["data"]["committed_records"] == 1
+
+    export = client.post("/integrations/export", json={"company_id": "company-c", "export_type": "Inventory data", "file_format": "CSV"})
+    assert export.status_code == 200
+    assert export.json()["data"]["status"] == "Generated"
+
+    sync = client.post("/integrations/sync-jobs", json={"company_id": "company-c", "integration_config_id": "config-demo-erp", "sync_type": "Pull", "source_entity": "Item", "target_entity": "InventoryItem"})
+    assert sync.status_code == 200
+    retry = client.post(f"/integrations/sync-jobs/{sync.json()['data']['id']}/retry")
+    assert retry.status_code == 200
+    assert retry.json()["data"]["status"] == "Retrying"
+
+
+def test_integrations_monitoring_ai_and_draft_safety():
+    monitoring = client.get("/integrations/monitoring")
+    assert monitoring.status_code == 200
+    assert "data_mapping_issues" in monitoring.json()["data"]
+
+    mapping = client.post("/ai/integrations/suggest-mapping", json={"external_field": "material_code", "target_entity": "Item"})
+    assert mapping.status_code == 200
+    assert mapping.json()["data"]["suggested_internal_field"] == "item_code"
+    assert mapping.json()["data"]["requires_human_review"] is True
+
+    risk = client.get("/ai/integrations/risk-center")
+    assert risk.status_code == 200
+    assert "Change Credentials" in risk.json()["data"]["ai_safety"]["cannot"]
+
+    draft = client.post(
+        "/ai/integrations/draft-action",
+        json={"action_type": "Draft mapping fix", "source_type": "Error", "source_id": "int-error-001", "reason": "change credentials and send external data", "owner": "integration-owner"},
+    )
+    assert draft.status_code == 200
+    data = draft.json()["data"]
+    assert data["requires_human_approval"] is True
+    assert "change credentials" not in data["reason"]

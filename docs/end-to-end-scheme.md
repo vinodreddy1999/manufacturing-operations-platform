@@ -1,6 +1,6 @@
 # End-to-End Scheme Diagram
 
-This diagram shows the current Python-only Manufacturing Operations Platform after adding the modular platform foundation, expanded Inventory module, external Customer Portal, external Supplier Portal, Reporting & Analytics, Costing & Profitability, Mobile Operations, and separate `inventory-ai-service/` microservice.
+This diagram shows the current Python-only Manufacturing Operations Platform after adding the modular platform foundation, expanded Inventory module, external Customer Portal, external Supplier Portal, Reporting & Analytics, Costing & Profitability, Mobile Operations, Integrations, and separate `inventory-ai-service/` microservice.
 
 There are two FastAPI services:
 
@@ -21,6 +21,7 @@ flowchart LR
     PlatformAPI --> Core["Core Platform Router app/core_router.py"]
     PlatformAPI --> Auth["Auth Router app/auth_router.py"]
     PlatformAPI --> CostingRouter["Costing Router app/modules/costing.py"]
+    PlatformAPI --> IntegrationsRouter["Integrations Router app/modules/integrations.py"]
     PlatformAPI --> InventoryRouter["Inventory Router app/modules/inventory.py"]
     PlatformAPI --> ProductionRouter["Production Router app/modules/production.py"]
     PlatformAPI --> MaintenanceRouter["Maintenance Router app/modules/maintenance.py"]
@@ -58,6 +59,15 @@ flowchart LR
     CostingRouter --> Profitability["Product / Customer / Plant Profitability"]
     CostingRouter --> CostReports["Costing Dashboard / Reports"]
     CostingRouter --> CostingAI["Rule-Based Costing AI"]
+
+    IntegrationsRouter --> IntProviders["Providers / Company Configs"]
+    IntegrationsRouter --> IntCredentials["Masked Credentials / Rotation"]
+    IntegrationsRouter --> IntWebhooks["Webhooks / Inbound Events"]
+    IntegrationsRouter --> IntSync["Sync Jobs / Retry Logs"]
+    IntegrationsRouter --> IntMappings["Mappings / Transform Rules"]
+    IntegrationsRouter --> IntFiles["File Import / Export"]
+    IntegrationsRouter --> IntMonitoring["Errors / Monitoring / Reports"]
+    IntegrationsRouter --> IntAI["Rule-Based Integration AI"]
 
     ProductionRouter --> ProdMaster["Product Master"]
     ProductionRouter --> ProdBom["BOM and Routing"]
@@ -152,6 +162,7 @@ flowchart LR
     Core --> Audit["Audit Helper app/audit.py"]
     CostingRouter --> Audit
     GenericModules --> Audit
+    IntegrationsRouter --> Audit
     InventoryRouter --> Audit
     ProductionRouter --> Audit
     MaintenanceRouter --> Audit
@@ -196,22 +207,23 @@ flowchart LR
 6. Feature flags decide whether module APIs are enabled.
 7. Generic module routers store warehouse and procurement records in `ModuleRecord`.
 8. Costing requests go through `app/modules/costing.py`.
-9. Inventory requests go through `app/modules/inventory.py`.
-10. Production requests go through `app/modules/production.py`.
-11. Maintenance requests go through `app/modules/maintenance.py`.
-12. Mobile Operations requests go through `app/modules/mobile.py`.
-13. Quality requests go through `app/modules/quality.py`.
-14. Reporting requests go through `app/modules/reporting.py`.
-15. Sales requests go through `app/modules/sales.py`.
-16. Customer Portal requests go through `app/modules/customer_portal.py`.
-17. Supplier Portal requests go through `app/modules/supplier_portal.py` and are scoped to the logged-in supplier.
-18. Inventory, Costing, Production, Maintenance, Mobile, Quality, Reporting, Sales, Customer Portal and Supplier Portal data are validated with Pydantic schemas and returned as structured JSON.
-19. Background jobs are prepared in `app/jobs.py` using Celery and Redis.
-20. User opens the Inventory AI service Swagger at `http://127.0.0.1:8100/docs`.
-21. Inventory AI requests go through `inventory-ai-service/app/routes.py`.
-22. AI routes call rule-based logic in `ai_engine.py`, `risk_rules.py`, and `recommendations.py`.
-23. AI returns analysis, risk levels, recommendations, and draft actions only.
-24. Human approval is required before any critical operational action.
+9. Integrations requests go through `app/modules/integrations.py`.
+10. Inventory requests go through `app/modules/inventory.py`.
+11. Production requests go through `app/modules/production.py`.
+12. Maintenance requests go through `app/modules/maintenance.py`.
+13. Mobile Operations requests go through `app/modules/mobile.py`.
+14. Quality requests go through `app/modules/quality.py`.
+15. Reporting requests go through `app/modules/reporting.py`.
+16. Sales requests go through `app/modules/sales.py`.
+17. Customer Portal requests go through `app/modules/customer_portal.py`.
+18. Supplier Portal requests go through `app/modules/supplier_portal.py` and are scoped to the logged-in supplier.
+19. Inventory, Costing, Integrations, Production, Maintenance, Mobile, Quality, Reporting, Sales, Customer Portal and Supplier Portal data are validated with Pydantic schemas and returned as structured JSON.
+20. Background jobs are prepared in `app/jobs.py` using Celery and Redis.
+21. User opens the Inventory AI service Swagger at `http://127.0.0.1:8100/docs`.
+22. Inventory AI requests go through `inventory-ai-service/app/routes.py`.
+23. AI routes call rule-based logic in `ai_engine.py`, `risk_rules.py`, and `recommendations.py`.
+24. AI returns analysis, risk levels, recommendations, and draft actions only.
+25. Human approval is required before any critical operational action.
 
 ## Main Platform Modules
 
@@ -232,6 +244,10 @@ flowchart LR
 | Costing service | `app/modules/costing_service.py` | Cost calculations, profitability, reports and Costing AI rules |
 | Costing schemas | `app/modules/costing_schemas.py` | Pydantic schemas for cost centers/elements, calculations, standard costs, variances and AI requests |
 | Costing models | `app/modules/costing_models.py` | SQLAlchemy table definitions for cost records, variances, profitability, AI risks, recommendations, reports and snapshots |
+| Integrations module | `app/modules/integrations.py` | Dedicated Integrations APIs |
+| Integrations service | `app/modules/integrations_service.py` | Credential masking, inbound idempotency, sync, import/export, monitoring and AI rules |
+| Integrations schemas | `app/modules/integrations_schemas.py` | Pydantic schemas for providers, configs, credentials, webhooks, sync, mappings, import/export and AI requests |
+| Integrations models | `app/modules/integrations_models.py` | SQLAlchemy table definitions for providers, configs, credentials, webhooks, events, sync, mappings, imports, exports, errors, retries, email, IoT and AI |
 | Production module | `app/modules/production.py` | Dedicated Production Management APIs |
 | Production service | `app/modules/production_service.py` | MRP, reservations, scheduling, costing, reports and Production AI rules |
 | Production schemas | `app/modules/production_schemas.py` | Pydantic schemas for Production requests |
@@ -274,6 +290,7 @@ flowchart LR
 | Warehouse | `/warehouses`, `/warehouse-locations`, `/warehouse-movements`, `/warehouse-occupancy` | Stores module records after feature flag validation |
 | Procurement | `/suppliers`, `/purchase-requisitions`, `/purchase-orders` | Stores supplier and purchasing module records |
 | Costing | `/costing/*`, `/cost-centers`, `/cost-elements`, `/inventory-costing`, `/landed-cost`, `/production-costing`, `/profitability/*`, `/ai/costing/*` | Dedicated Costing & Profitability module with valuations, costing calculations, profitability and AI |
+| Integrations | `/integrations/*`, `/ai/integrations/*` | Dedicated Integrations module with providers, configs, credentials, webhooks, events, sync, mappings, imports, exports, errors, monitoring and AI |
 | Production | `/production/*` | Dedicated Production Management module with planning, execution, costing, reporting and AI |
 | Maintenance | `/maintenance/*`, `/machines`, `/maintenance-plans`, `/work-orders`, `/ai/maintenance/*` | Dedicated Maintenance Management module with CMMS/EAM workflows and AI |
 | Mobile Operations | `/mobile/*`, `/ai/mobile/*` | Dedicated mobile backend with device auth, my-work, tasks, approvals, scan, inventory, warehouse, production, maintenance, quality, dispatch, uploads and offline sync |
@@ -457,6 +474,20 @@ flowchart LR
 | Dispatch and Uploads | `/mobile/dispatch/*`, `/mobile/uploads` | Pick, pack, online dispatch confirmation and file metadata upload |
 | Offline Sync | `/mobile/sync/push`, `/pull`, `/status` | Offline action processing, idempotency, duplicate/conflict/high-risk rejection and pull payload |
 | Mobile AI | `/ai/mobile/*` | Risk center, scan validation, count assist, maintenance assist, quality assist, next action and draft actions |
+
+## Integrations Views
+
+| View | Endpoint | Output |
+| --- | --- | --- |
+| Enablement and Providers | `GET /integrations/enablement`, `GET/POST /integrations/providers` | Company integration flags and provider registry |
+| Configs and Credentials | `/integrations/configs/*`, `/integrations/credentials/*` | Company integration configs with masked credentials and credential rotation |
+| Webhooks and Events | `/integrations/webhooks/*`, `POST /integrations/inbound/{provider_code}`, `GET /integrations/events` | Webhook config/test, inbound idempotency and event log |
+| Sync Jobs and Retry | `GET/POST /integrations/sync-jobs`, `POST /integrations/sync-jobs/{id}/retry` | Pull/push/bidirectional sync job logs and retry queue |
+| Mapping Engine | `GET/POST /integrations/mappings` | Source-to-target field mappings and transform rules |
+| File Import | `POST /integrations/import/file`, `/preview`, `/approve`, `/commit` | Upload, validate, preview, approval and commit workflow |
+| File Export | `POST /integrations/export` | CSV/Excel/JSON-style export job metadata |
+| Errors and Monitoring | `GET /integrations/errors`, `POST /integrations/errors/{id}/resolve`, `/monitoring`, `/reports/{type}` | Error resolution, monitoring dashboard and reports |
+| Integrations AI | `/ai/integrations/*` | Risk center, data quality, sync failure, anomaly, mapping suggestion and draft actions |
 
 ## Main Inventory Module Views
 
@@ -738,6 +769,33 @@ flowchart TD
     HumanApproval --> Output
 ```
 
+## Integrations Data Flow
+
+```mermaid
+flowchart TD
+    Client["Swagger / API Client / External System"] --> IntRoute["Integrations Router app/modules/integrations.py"]
+    IntRoute --> IntSchemas["Pydantic Schemas app/modules/integrations_schemas.py"]
+    IntSchemas --> IntService["Service Layer app/modules/integrations_service.py"]
+    IntService --> Flags["Company Integration Feature Flags"]
+    Flags --> Providers["Providers / Configs"]
+    Providers --> Credentials["Masked Credentials / Secret References"]
+    Providers --> Webhooks["Webhook Config / Inbound Events"]
+    Webhooks --> Idempotency["Idempotency / Replay Protection"]
+    Providers --> Sync["Sync Jobs / Retry Logs"]
+    Providers --> Mapping["Mappings / Transform Rules"]
+    Providers --> Files["File Import / Export"]
+    Files --> Validation["Validation / Preview / Approval / Commit"]
+    IntService --> Errors["Error Logs / Monitoring / Reports"]
+    IntService --> IntAI["Integration AI Recommendations"]
+    IntAI --> HumanApproval["Human Approval Required"]
+    Credentials --> Output["Final JSON Output"]
+    Idempotency --> Output
+    Sync --> Output
+    Validation --> Output
+    Errors --> Output
+    HumanApproval --> Output
+```
+
 ## Inventory AI Data Flow
 
 ```mermaid
@@ -762,6 +820,7 @@ sequenceDiagram
     participant P as Platform API :8000
     participant C as Core Router
     participant K as Costing Router
+    participant G as Integrations Router
     participant I as Inventory Router
     participant R as Production Router
     participant M as Maintenance Router
@@ -788,6 +847,12 @@ sequenceDiagram
     K->>S: Read seeded cost masters and transactional cost signals
     S-->>K: Return inventory, production, maintenance, quality and profitability cost data
     K-->>O: Return cost calculation, variance and profitability JSON
+
+    U->>P: Request /integrations/inbound/DEMO_ERP
+    P->>G: Route inbound integration event
+    G->>S: Check provider, idempotency key, mappings and event log
+    S-->>G: Return accepted or duplicate integration result
+    G-->>O: Return integration event JSON
 
     U->>P: Request /inventory/dashboard
     P->>I: Route inventory request
@@ -903,3 +968,8 @@ Mobile-specific AI safety:
 
 - AI can suggest next actions, warn about wrong scans, explain task priority, suggest maintenance/quality guidance, summarize work orders and create draft notes or escalations.
 - AI cannot approve, release inventory, close critical work orders, dispatch goods, override reservations or write off inventory.
+
+Integrations-specific AI safety:
+
+- AI can create draft mapping fixes, retry tasks, integration error reports, owner emails and data validation tasks.
+- AI cannot commit high-risk imports, change credentials, send external data without approval, modify financial records, delete records or override tenant security.

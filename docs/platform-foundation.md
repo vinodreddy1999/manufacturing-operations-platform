@@ -20,6 +20,7 @@ Implemented now:
 - Dedicated Reporting & Analytics module with report catalog, scoped report execution, exports, saved/scheduled reports, dashboards, KPI snapshots, cross-module analytics, Celery job hooks and rule-based AI
 - Dedicated Costing & Profitability module with cost centers/elements, inventory valuation, landed cost, production/maintenance/quality costing, standard costs, variance, profitability, Celery job hooks and rule-based AI
 - Dedicated Mobile Operations module with mobile auth, device management, my-work, tasks, approvals, scan resolution, offline sync, uploads, mobile audit, notifications, Celery job hooks and rule-based AI
+- Dedicated Integrations module with provider/config registry, masked credentials, webhooks, inbound idempotency, sync jobs, mappings, file import/export, errors, retries, monitoring, Celery job hooks and rule-based AI
 - JWT/password security helpers
 - Optional AI provider interface: `AIProvider`, `MockAIProvider`, `OpenAIProvider`
 - Celery job declarations for reports, AI scans, expiry checks and dead-stock checks
@@ -273,3 +274,28 @@ AI safety boundary:
 
 - AI can suggest, warn, summarize and create draft actions.
 - AI cannot approve, release inventory, close critical work orders, dispatch goods, override reservations or write off inventory.
+
+## Integrations Module Depth
+
+Implemented Integrations areas:
+
+- Company-level integration feature flags for APIs, webhooks, file import/export, ERP, accounting, machine/IoT, email and AI monitoring
+- Integration provider registry and company integration configs
+- Masked credential storage and rotation structure
+- Inbound and outbound webhook records with retry/security fields
+- Integration event log with idempotency keys
+- Sync job and sync job item logs with retry queue support
+- Configurable field mappings and transform-rule table structure
+- File import workflow: upload, parse/validate, preview, approve and commit
+- File export workflow for CSV/Excel/JSON-style exports
+- Integration error logs, retry logs and resolution workflow
+- Email provider, template and delivery log structures
+- Machine/IoT future-ready configuration and event tables
+- Monitoring dashboard and integration report outputs
+- Rule-based Integration AI risk center, data quality, sync failure, anomaly, mapping suggestion and draft action endpoints
+- Celery job hooks for scheduled sync, webhook delivery/retry, file import/export, email delivery, failed record retry, data quality scan and AI risk scan
+
+AI safety boundary:
+
+- AI can analyze, recommend and create draft actions.
+- AI cannot commit high-risk imports, change credentials, send external data without approval, modify financial records, delete records or override tenant security.

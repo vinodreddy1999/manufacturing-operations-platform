@@ -236,3 +236,48 @@ def mobile_stale_work_alert_job(company_id: str) -> dict:
 @celery_app.task
 def mobile_device_inactivity_alert_job(company_id: str) -> dict:
     return {"company_id": company_id, "status": "MOBILE_DEVICE_INACTIVITY_ALERT_COMPLETED"}
+
+
+@celery_app.task
+def integrations_scheduled_sync_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "INTEGRATIONS_SCHEDULED_SYNC_COMPLETED"}
+
+
+@celery_app.task
+def integrations_webhook_delivery_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "INTEGRATIONS_WEBHOOK_DELIVERY_COMPLETED"}
+
+
+@celery_app.task
+def integrations_webhook_retry_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "INTEGRATIONS_WEBHOOK_RETRY_COMPLETED"}
+
+
+@celery_app.task
+def integrations_file_import_processing_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "INTEGRATIONS_FILE_IMPORT_PROCESSING_COMPLETED"}
+
+
+@celery_app.task
+def integrations_file_export_generation_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "INTEGRATIONS_FILE_EXPORT_GENERATION_COMPLETED"}
+
+
+@celery_app.task
+def integrations_email_delivery_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "INTEGRATIONS_EMAIL_DELIVERY_COMPLETED"}
+
+
+@celery_app.task
+def integrations_retry_failed_records_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "INTEGRATIONS_RETRY_FAILED_RECORDS_COMPLETED"}
+
+
+@celery_app.task
+def integrations_data_quality_scan_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "INTEGRATIONS_DATA_QUALITY_SCAN_COMPLETED"}
+
+
+@celery_app.task
+def integrations_ai_risk_scan_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "INTEGRATIONS_AI_RISK_SCAN_COMPLETED", "actions_created": "draft_only"}

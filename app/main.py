@@ -11,6 +11,8 @@ from .modules.customer_portal import ai_router as customer_portal_ai_router
 from .modules.customer_portal import router as customer_portal_router
 from .modules.costing import ai_router as costing_ai_router
 from .modules.costing import router as costing_router
+from .modules.integrations import ai_router as integrations_ai_router
+from .modules.integrations import router as integrations_router
 from .modules.inventory import router as inventory_router
 from .modules.maintenance import ai_router as maintenance_ai_router
 from .modules.maintenance import alias_router as maintenance_alias_router
@@ -57,6 +59,8 @@ app.include_router(costing_router)
 app.include_router(costing_ai_router)
 app.include_router(customer_portal_router)
 app.include_router(customer_portal_ai_router)
+app.include_router(integrations_router)
+app.include_router(integrations_ai_router)
 app.include_router(inventory_router)
 app.include_router(production_router)
 app.include_router(maintenance_router)

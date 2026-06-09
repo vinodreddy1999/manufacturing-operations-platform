@@ -47,6 +47,8 @@ The Costing & Profitability module has been added as a dedicated cost intelligen
 
 The Mobile Operations module has been added as a dedicated shop-floor/mobile backend with mobile authentication, device management, my-work dashboard, task/approval actions, scan resolution, inventory receiving/transfers/counting, warehouse movement, production updates, maintenance execution, quality inspection, dispatch operations, uploads, offline sync, audit logs, notifications, and rule-based Mobile AI.
 
+The Integrations module has been added as a dedicated API/file/webhook/email integration backend with provider registry, company configs, masked credential storage, webhooks, inbound events with idempotency, sync jobs, mappings, file import/export, errors/retries, monitoring reports, email/machine hooks, and rule-based Integration AI.
+
 ## Diagram
 
 See the GitHub-rendered end-to-end scheme diagram here:
@@ -204,6 +206,15 @@ app/
     mobile_repository.py
                        Seeded Mobile Operations repository
     mobile_service.py Mobile auth, device, workflow, scan, offline sync and AI rules
+    integrations.py   Integrations API routes
+    integrations_models.py
+                       SQLAlchemy tables for providers, configs, credentials, webhooks, events, sync, imports, exports, errors, email, IoT and AI
+    integrations_schemas.py
+                       Pydantic schemas for providers, configs, credentials, webhooks, sync, mappings, import/export and AI requests
+    integrations_repository.py
+                       Seeded Integrations repository
+    integrations_service.py
+                       Credential masking, inbound idempotency, sync, import/export, monitoring and AI rules
   ai_copilot/         AIProvider, MockAIProvider and optional OpenAIProvider interface
   jobs.py             Celery jobs for reports, AI risk scans, expiry/dead stock checks
 alembic/              Migration environment and first foundation migration
@@ -371,6 +382,22 @@ Key endpoint groups:
 - Mobile AI: `/ai/mobile/risk-center`, `/scan-validation`, `/count-assist`, `/maintenance-assist`, `/quality-assist`, `/suggest-next-action`, `/draft-action`
 
 Mobile AI is recommendation-only. It can suggest next actions, warn field users, summarize work and create draft notes/escalations; it cannot approve, release inventory, close critical work orders, dispatch goods, override reservations, or write off inventory.
+
+## Integrations Module
+
+Open `http://localhost:8000/docs` and use the `Integrations` and `Integrations AI` tags.
+
+Key endpoint groups:
+
+- Enablement and providers: `/integrations/enablement`, `/integrations/providers`
+- Configs and credentials: `/integrations/configs`, `/integrations/credentials`
+- Webhooks and inbound events: `/integrations/webhooks`, `/integrations/inbound/{provider_code}`
+- Events and sync: `/integrations/events`, `/integrations/sync-jobs`
+- Mappings and file exchange: `/integrations/mappings`, `/integrations/import/file`, `/integrations/export`
+- Errors, monitoring and reports: `/integrations/errors`, `/integrations/monitoring`, `/integrations/reports/{report_type}`
+- Integrations AI: `/ai/integrations/risk-center`, `/data-quality`, `/sync-failure-analysis`, `/anomaly-detection`, `/suggest-mapping`, `/draft-action`
+
+Integration AI is recommendation-only. It can suggest mapping fixes, retry tasks, error reports, owner emails and validation tasks; it cannot commit high-risk imports, change credentials, send external data without approval, modify financial records, delete records, or override tenant security.
 
 ## Platform Foundation
 
