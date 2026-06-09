@@ -45,6 +45,8 @@ The Reporting & Analytics module has been added as a dedicated BI-style backend 
 
 The Costing & Profitability module has been added as a dedicated cost intelligence backend with cost centers, cost elements, inventory valuation, landed cost, production costing, maintenance and quality costing, allocation rules, standard costs, variance analysis, profitability views, costing reports, dashboard cards, and rule-based Costing AI.
 
+The Mobile Operations module has been added as a dedicated shop-floor/mobile backend with mobile authentication, device management, my-work dashboard, task/approval actions, scan resolution, inventory receiving/transfers/counting, warehouse movement, production updates, maintenance execution, quality inspection, dispatch operations, uploads, offline sync, audit logs, notifications, and rule-based Mobile AI.
+
 ## Diagram
 
 See the GitHub-rendered end-to-end scheme diagram here:
@@ -196,6 +198,12 @@ app/
                        Seeded Costing repository
     costing_service.py
                        Cost calculation, profitability, reports and AI rules
+    mobile.py         Mobile Operations API routes
+    mobile_models.py  SQLAlchemy tables for devices, sessions, work queue, offline sync, scans, uploads, audit, conflicts, notifications and AI
+    mobile_schemas.py Pydantic schemas for mobile auth, device registration, workflows, sync and AI requests
+    mobile_repository.py
+                       Seeded Mobile Operations repository
+    mobile_service.py Mobile auth, device, workflow, scan, offline sync and AI rules
   ai_copilot/         AIProvider, MockAIProvider and optional OpenAIProvider interface
   jobs.py             Celery jobs for reports, AI risk scans, expiry/dead stock checks
 alembic/              Migration environment and first foundation migration
@@ -346,6 +354,23 @@ Key endpoint groups:
 - Costing AI: `/ai/costing/risk-center`, `/cost-increase`, `/low-margin-products`, `/customer-profitability-risk`, `/wastage-cost-risk`, `/production-variance`, `/supplier-cost-risk`, `/cost-optimization`, `/draft-action`
 
 Costing AI is recommendation-only. It can analyze cost increases, low margin products, wastage, production variance and supplier cost risk; it cannot change product price, change supplier contracts, approve cost allocation, write off inventory, change standard cost, or modify financial records.
+
+## Mobile Operations Module
+
+Open `http://localhost:8000/docs` and use the `Mobile Operations` and `Mobile AI` tags.
+
+Key endpoint groups:
+
+- Auth and devices: `/mobile/auth/login`, `/refresh`, `/logout`, `/mobile/devices/register`, `/mobile/devices/{id}/disable`
+- Work and approvals: `/mobile/my-work`, `/mobile/tasks`, `/mobile/approvals`
+- Scan and inventory: `/mobile/scan/resolve`, `/mobile/inventory/receipts`, `/mobile/inventory/transfers`, `/mobile/inventory/counts`
+- Warehouse and production: `/mobile/warehouse/movements`, `/mobile/production/orders`
+- Maintenance and quality: `/mobile/maintenance/work-orders`, `/mobile/quality/inspections`
+- Dispatch and uploads: `/mobile/dispatch/pick-lists`, `/mobile/dispatch/confirm`, `/mobile/uploads`
+- Offline sync: `/mobile/sync/push`, `/mobile/sync/pull`, `/mobile/sync/status`
+- Mobile AI: `/ai/mobile/risk-center`, `/scan-validation`, `/count-assist`, `/maintenance-assist`, `/quality-assist`, `/suggest-next-action`, `/draft-action`
+
+Mobile AI is recommendation-only. It can suggest next actions, warn field users, summarize work and create draft notes/escalations; it cannot approve, release inventory, close critical work orders, dispatch goods, override reservations, or write off inventory.
 
 ## Platform Foundation
 

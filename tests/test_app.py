@@ -607,3 +607,82 @@ def test_costing_profitability_reports_and_ai_are_draft_only():
     data = draft.json()["data"]
     assert data["requires_human_approval"] is True
     assert "change product price" not in data["reason"]
+
+
+def test_mobile_login_device_my_work_and_scan():
+    login = client.post("/mobile/auth/login", json={"user_id": "mobile-user-warehouse", "password": "Mobile123!", "device_id": "device-demo-001"})
+    assert login.status_code == 200
+    assert login.json()["data"]["role"] == "Warehouse Operator"
+
+    device = client.post(
+        "/mobile/devices/register",
+        json={"device_id": "device-test-001", "user_id": "mobile-user-warehouse", "company_id": "company-c", "device_name": "Test Scanner", "device_type": "Scanner", "os": "Android", "app_version": "1.0.0"},
+    )
+    assert device.status_code == 200
+    assert device.json()["data"]["status"] == "Active"
+
+    my_work = client.get("/mobile/my-work")
+    assert my_work.status_code == 200
+    assert "my_tasks" in my_work.json()["data"]
+
+    scan = client.post("/mobile/scan/resolve", json={"scanned_value": "ITEM:item-steel", "scan_context": "inventory_count", "device_id": "device-demo-001", "user_id": "mobile-user-warehouse"})
+    assert scan.status_code == 200
+    assert scan.json()["data"]["entity_type"] == "Item"
+
+
+def test_mobile_inventory_count_transfer_and_sync_conflicts():
+    transfer = client.post(
+        "/mobile/inventory/transfers",
+        json={"source_bin_id": "bin-a-01-01", "destination_bin_id": "bin-b-01-01", "item_id": "item-steel", "quantity": 5, "stock_status": "Available", "idempotency_key": "transfer-key-001"},
+    )
+    assert transfer.status_code == 200
+    assert transfer.json()["data"]["status"] == "Draft"
+
+    count = client.post(
+        "/mobile/inventory/counts/count-cycle-001/submit-item",
+        json={"location_id": "bin-a-01-01", "item_id": "item-steel", "counted_quantity": 90, "system_quantity": 100, "variance_reason": "Missing", "idempotency_key": "count-key-001"},
+    )
+    assert count.status_code == 200
+    assert count.json()["data"]["variance_status"] == "Requires Approval"
+
+    sync = client.post(
+        "/mobile/sync/push",
+        json={
+            "device_id": "device-demo-001",
+            "user_id": "mobile-user-warehouse",
+            "actions": [
+                {"local_action_id": "local-001", "action_type": "inventory.count_entry", "payload": {"item_id": "item-steel"}, "created_offline_at": "2026-06-09T10:00:00", "idempotency_key": "offline-key-001"},
+                {"local_action_id": "local-002", "action_type": "approval.approve", "payload": {}, "created_offline_at": "2026-06-09T10:05:00", "idempotency_key": "offline-key-002"},
+            ],
+        },
+    )
+    assert sync.status_code == 200
+    statuses = {row["status"] for row in sync.json()["data"]["results"]}
+    assert "accepted" in statuses
+    assert "rejected" in statuses
+
+
+def test_mobile_workflows_uploads_and_ai_are_safe():
+    maintenance = client.post(
+        "/mobile/maintenance/work-orders/wo-breakdown-001/complete",
+        json={"root_cause": "Bearing wear", "spare_usage": [{"spare_id": "spare-spindle-bearing", "quantity": 1}], "downtime_minutes": 30, "completion_notes": "Completed", "idempotency_key": "wo-key-001"},
+    )
+    assert maintenance.status_code == 200
+    assert maintenance.json()["data"]["status"] == "Completed"
+
+    upload = client.post("/mobile/uploads", json={"related_type": "Task", "related_id": "mob-task-count-001", "file_type": "Photo", "uploaded_by": "mobile-user-warehouse", "device_id": "device-demo-001"})
+    assert upload.status_code == 200
+    assert upload.json()["data"]["sync_status"] == "Synced"
+
+    risk = client.get("/ai/mobile/risk-center")
+    assert risk.status_code == 200
+    assert "Write Off Inventory" in risk.json()["data"]["ai_safety"]["cannot"]
+
+    draft = client.post(
+        "/ai/mobile/draft-action",
+        json={"action_type": "Draft supervisor escalation", "source_type": "Count", "source_id": "count-cycle-001", "reason": "approve release inventory and dispatch goods", "owner": "plant-supervisor"},
+    )
+    assert draft.status_code == 200
+    data = draft.json()["data"]
+    assert data["requires_human_approval"] is True
+    assert "release inventory" not in data["reason"]

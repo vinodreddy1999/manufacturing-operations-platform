@@ -1,6 +1,6 @@
 # End-to-End Scheme Diagram
 
-This diagram shows the current Python-only Manufacturing Operations Platform after adding the modular platform foundation, expanded Inventory module, external Customer Portal, external Supplier Portal, Reporting & Analytics, Costing & Profitability, and separate `inventory-ai-service/` microservice.
+This diagram shows the current Python-only Manufacturing Operations Platform after adding the modular platform foundation, expanded Inventory module, external Customer Portal, external Supplier Portal, Reporting & Analytics, Costing & Profitability, Mobile Operations, and separate `inventory-ai-service/` microservice.
 
 There are two FastAPI services:
 
@@ -24,6 +24,7 @@ flowchart LR
     PlatformAPI --> InventoryRouter["Inventory Router app/modules/inventory.py"]
     PlatformAPI --> ProductionRouter["Production Router app/modules/production.py"]
     PlatformAPI --> MaintenanceRouter["Maintenance Router app/modules/maintenance.py"]
+    PlatformAPI --> MobileRouter["Mobile Operations Router app/modules/mobile.py"]
     PlatformAPI --> QualityRouter["Quality Router app/modules/quality.py"]
     PlatformAPI --> ReportingRouter["Reporting Router app/modules/reporting.py"]
     PlatformAPI --> SalesRouter["Sales Router app/modules/sales.py"]
@@ -75,6 +76,15 @@ flowchart LR
     MaintenanceRouter --> MaintDocs["Attachments / Documents / History"]
     MaintenanceRouter --> MaintReports["Dashboard / Reports / MTTR / MTBF"]
     MaintenanceRouter --> MaintAI["Rule-Based Maintenance AI"]
+
+    MobileRouter --> MobileAuth["Mobile Auth / Devices"]
+    MobileRouter --> MobileWork["My Work / Tasks / Approvals"]
+    MobileRouter --> MobileScan["Barcode / QR Scan Resolver"]
+    MobileRouter --> MobileInventory["Inventory Receive / Transfer / Count"]
+    MobileRouter --> MobileWarehouse["Warehouse Movement"]
+    MobileRouter --> MobileOps["Production / Maintenance / Quality / Dispatch"]
+    MobileRouter --> MobileSync["Uploads / Offline Sync / Conflicts"]
+    MobileRouter --> MobileAI["Rule-Based Mobile AI"]
 
     QualityRouter --> QualPlans["Quality Plans / Checklists / Sampling"]
     QualityRouter --> QualLots["Inspection Lots and Execution"]
@@ -145,6 +155,7 @@ flowchart LR
     InventoryRouter --> Audit
     ProductionRouter --> Audit
     MaintenanceRouter --> Audit
+    MobileRouter --> Audit
     QualityRouter --> Audit
     ReportingRouter --> Audit
     SalesRouter --> Audit
@@ -188,18 +199,19 @@ flowchart LR
 9. Inventory requests go through `app/modules/inventory.py`.
 10. Production requests go through `app/modules/production.py`.
 11. Maintenance requests go through `app/modules/maintenance.py`.
-12. Quality requests go through `app/modules/quality.py`.
-13. Reporting requests go through `app/modules/reporting.py`.
-14. Sales requests go through `app/modules/sales.py`.
-15. Customer Portal requests go through `app/modules/customer_portal.py`.
-16. Supplier Portal requests go through `app/modules/supplier_portal.py` and are scoped to the logged-in supplier.
-17. Inventory, Costing, Production, Maintenance, Quality, Reporting, Sales, Customer Portal and Supplier Portal data are validated with Pydantic schemas and returned as structured JSON.
-18. Background jobs are prepared in `app/jobs.py` using Celery and Redis.
-19. User opens the Inventory AI service Swagger at `http://127.0.0.1:8100/docs`.
-20. Inventory AI requests go through `inventory-ai-service/app/routes.py`.
-21. AI routes call rule-based logic in `ai_engine.py`, `risk_rules.py`, and `recommendations.py`.
-22. AI returns analysis, risk levels, recommendations, and draft actions only.
-23. Human approval is required before any critical operational action.
+12. Mobile Operations requests go through `app/modules/mobile.py`.
+13. Quality requests go through `app/modules/quality.py`.
+14. Reporting requests go through `app/modules/reporting.py`.
+15. Sales requests go through `app/modules/sales.py`.
+16. Customer Portal requests go through `app/modules/customer_portal.py`.
+17. Supplier Portal requests go through `app/modules/supplier_portal.py` and are scoped to the logged-in supplier.
+18. Inventory, Costing, Production, Maintenance, Mobile, Quality, Reporting, Sales, Customer Portal and Supplier Portal data are validated with Pydantic schemas and returned as structured JSON.
+19. Background jobs are prepared in `app/jobs.py` using Celery and Redis.
+20. User opens the Inventory AI service Swagger at `http://127.0.0.1:8100/docs`.
+21. Inventory AI requests go through `inventory-ai-service/app/routes.py`.
+22. AI routes call rule-based logic in `ai_engine.py`, `risk_rules.py`, and `recommendations.py`.
+23. AI returns analysis, risk levels, recommendations, and draft actions only.
+24. Human approval is required before any critical operational action.
 
 ## Main Platform Modules
 
@@ -228,6 +240,10 @@ flowchart LR
 | Maintenance service | `app/modules/maintenance_service.py` | Approvals, spares, downtime, health score, reports and Maintenance AI rules |
 | Maintenance schemas | `app/modules/maintenance_schemas.py` | Pydantic schemas for Maintenance requests |
 | Maintenance models | `app/modules/maintenance_models.py` | SQLAlchemy table definitions for Maintenance Management |
+| Mobile Operations module | `app/modules/mobile.py` | Dedicated Mobile Operations APIs |
+| Mobile Operations service | `app/modules/mobile_service.py` | Mobile auth, device, workflow, scan, offline sync and Mobile AI rules |
+| Mobile Operations schemas | `app/modules/mobile_schemas.py` | Pydantic schemas for mobile auth, workflow actions, uploads, sync and AI requests |
+| Mobile Operations models | `app/modules/mobile_models.py` | SQLAlchemy table definitions for devices, sessions, tokens, work queue, sync, scans, uploads, audit, conflicts, notifications and AI |
 | Quality module | `app/modules/quality.py` | Dedicated Quality Management APIs |
 | Quality service | `app/modules/quality_service.py` | Inspection execution, failure handling, KPIs, reports and Quality AI rules |
 | Quality schemas | `app/modules/quality_schemas.py` | Pydantic schemas for Quality requests |
@@ -260,6 +276,7 @@ flowchart LR
 | Costing | `/costing/*`, `/cost-centers`, `/cost-elements`, `/inventory-costing`, `/landed-cost`, `/production-costing`, `/profitability/*`, `/ai/costing/*` | Dedicated Costing & Profitability module with valuations, costing calculations, profitability and AI |
 | Production | `/production/*` | Dedicated Production Management module with planning, execution, costing, reporting and AI |
 | Maintenance | `/maintenance/*`, `/machines`, `/maintenance-plans`, `/work-orders`, `/ai/maintenance/*` | Dedicated Maintenance Management module with CMMS/EAM workflows and AI |
+| Mobile Operations | `/mobile/*`, `/ai/mobile/*` | Dedicated mobile backend with device auth, my-work, tasks, approvals, scan, inventory, warehouse, production, maintenance, quality, dispatch, uploads and offline sync |
 | Quality | `/quality/*`, `/ai/quality/*` | Dedicated Quality Management module with QMS workflows and AI |
 | Reporting | `/reports/*`, `/dashboards/*`, `/kpis/*`, `/analytics/*`, `/ai/reporting/*` | Dedicated Reporting & Analytics module with catalog, exports, schedules, dashboards, KPIs, cross-module analytics and AI insights |
 | Sales | `/customers`, `/sales-orders`, `/dispatch-orders`, `/shipments`, `/returns`, `/ai/sales/*` | Dedicated Sales & Distribution module with order, allocation, dispatch, returns and AI |
@@ -423,6 +440,23 @@ flowchart LR
 | Variance and Profitability | `GET/POST /cost-variance`, `/profitability/products`, `/customers`, `/plants` | Cost variances and product, customer and plant profitability |
 | Reports | `/costing/reports/*` | Inventory valuation, production cost, wastage cost and profitability reports |
 | Costing AI | `/ai/costing/*` | Risk center, cost increase, low margin, customer profitability, wastage, production variance, supplier cost, optimization and draft actions |
+
+## Mobile Operations Views
+
+| View | Endpoint | Output |
+| --- | --- | --- |
+| Enablement/Auth/Devices | `/mobile/enablement`, `/mobile/auth/*`, `/mobile/devices/*` | Company mobile flags, mobile JWT flow, refresh/logout, device registration and disable |
+| My Work | `GET /mobile/my-work` | Tasks, approvals, work orders, inspections, counts, receipts, production updates, alerts and sync status |
+| Tasks and Approvals | `/mobile/tasks/*`, `/mobile/approvals/*` | Start/comment/complete/block tasks and approve/reject approvals |
+| Scan Resolver | `POST /mobile/scan/resolve` | Entity type, entity id, display name, allowed actions and warnings |
+| Inventory Mobile | `/mobile/inventory/receipts`, `/transfers`, `/counts` | Receiving, transfer, counting, variance and idempotent mobile write flow |
+| Warehouse Mobile | `/mobile/warehouse/movements`, `/locations/{id}`, `/search` | Bin movement, location detail and mobile search |
+| Production Mobile | `/mobile/production/orders/*` | Start production, daily log, material consumption and completion |
+| Maintenance Mobile | `/mobile/maintenance/work-orders/*` | Work order start, spares, photos and completion |
+| Quality Mobile | `/mobile/quality/inspections/*` | Checklist result submission, defect photos and completion |
+| Dispatch and Uploads | `/mobile/dispatch/*`, `/mobile/uploads` | Pick, pack, online dispatch confirmation and file metadata upload |
+| Offline Sync | `/mobile/sync/push`, `/pull`, `/status` | Offline action processing, idempotency, duplicate/conflict/high-risk rejection and pull payload |
+| Mobile AI | `/ai/mobile/*` | Risk center, scan validation, count assist, maintenance assist, quality assist, next action and draft actions |
 
 ## Main Inventory Module Views
 
@@ -677,6 +711,33 @@ flowchart TD
     HumanApproval --> Output
 ```
 
+## Mobile Operations Data Flow
+
+```mermaid
+flowchart TD
+    MobileUser["Shop-floor / Warehouse / Technician Mobile User"] --> MobileRoute["Mobile Router app/modules/mobile.py"]
+    MobileRoute --> MobileSchemas["Pydantic Schemas app/modules/mobile_schemas.py"]
+    MobileSchemas --> MobileService["Service Layer app/modules/mobile_service.py"]
+    MobileService --> Flags["Company Mobile Feature Flags"]
+    Flags --> DeviceAuth["Mobile Auth / Device Session"]
+    DeviceAuth --> Work["My Work / Tasks / Approvals"]
+    DeviceAuth --> Scan["Barcode / QR Scan Resolver"]
+    DeviceAuth --> Workflow["Inventory / Warehouse / Production / Maintenance / Quality / Dispatch Actions"]
+    DeviceAuth --> Uploads["Photo / Document Upload Metadata"]
+    DeviceAuth --> Offline["Offline Sync Push / Pull / Status"]
+    Offline --> Idempotency["Idempotency / Duplicate Detection"]
+    Offline --> Conflicts["Conflict Detection / High-Risk Offline Rejection"]
+    MobileService --> Audit["Mobile Audit Log"]
+    MobileService --> MobileAI["Mobile AI Recommendations"]
+    MobileAI --> HumanApproval["Human Approval Required"]
+    Work --> Output["Final JSON Output"]
+    Scan --> Output
+    Workflow --> Output
+    Uploads --> Output
+    Conflicts --> Output
+    HumanApproval --> Output
+```
+
 ## Inventory AI Data Flow
 
 ```mermaid
@@ -704,6 +765,7 @@ sequenceDiagram
     participant I as Inventory Router
     participant R as Production Router
     participant M as Maintenance Router
+    participant MO as Mobile Router
     participant Q as Quality Router
     participant B as Reporting Router
     participant X as Sales Router
@@ -744,6 +806,12 @@ sequenceDiagram
     M->>S: Read machines, plans, work orders, spares and downtime
     S-->>M: Return maintenance seed data
     M-->>O: Return dashboard, MTTR, MTBF and risk JSON
+
+    U->>P: Request /mobile/sync/push
+    P->>MO: Route mobile sync request
+    MO->>S: Read device, offline actions, idempotency keys and conflicts
+    S-->>MO: Return mobile seed data and sync rules
+    MO-->>O: Return accepted, rejected, duplicate or review sync results
 
     U->>P: Request /quality/inspection-lots/lot-incoming-001/submit
     P->>Q: Route quality request
@@ -830,3 +898,8 @@ Costing-specific AI safety:
 
 - AI can create draft cost review tasks, supplier price reviews, product pricing reviews, wastage investigations, maintenance cost reviews and margin alert emails.
 - AI cannot change product prices, change supplier contracts, approve cost allocation, write off inventory, change standard cost or modify financial records.
+
+Mobile-specific AI safety:
+
+- AI can suggest next actions, warn about wrong scans, explain task priority, suggest maintenance/quality guidance, summarize work orders and create draft notes or escalations.
+- AI cannot approve, release inventory, close critical work orders, dispatch goods, override reservations or write off inventory.

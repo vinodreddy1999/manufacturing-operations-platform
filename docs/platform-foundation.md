@@ -19,6 +19,7 @@ Implemented now:
 - Dedicated Supplier Portal module with external-supplier security, supplier-scoped routes, SQLAlchemy table definitions, seeded repository, service layer, Celery job hooks and rule-based AI
 - Dedicated Reporting & Analytics module with report catalog, scoped report execution, exports, saved/scheduled reports, dashboards, KPI snapshots, cross-module analytics, Celery job hooks and rule-based AI
 - Dedicated Costing & Profitability module with cost centers/elements, inventory valuation, landed cost, production/maintenance/quality costing, standard costs, variance, profitability, Celery job hooks and rule-based AI
+- Dedicated Mobile Operations module with mobile auth, device management, my-work, tasks, approvals, scan resolution, offline sync, uploads, mobile audit, notifications, Celery job hooks and rule-based AI
 - JWT/password security helpers
 - Optional AI provider interface: `AIProvider`, `MockAIProvider`, `OpenAIProvider`
 - Celery job declarations for reports, AI scans, expiry checks and dead-stock checks
@@ -244,3 +245,31 @@ AI safety boundary:
 
 - AI can analyze, recommend and create draft actions.
 - AI cannot change product prices, change supplier contracts, approve cost allocation, write off inventory, change standard cost or modify financial records.
+
+## Mobile Operations Module Depth
+
+Implemented Mobile Operations areas:
+
+- Company-level mobile feature flags for inventory, warehouse, production, maintenance, quality, sales, offline sync, barcode/QR, photo uploads and approvals
+- Isolated mobile login, refresh, logout and device registration/disable flow
+- Mobile device/session/token-ready model structure
+- Mobile my-work dashboard with tasks, approvals, work orders, inspections, counts, receipts, alerts and sync status
+- Task start, comment, complete and block actions
+- Mobile approval approve/reject actions
+- Barcode/QR scan resolver with entity type, allowed actions and warnings
+- Inventory receiving, transfer and count workflows with idempotency keys and variance handling
+- Warehouse movement and location/search APIs
+- Production daily log, material consumption and completion endpoints
+- Maintenance work order execution, spare usage, photos and completion endpoints
+- Quality inspection result and completion endpoints
+- Dispatch pick, packing and online dispatch confirmation flow
+- Upload metadata capture for photos/documents/evidence
+- Offline sync push/pull/status, duplicate idempotency detection and high-risk offline action rejection
+- Mobile audit logs, conflicts and notifications
+- Rule-based Mobile AI risk center, scan validation, count assist, maintenance assist, quality assist, next action and draft action endpoints
+- Celery job hooks for sync processing, failed retry, notification delivery, upload processing, photo compression, AI risk scan, stale work and device inactivity
+
+AI safety boundary:
+
+- AI can suggest, warn, summarize and create draft actions.
+- AI cannot approve, release inventory, close critical work orders, dispatch goods, override reservations or write off inventory.

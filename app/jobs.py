@@ -196,3 +196,43 @@ def costing_ai_risk_scan_job(company_id: str) -> dict:
 @celery_app.task
 def costing_scheduled_report_job(company_id: str, report_code: str) -> dict:
     return {"company_id": company_id, "report_code": report_code, "status": "COSTING_SCHEDULED_REPORT_COMPLETED"}
+
+
+@celery_app.task
+def mobile_offline_sync_processing_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "MOBILE_OFFLINE_SYNC_PROCESSING_COMPLETED"}
+
+
+@celery_app.task
+def mobile_failed_sync_retry_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "MOBILE_FAILED_SYNC_RETRY_COMPLETED"}
+
+
+@celery_app.task
+def mobile_notification_delivery_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "MOBILE_NOTIFICATION_DELIVERY_QUEUED"}
+
+
+@celery_app.task
+def mobile_upload_processing_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "MOBILE_UPLOAD_PROCESSING_COMPLETED"}
+
+
+@celery_app.task
+def mobile_photo_compression_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "MOBILE_PHOTO_COMPRESSION_COMPLETED"}
+
+
+@celery_app.task
+def mobile_ai_risk_scan_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "MOBILE_AI_RISK_SCAN_COMPLETED", "actions_created": "draft_only"}
+
+
+@celery_app.task
+def mobile_stale_work_alert_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "MOBILE_STALE_WORK_ALERT_COMPLETED"}
+
+
+@celery_app.task
+def mobile_device_inactivity_alert_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "MOBILE_DEVICE_INACTIVITY_ALERT_COMPLETED"}
