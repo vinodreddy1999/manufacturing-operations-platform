@@ -21,6 +21,7 @@ Implemented now:
 - Dedicated Costing & Profitability module with cost centers/elements, inventory valuation, landed cost, production/maintenance/quality costing, standard costs, variance, profitability, Celery job hooks and rule-based AI
 - Dedicated Mobile Operations module with mobile auth, device management, my-work, tasks, approvals, scan resolution, offline sync, uploads, mobile audit, notifications, Celery job hooks and rule-based AI
 - Dedicated Integrations module with provider/config registry, masked credentials, webhooks, inbound idempotency, sync jobs, mappings, file import/export, errors, retries, monitoring, Celery job hooks and rule-based AI
+- Future Manufacturing Intelligence module with command center, cross-module risks, impact graph, root cause, what-if, bottlenecks, health scores, customer/cost impacts, recommendations, Celery job hooks and draft-only intelligence actions
 - JWT/password security helpers
 - Optional AI provider interface: `AIProvider`, `MockAIProvider`, `OpenAIProvider`
 - Celery job declarations for reports, AI scans, expiry checks and dead-stock checks
@@ -299,3 +300,25 @@ AI safety boundary:
 
 - AI can analyze, recommend and create draft actions.
 - AI cannot commit high-risk imports, change credentials, send external data without approval, modify financial records, delete records or override tenant security.
+
+## Manufacturing Intelligence Module Depth
+
+Implemented Manufacturing Intelligence areas:
+
+- Company-level intelligence feature flags for risk center, root cause, what-if, command center, draft actions, LLM summary and digital-twin future mode
+- Cross-module risk registry connecting procurement, inventory, production, maintenance, quality, sales and costing signals
+- Business impact graph with nodes for suppliers, purchase orders, inventory items, production orders, machines, sales orders, customers and cost centers
+- Rule-based root cause analysis with evidence and confidence
+- What-if simulation framework for supplier delays, machine downtime, demand changes, rejected batches, warehouse fullness and priority changes
+- Bottleneck detection for material and machine constraints
+- Operational and plant health scores
+- Customer impact and cost impact analysis
+- Recommendation and draft action engines
+- Mock LLM provider interface for future natural-language summaries
+- Executive summary generation
+- Celery job hooks for risk scan, health score calculation, bottleneck detection, customer/cost impact scans, executive summary generation, stale risk cleanup and recommendation generation
+
+AI safety boundary:
+
+- AI can analyze, explain, simulate, recommend and create draft actions.
+- AI cannot approve purchase orders, transfer inventory, change production schedules, release quarantine, dispatch goods, send external email without approval, write off inventory, change pricing or modify financial records.

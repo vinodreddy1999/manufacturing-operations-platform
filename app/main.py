@@ -17,6 +17,7 @@ from .modules.inventory import router as inventory_router
 from .modules.maintenance import ai_router as maintenance_ai_router
 from .modules.maintenance import alias_router as maintenance_alias_router
 from .modules.maintenance import router as maintenance_router
+from .modules.manufacturing_intelligence import router as manufacturing_intelligence_router
 from .modules.mobile import ai_router as mobile_ai_router
 from .modules.mobile import router as mobile_router
 from .modules.production import router as production_router
@@ -62,6 +63,7 @@ app.include_router(customer_portal_ai_router)
 app.include_router(integrations_router)
 app.include_router(integrations_ai_router)
 app.include_router(inventory_router)
+app.include_router(manufacturing_intelligence_router)
 app.include_router(production_router)
 app.include_router(maintenance_router)
 app.include_router(maintenance_alias_router)

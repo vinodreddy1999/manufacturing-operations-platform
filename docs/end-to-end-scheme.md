@@ -1,6 +1,6 @@
 # End-to-End Scheme Diagram
 
-This diagram shows the current Python-only Manufacturing Operations Platform after adding the modular platform foundation, expanded Inventory module, external Customer Portal, external Supplier Portal, Reporting & Analytics, Costing & Profitability, Mobile Operations, Integrations, and separate `inventory-ai-service/` microservice.
+This diagram shows the current Python-only Manufacturing Operations Platform after adding the modular platform foundation, expanded Inventory module, external Customer Portal, external Supplier Portal, Reporting & Analytics, Costing & Profitability, Mobile Operations, Integrations, Manufacturing Intelligence, and separate `inventory-ai-service/` microservice.
 
 There are two FastAPI services:
 
@@ -25,6 +25,7 @@ flowchart LR
     PlatformAPI --> InventoryRouter["Inventory Router app/modules/inventory.py"]
     PlatformAPI --> ProductionRouter["Production Router app/modules/production.py"]
     PlatformAPI --> MaintenanceRouter["Maintenance Router app/modules/maintenance.py"]
+    PlatformAPI --> IntelligenceRouter["Manufacturing Intelligence Router app/modules/manufacturing_intelligence.py"]
     PlatformAPI --> MobileRouter["Mobile Operations Router app/modules/mobile.py"]
     PlatformAPI --> QualityRouter["Quality Router app/modules/quality.py"]
     PlatformAPI --> ReportingRouter["Reporting Router app/modules/reporting.py"]
@@ -68,6 +69,15 @@ flowchart LR
     IntegrationsRouter --> IntFiles["File Import / Export"]
     IntegrationsRouter --> IntMonitoring["Errors / Monitoring / Reports"]
     IntegrationsRouter --> IntAI["Rule-Based Integration AI"]
+
+    IntelligenceRouter --> IntelCommand["Command Center"]
+    IntelligenceRouter --> IntelRisks["Cross-Module Risk Engine"]
+    IntelligenceRouter --> IntelGraph["Business Impact Graph"]
+    IntelligenceRouter --> IntelRoot["Root Cause / What-If"]
+    IntelligenceRouter --> IntelHealth["Bottlenecks / Health Scores"]
+    IntelligenceRouter --> IntelImpact["Customer / Cost Impact"]
+    IntelligenceRouter --> IntelActions["Recommendations / Draft Actions"]
+    IntelligenceRouter --> IntelSummary["Executive Summary / LLM-ready Provider"]
 
     ProductionRouter --> ProdMaster["Product Master"]
     ProductionRouter --> ProdBom["BOM and Routing"]
@@ -163,6 +173,7 @@ flowchart LR
     CostingRouter --> Audit
     GenericModules --> Audit
     IntegrationsRouter --> Audit
+    IntelligenceRouter --> Audit
     InventoryRouter --> Audit
     ProductionRouter --> Audit
     MaintenanceRouter --> Audit
@@ -209,21 +220,22 @@ flowchart LR
 8. Costing requests go through `app/modules/costing.py`.
 9. Integrations requests go through `app/modules/integrations.py`.
 10. Inventory requests go through `app/modules/inventory.py`.
-11. Production requests go through `app/modules/production.py`.
-12. Maintenance requests go through `app/modules/maintenance.py`.
-13. Mobile Operations requests go through `app/modules/mobile.py`.
-14. Quality requests go through `app/modules/quality.py`.
-15. Reporting requests go through `app/modules/reporting.py`.
-16. Sales requests go through `app/modules/sales.py`.
-17. Customer Portal requests go through `app/modules/customer_portal.py`.
-18. Supplier Portal requests go through `app/modules/supplier_portal.py` and are scoped to the logged-in supplier.
-19. Inventory, Costing, Integrations, Production, Maintenance, Mobile, Quality, Reporting, Sales, Customer Portal and Supplier Portal data are validated with Pydantic schemas and returned as structured JSON.
-20. Background jobs are prepared in `app/jobs.py` using Celery and Redis.
-21. User opens the Inventory AI service Swagger at `http://127.0.0.1:8100/docs`.
-22. Inventory AI requests go through `inventory-ai-service/app/routes.py`.
-23. AI routes call rule-based logic in `ai_engine.py`, `risk_rules.py`, and `recommendations.py`.
-24. AI returns analysis, risk levels, recommendations, and draft actions only.
-25. Human approval is required before any critical operational action.
+11. Manufacturing Intelligence requests go through `app/modules/manufacturing_intelligence.py`.
+12. Production requests go through `app/modules/production.py`.
+13. Maintenance requests go through `app/modules/maintenance.py`.
+14. Mobile Operations requests go through `app/modules/mobile.py`.
+15. Quality requests go through `app/modules/quality.py`.
+16. Reporting requests go through `app/modules/reporting.py`.
+17. Sales requests go through `app/modules/sales.py`.
+18. Customer Portal requests go through `app/modules/customer_portal.py`.
+19. Supplier Portal requests go through `app/modules/supplier_portal.py` and are scoped to the logged-in supplier.
+20. Inventory, Costing, Integrations, Manufacturing Intelligence, Production, Maintenance, Mobile, Quality, Reporting, Sales, Customer Portal and Supplier Portal data are validated with Pydantic schemas and returned as structured JSON.
+21. Background jobs are prepared in `app/jobs.py` using Celery and Redis.
+22. User opens the Inventory AI service Swagger at `http://127.0.0.1:8100/docs`.
+23. Inventory AI requests go through `inventory-ai-service/app/routes.py`.
+24. AI routes call rule-based logic in `ai_engine.py`, `risk_rules.py`, and `recommendations.py`.
+25. AI returns analysis, risk levels, recommendations, and draft actions only.
+26. Human approval is required before any critical operational action.
 
 ## Main Platform Modules
 
@@ -248,6 +260,10 @@ flowchart LR
 | Integrations service | `app/modules/integrations_service.py` | Credential masking, inbound idempotency, sync, import/export, monitoring and AI rules |
 | Integrations schemas | `app/modules/integrations_schemas.py` | Pydantic schemas for providers, configs, credentials, webhooks, sync, mappings, import/export and AI requests |
 | Integrations models | `app/modules/integrations_models.py` | SQLAlchemy table definitions for providers, configs, credentials, webhooks, events, sync, mappings, imports, exports, errors, retries, email, IoT and AI |
+| Manufacturing Intelligence module | `app/modules/manufacturing_intelligence.py` | Future command-center intelligence APIs |
+| Manufacturing Intelligence service | `app/modules/manufacturing_intelligence_service.py` | Command center, impact graph, root cause, what-if, health, impact, recommendations and summaries |
+| Manufacturing Intelligence schemas | `app/modules/manufacturing_intelligence_schemas.py` | Pydantic schemas for root cause, what-if and draft actions |
+| Manufacturing Intelligence models | `app/modules/manufacturing_intelligence_models.py` | SQLAlchemy table definitions for risks, graph, root cause, what-if, bottlenecks, health, impacts, recommendations, drafts, summaries and audit |
 | Production module | `app/modules/production.py` | Dedicated Production Management APIs |
 | Production service | `app/modules/production_service.py` | MRP, reservations, scheduling, costing, reports and Production AI rules |
 | Production schemas | `app/modules/production_schemas.py` | Pydantic schemas for Production requests |
@@ -291,6 +307,7 @@ flowchart LR
 | Procurement | `/suppliers`, `/purchase-requisitions`, `/purchase-orders` | Stores supplier and purchasing module records |
 | Costing | `/costing/*`, `/cost-centers`, `/cost-elements`, `/inventory-costing`, `/landed-cost`, `/production-costing`, `/profitability/*`, `/ai/costing/*` | Dedicated Costing & Profitability module with valuations, costing calculations, profitability and AI |
 | Integrations | `/integrations/*`, `/ai/integrations/*` | Dedicated Integrations module with providers, configs, credentials, webhooks, events, sync, mappings, imports, exports, errors, monitoring and AI |
+| Manufacturing Intelligence | `/manufacturing-intelligence/*` | Future command-center layer with cross-module risks, impact graph, root cause, what-if, health, impact, recommendations and executive summary |
 | Production | `/production/*` | Dedicated Production Management module with planning, execution, costing, reporting and AI |
 | Maintenance | `/maintenance/*`, `/machines`, `/maintenance-plans`, `/work-orders`, `/ai/maintenance/*` | Dedicated Maintenance Management module with CMMS/EAM workflows and AI |
 | Mobile Operations | `/mobile/*`, `/ai/mobile/*` | Dedicated mobile backend with device auth, my-work, tasks, approvals, scan, inventory, warehouse, production, maintenance, quality, dispatch, uploads and offline sync |
@@ -488,6 +505,21 @@ flowchart LR
 | File Export | `POST /integrations/export` | CSV/Excel/JSON-style export job metadata |
 | Errors and Monitoring | `GET /integrations/errors`, `POST /integrations/errors/{id}/resolve`, `/monitoring`, `/reports/{type}` | Error resolution, monitoring dashboard and reports |
 | Integrations AI | `/ai/integrations/*` | Risk center, data quality, sync failure, anomaly, mapping suggestion and draft actions |
+
+## Manufacturing Intelligence Views
+
+| View | Endpoint | Output |
+| --- | --- | --- |
+| Enablement | `GET /manufacturing-intelligence/enablement` | Company-level intelligence feature flags |
+| Command Center | `GET /manufacturing-intelligence/command-center` | Top risks, dependencies, bottlenecks, supplier/machine/quality/customer/cost impact and recommended actions |
+| Risks | `GET /manufacturing-intelligence/risks` | Cross-module risks with source module, impacted modules, confidence, business impact and action |
+| Impact Graph | `GET /manufacturing-intelligence/impact-graph/{entity_type}/{entity_id}` | Nodes and edges connecting supplier, PO, item, production, machine, sales order, customer and cost center |
+| Root Cause | `POST /manufacturing-intelligence/root-cause` | Likely causes, evidence, confidence, impacted orders and recommended tasks |
+| What-If | `POST /manufacturing-intelligence/what-if` | Inventory, production, sales, quality, maintenance and cost impacts for simulated scenarios |
+| Bottlenecks and Health | `/bottlenecks`, `/health-score`, `/plant-health-score` | Bottleneck records, operational scores and plant health factors |
+| Business Impact | `/customer-impact`, `/cost-impact` | Customer order impacts and quantified cost impact records |
+| Recommendations and Drafts | `/recommendations`, `POST /draft-action` | Draft-only recommendations and human-approval-required draft actions |
+| Executive Summary | `GET /manufacturing-intelligence/executive-summary` | Rule-based/LLM-ready executive summary with top risks and decisions |
 
 ## Main Inventory Module Views
 
@@ -796,6 +828,32 @@ flowchart TD
     HumanApproval --> Output
 ```
 
+## Manufacturing Intelligence Data Flow
+
+```mermaid
+flowchart TD
+    Client["Executive / Planner / Swagger Client"] --> IntelRoute["Manufacturing Intelligence Router app/modules/manufacturing_intelligence.py"]
+    IntelRoute --> IntelSchemas["Pydantic Schemas app/modules/manufacturing_intelligence_schemas.py"]
+    IntelSchemas --> IntelService["Service Layer app/modules/manufacturing_intelligence_service.py"]
+    IntelService --> Flags["Intelligence Feature Flags"]
+    Flags --> RiskEngine["Cross-Module Risk Engine"]
+    RiskEngine --> ImpactGraph["Business Impact Graph"]
+    RiskEngine --> RootCause["Root Cause Engine"]
+    RiskEngine --> WhatIf["What-If Simulation Engine"]
+    RiskEngine --> Health["Health Score / Bottleneck Engine"]
+    RiskEngine --> Impact["Customer / Cost Impact"]
+    RiskEngine --> Recommendations["Recommendation / Draft Action Engine"]
+    IntelService --> LLM["Mock LLM Provider / OpenAI-ready Interface"]
+    Recommendations --> HumanApproval["Human Approval Required"]
+    ImpactGraph --> Output["Final JSON Output"]
+    RootCause --> Output
+    WhatIf --> Output
+    Health --> Output
+    Impact --> Output
+    LLM --> Output
+    HumanApproval --> Output
+```
+
 ## Inventory AI Data Flow
 
 ```mermaid
@@ -821,6 +879,7 @@ sequenceDiagram
     participant C as Core Router
     participant K as Costing Router
     participant G as Integrations Router
+    participant MI as Manufacturing Intelligence Router
     participant I as Inventory Router
     participant R as Production Router
     participant M as Maintenance Router
@@ -853,6 +912,12 @@ sequenceDiagram
     G->>S: Check provider, idempotency key, mappings and event log
     S-->>G: Return accepted or duplicate integration result
     G-->>O: Return integration event JSON
+
+    U->>P: Request /manufacturing-intelligence/command-center
+    P->>MI: Route intelligence request
+    MI->>S: Read risks, graph, health, customer and cost impact
+    S-->>MI: Return cross-module intelligence seed data
+    MI-->>O: Return command center, impact graph and recommendations JSON
 
     U->>P: Request /inventory/dashboard
     P->>I: Route inventory request
@@ -973,3 +1038,8 @@ Integrations-specific AI safety:
 
 - AI can create draft mapping fixes, retry tasks, integration error reports, owner emails and data validation tasks.
 - AI cannot commit high-risk imports, change credentials, send external data without approval, modify financial records, delete records or override tenant security.
+
+Manufacturing Intelligence-specific AI safety:
+
+- AI can analyze, explain, simulate, recommend and create draft actions.
+- AI cannot approve purchase orders, transfer inventory, change production schedules, release quarantine, dispatch goods, send external email without approval, write off inventory, change pricing or modify financial records.

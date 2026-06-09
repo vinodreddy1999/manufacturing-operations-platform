@@ -755,3 +755,56 @@ def test_integrations_monitoring_ai_and_draft_safety():
     data = draft.json()["data"]
     assert data["requires_human_approval"] is True
     assert "change credentials" not in data["reason"]
+
+
+def test_manufacturing_intelligence_command_center_and_impact_graph():
+    command = client.get("/manufacturing-intelligence/command-center")
+    assert command.status_code == 200
+    data = command.json()["data"]
+    assert len(data["top_operational_risks"]) >= 1
+    assert "customer_impact" in data
+    assert "cost_impact" in data
+
+    graph = client.get("/manufacturing-intelligence/impact-graph/Production%20Order/po-demo-001")
+    assert graph.status_code == 200
+    assert graph.json()["data"]["start"]["entity_id"] == "po-demo-001"
+    assert len(graph.json()["data"]["edges"]) >= 1
+
+
+def test_manufacturing_intelligence_root_cause_what_if_and_health():
+    root = client.post("/manufacturing-intelligence/root-cause", json={"problem_type": "Production delay", "entity_type": "Production Order", "entity_id": "po-demo-001", "user_role": "Plant Manager"})
+    assert root.status_code == 200
+    assert "Material shortage" in root.json()["data"]["likely_causes"]
+    assert root.json()["data"]["confidence"] > 0.5
+
+    what_if = client.post("/manufacturing-intelligence/what-if", json={"scenario_type": "supplier delayed by 5 days", "parameters": {"delay_days": 5}, "created_by": "planner"})
+    assert what_if.status_code == 200
+    assert "production_impact" in what_if.json()["data"]["result"]
+
+    health = client.get("/manufacturing-intelligence/health-score")
+    assert health.status_code == 200
+    assert health.json()["data"]["scores"][0]["score"] <= 100
+
+
+def test_manufacturing_intelligence_impacts_summary_and_draft_safety():
+    customer = client.get("/manufacturing-intelligence/customer-impact")
+    assert customer.status_code == 200
+    assert customer.json()["data"][0]["sales_order_id"] == "so-001"
+
+    cost = client.get("/manufacturing-intelligence/cost-impact")
+    assert cost.status_code == 200
+    assert cost.json()["data"]["total_estimated_impact"] > 0
+
+    summary = client.get("/manufacturing-intelligence/executive-summary")
+    assert summary.status_code == 200
+    assert "recommended_decisions" in summary.json()["data"]
+
+    draft = client.post(
+        "/manufacturing-intelligence/draft-action",
+        json={"action_type": "Draft production reschedule", "source_type": "Risk", "source_id": "intel-risk-001", "reason": "approve purchase orders and transfer inventory and send external email", "owner": "operations-manager"},
+    )
+    assert draft.status_code == 200
+    data = draft.json()["data"]
+    assert data["requires_human_approval"] is True
+    assert "approve purchase orders" not in data["reason"]
+    assert "Transfer Inventory" in data["ai_safety"]["cannot"]

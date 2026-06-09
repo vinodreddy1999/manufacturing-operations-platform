@@ -281,3 +281,43 @@ def integrations_data_quality_scan_job(company_id: str) -> dict:
 @celery_app.task
 def integrations_ai_risk_scan_job(company_id: str) -> dict:
     return {"company_id": company_id, "status": "INTEGRATIONS_AI_RISK_SCAN_COMPLETED", "actions_created": "draft_only"}
+
+
+@celery_app.task
+def manufacturing_intelligence_risk_scan_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "MANUFACTURING_INTELLIGENCE_RISK_SCAN_COMPLETED", "actions_created": "draft_only"}
+
+
+@celery_app.task
+def manufacturing_intelligence_health_score_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "MANUFACTURING_INTELLIGENCE_HEALTH_SCORE_COMPLETED"}
+
+
+@celery_app.task
+def manufacturing_intelligence_bottleneck_detection_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "MANUFACTURING_INTELLIGENCE_BOTTLENECK_DETECTION_COMPLETED"}
+
+
+@celery_app.task
+def manufacturing_intelligence_customer_impact_scan_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "MANUFACTURING_INTELLIGENCE_CUSTOMER_IMPACT_SCAN_COMPLETED"}
+
+
+@celery_app.task
+def manufacturing_intelligence_cost_impact_scan_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "MANUFACTURING_INTELLIGENCE_COST_IMPACT_SCAN_COMPLETED"}
+
+
+@celery_app.task
+def manufacturing_intelligence_executive_summary_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "MANUFACTURING_INTELLIGENCE_EXECUTIVE_SUMMARY_COMPLETED", "actions_created": "draft_only"}
+
+
+@celery_app.task
+def manufacturing_intelligence_stale_risk_cleanup_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "MANUFACTURING_INTELLIGENCE_STALE_RISK_CLEANUP_COMPLETED"}
+
+
+@celery_app.task
+def manufacturing_intelligence_recommendation_generation_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "MANUFACTURING_INTELLIGENCE_RECOMMENDATION_GENERATION_COMPLETED", "actions_created": "draft_only"}

@@ -49,6 +49,8 @@ The Mobile Operations module has been added as a dedicated shop-floor/mobile bac
 
 The Integrations module has been added as a dedicated API/file/webhook/email integration backend with provider registry, company configs, masked credential storage, webhooks, inbound events with idempotency, sync jobs, mappings, file import/export, errors/retries, monitoring reports, email/machine hooks, and rule-based Integration AI.
 
+The Manufacturing Intelligence module has been added as a future command-center backend that connects risks across Inventory, Warehouse, Procurement, Production, Maintenance, Quality, Sales, Costing and Forecasting with impact graphs, root-cause analysis, what-if simulation, health scores, customer/cost impact, recommendations, draft actions and executive summaries.
+
 ## Diagram
 
 See the GitHub-rendered end-to-end scheme diagram here:
@@ -215,6 +217,16 @@ app/
                        Seeded Integrations repository
     integrations_service.py
                        Credential masking, inbound idempotency, sync, import/export, monitoring and AI rules
+    manufacturing_intelligence.py
+                       Manufacturing Intelligence API routes
+    manufacturing_intelligence_models.py
+                       SQLAlchemy tables for risks, links, impact graph, root cause, what-if, health, impacts, recommendations, summaries and audit
+    manufacturing_intelligence_schemas.py
+                       Pydantic schemas for root cause, what-if and draft actions
+    manufacturing_intelligence_repository.py
+                       Seeded Manufacturing Intelligence repository
+    manufacturing_intelligence_service.py
+                       Command center, impact graph, root cause, what-if, health, impact, recommendation and summary rules
   ai_copilot/         AIProvider, MockAIProvider and optional OpenAIProvider interface
   jobs.py             Celery jobs for reports, AI risk scans, expiry/dead stock checks
 alembic/              Migration environment and first foundation migration
@@ -398,6 +410,22 @@ Key endpoint groups:
 - Integrations AI: `/ai/integrations/risk-center`, `/data-quality`, `/sync-failure-analysis`, `/anomaly-detection`, `/suggest-mapping`, `/draft-action`
 
 Integration AI is recommendation-only. It can suggest mapping fixes, retry tasks, error reports, owner emails and validation tasks; it cannot commit high-risk imports, change credentials, send external data without approval, modify financial records, delete records, or override tenant security.
+
+## Manufacturing Intelligence Module
+
+Open `http://localhost:8000/docs` and use the `Manufacturing Intelligence` tag.
+
+Key endpoint groups:
+
+- Command center and risks: `/manufacturing-intelligence/command-center`, `/risks`
+- Impact graph: `/manufacturing-intelligence/impact-graph/{entity_type}/{entity_id}`
+- Root cause and what-if: `/manufacturing-intelligence/root-cause`, `/what-if`
+- Bottlenecks and health: `/manufacturing-intelligence/bottlenecks`, `/health-score`, `/plant-health-score`
+- Business impact: `/manufacturing-intelligence/customer-impact`, `/cost-impact`
+- Recommendations and drafts: `/manufacturing-intelligence/recommendations`, `/draft-action`
+- Executive summary: `/manufacturing-intelligence/executive-summary`
+
+Manufacturing Intelligence is draft-only for critical actions. It can analyze, explain, simulate, recommend and create drafts; it cannot approve purchase orders, transfer inventory, change production schedules, release quarantine, dispatch goods, send external email without approval, write off inventory, change pricing, or modify financial records.
 
 ## Platform Foundation
 
