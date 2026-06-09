@@ -808,3 +808,85 @@ def test_manufacturing_intelligence_impacts_summary_and_draft_safety():
     assert data["requires_human_approval"] is True
     assert "approve purchase orders" not in data["reason"]
     assert "Transfer Inventory" in data["ai_safety"]["cannot"]
+
+
+def test_frontend_navigation_admin_dashboard_and_access_control():
+    navigation = client.get("/frontend/navigation")
+    assert navigation.status_code == 200
+    sections = {section["section"] for section in navigation.json()["data"]}
+    assert "Platform Management" in sections
+    assert "Intelligence" in sections
+
+    dashboard = client.get("/admin/dashboard")
+    assert dashboard.status_code == 200
+    data = dashboard.json()["data"]
+    assert data["user_count"] >= data["active_users"]
+    assert "ai_readiness" in data
+
+    access = client.get("/admin/access-control")
+    assert access.status_code == 200
+    assert "Dashboard Visible" in access.json()["data"]["permission_logic"]
+
+    visible = client.post(
+        "/admin/access-control/evaluate-dashboard",
+        json={"tenant_dashboard_enabled": True, "role_permission": True, "user_permission": True, "data_scope_permission": False},
+    )
+    assert visible.status_code == 200
+    assert visible.json()["data"]["dashboard_visible"] is False
+
+
+def test_admin_workflow_kpis_and_compliance_contracts():
+    workflow = client.post("/admin/workflows/simulate", json={"workflow_name": "Purchase Request Approval", "amount": 150000, "requester_role": "Procurement Manager"})
+    assert workflow.status_code == 200
+    assert "Finance Approval" in workflow.json()["data"]["steps"]
+    assert workflow.json()["data"]["requires_human_approval"] is True
+
+    kpis = client.get("/admin/kpis")
+    assert kpis.status_code == 200
+    assert any(kpi["kpi_code"] == "OEE" for kpi in kpis.json()["data"])
+
+    compliance = client.get("/admin/compliance")
+    assert compliance.status_code == 200
+    assert "ISO" in compliance.json()["data"]["standards"]
+
+
+def test_manufacturing_data_hub_mapping_quality_and_pending_update():
+    systems = client.get("/manufacturing-data-hub/connected-systems")
+    assert systems.status_code == 200
+    assert any(system["system_name"] == "SAP S/4HANA" for system in systems.json()["data"])
+
+    preview = client.post(
+        "/manufacturing-data-hub/mappings/preview",
+        json={"source_system": "SAP S/4HANA", "source_field": "SAP Material Code", "source_value": " rm-stl-001 ", "target_entity": "InventoryItem"},
+    )
+    assert preview.status_code == 200
+    assert preview.json()["data"]["target_field"] == "SKU"
+    assert preview.json()["data"]["transformed_value"] == "RM-STL-001"
+
+    quality = client.get("/manufacturing-data-hub/data-quality")
+    assert quality.status_code == 200
+    assert quality.json()["data"]["overall_score"] > 80
+
+    decision = client.post("/manufacturing-data-hub/pending-updates/erp-upd-001/decision", json={"decided_by": "company-admin", "decision": "Approved", "comment": "Approved for ERP export"})
+    assert decision.status_code == 200
+    assert decision.json()["data"]["approval_status"] == "Approved"
+    assert decision.json()["data"]["erp_status"] == "Export Ready"
+
+
+def test_planning_ai_command_digital_twin_and_operations_center():
+    planning = client.get("/planning/overview")
+    assert planning.status_code == 200
+    assert "Demand Planning" in planning.json()["data"]["planning_areas"]
+
+    command = client.get("/ai-command-center/overview")
+    assert command.status_code == 200
+    assert command.json()["data"]["autonomous_planning_engine"]["mode"] == "Recommendation Only"
+
+    twin = client.get("/digital-twin/overview")
+    assert twin.status_code == 200
+    assert "Enterprise Twin" in twin.json()["data"]["twins"]
+    assert twin.json()["data"]["knowledge_graph"]["used_by_ai"] is True
+
+    operations = client.get("/digital-operations-center/overview")
+    assert operations.status_code == 200
+    assert "AI Decision Center" in operations.json()["data"]["executive_layer"]

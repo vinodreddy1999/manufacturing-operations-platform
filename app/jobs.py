@@ -321,3 +321,28 @@ def manufacturing_intelligence_stale_risk_cleanup_job(company_id: str) -> dict:
 @celery_app.task
 def manufacturing_intelligence_recommendation_generation_job(company_id: str) -> dict:
     return {"company_id": company_id, "status": "MANUFACTURING_INTELLIGENCE_RECOMMENDATION_GENERATION_COMPLETED", "actions_created": "draft_only"}
+
+
+@celery_app.task
+def admin_dashboard_refresh_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "ADMIN_DASHBOARD_REFRESH_COMPLETED"}
+
+
+@celery_app.task
+def data_hub_quality_scan_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "DATA_HUB_QUALITY_SCAN_COMPLETED"}
+
+
+@celery_app.task
+def data_hub_ai_readiness_scan_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "DATA_HUB_AI_READINESS_SCAN_COMPLETED"}
+
+
+@celery_app.task
+def data_hub_sync_monitoring_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "DATA_HUB_SYNC_MONITORING_COMPLETED"}
+
+
+@celery_app.task
+def data_hub_pending_update_export_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "DATA_HUB_PENDING_UPDATE_EXPORT_READY", "requires_human_approval": True}

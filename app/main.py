@@ -14,6 +14,7 @@ from .modules.costing import router as costing_router
 from .modules.integrations import ai_router as integrations_ai_router
 from .modules.integrations import router as integrations_router
 from .modules.inventory import router as inventory_router
+from .modules.frontend_admin import admin_router, ai_command_router, data_hub_router, digital_ops_router, digital_twin_router, frontend_router, planning_router, platform_management_router
 from .modules.maintenance import ai_router as maintenance_ai_router
 from .modules.maintenance import alias_router as maintenance_alias_router
 from .modules.maintenance import router as maintenance_router
@@ -63,6 +64,14 @@ app.include_router(customer_portal_ai_router)
 app.include_router(integrations_router)
 app.include_router(integrations_ai_router)
 app.include_router(inventory_router)
+app.include_router(frontend_router)
+app.include_router(admin_router)
+app.include_router(platform_management_router)
+app.include_router(data_hub_router)
+app.include_router(planning_router)
+app.include_router(ai_command_router)
+app.include_router(digital_twin_router)
+app.include_router(digital_ops_router)
 app.include_router(manufacturing_intelligence_router)
 app.include_router(production_router)
 app.include_router(maintenance_router)

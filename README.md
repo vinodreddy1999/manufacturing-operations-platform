@@ -51,6 +51,8 @@ The Integrations module has been added as a dedicated API/file/webhook/email int
 
 The Manufacturing Intelligence module has been added as a future command-center backend that connects risks across Inventory, Warehouse, Procurement, Production, Maintenance, Quality, Sales, Costing and Forecasting with impact graphs, root-cause analysis, what-if simulation, health scores, customer/cost impact, recommendations, draft actions and executive summaries.
 
+The Frontend & Admin Platform module has been added as a backend contract layer for future React/TypeScript screens. It exposes navigation, folder structure, admin dashboard, company setup, RBAC, dashboard access, data scopes, workflows, KPIs, alerts, notifications, security, documents, compliance, platform management, Manufacturing Data Hub, Planning, AI Command Center, Digital Twin and Digital Operations Center APIs.
+
 ## Diagram
 
 See the GitHub-rendered end-to-end scheme diagram here:
@@ -227,6 +229,15 @@ app/
                        Seeded Manufacturing Intelligence repository
     manufacturing_intelligence_service.py
                        Command center, impact graph, root cause, what-if, health, impact, recommendation and summary rules
+    frontend_admin.py  Frontend, Admin, Platform Management, Data Hub, Planning, AI Command Center, Digital Twin and Operations Center API routes
+    frontend_admin_models.py
+                       SQLAlchemy tables for subscriptions, dashboard access, scopes, workflows, data hub connections, mappings, pending ERP updates and digital twin nodes
+    frontend_admin_schemas.py
+                       Pydantic schemas for dashboard access, mapping preview, workflow simulation and pending update decisions
+    frontend_admin_repository.py
+                       Seeded frontend/admin/data hub repository
+    frontend_admin_service.py
+                       Admin metrics, RBAC logic, data quality, AI readiness, mapping, synchronization and digital operations rules
   ai_copilot/         AIProvider, MockAIProvider and optional OpenAIProvider interface
   jobs.py             Celery jobs for reports, AI risk scans, expiry/dead stock checks
 alembic/              Migration environment and first foundation migration
@@ -426,6 +437,23 @@ Key endpoint groups:
 - Executive summary: `/manufacturing-intelligence/executive-summary`
 
 Manufacturing Intelligence is draft-only for critical actions. It can analyze, explain, simulate, recommend and create drafts; it cannot approve purchase orders, transfer inventory, change production schedules, release quarantine, dispatch goods, send external email without approval, write off inventory, change pricing, or modify financial records.
+
+## Frontend & Admin Platform Contracts
+
+Open `http://localhost:8000/docs` and use the `Frontend Contracts`, `Admin`, `Platform Management`, `Manufacturing Data Hub`, `Planning`, `AI Command Center`, `Digital Twin` and `Digital Operations Center` tags.
+
+Key endpoint groups:
+
+- Frontend contracts: `/frontend/navigation`, `/frontend/folder-structure`
+- Admin dashboard and setup: `/admin/dashboard`, `/admin/company-setup`
+- Access control: `/admin/users-roles`, `/admin/access-control`, `/admin/access-control/evaluate-dashboard`, `/admin/data-scopes`
+- Admin engines: `/admin/workflows`, `/admin/workflows/simulate`, `/admin/kpis`, `/admin/alerts`, `/admin/notifications`
+- Governance: `/admin/security`, `/admin/documents`, `/admin/compliance`
+- Super Admin: `/platform-management/overview`
+- Manufacturing Data Hub: `/manufacturing-data-hub/connected-systems`, `/catalog`, `/mappings`, `/mappings/preview`, `/data-quality`, `/ai-readiness`, `/lineage`, `/event-streaming`, `/pending-updates`, `/action-center`, `/erp-feedback`, `/reconciliation`, `/synchronization-dashboard`
+- Future command surfaces: `/planning/overview`, `/ai-command-center/overview`, `/digital-twin/overview`, `/digital-operations-center/overview`
+
+Dashboard visibility uses the defined rule: tenant enabled dashboard plus role permission plus user permission plus data scope permission. Data Hub pending updates are approval-first so read-only ERP integrations can export recommended changes only after human decision.
 
 ## Platform Foundation
 

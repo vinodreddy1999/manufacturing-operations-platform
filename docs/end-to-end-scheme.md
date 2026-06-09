@@ -1,6 +1,6 @@
 # End-to-End Scheme Diagram
 
-This diagram shows the current Python-only Manufacturing Operations Platform after adding the modular platform foundation, expanded Inventory module, external Customer Portal, external Supplier Portal, Reporting & Analytics, Costing & Profitability, Mobile Operations, Integrations, Manufacturing Intelligence, and separate `inventory-ai-service/` microservice.
+This diagram shows the current Python-only Manufacturing Operations Platform after adding the modular platform foundation, expanded Inventory module, external Customer Portal, external Supplier Portal, Reporting & Analytics, Costing & Profitability, Mobile Operations, Integrations, Manufacturing Intelligence, Frontend & Admin Platform contracts, Manufacturing Data Hub, and separate `inventory-ai-service/` microservice.
 
 There are two FastAPI services:
 
@@ -20,6 +20,7 @@ flowchart LR
 
     PlatformAPI --> Core["Core Platform Router app/core_router.py"]
     PlatformAPI --> Auth["Auth Router app/auth_router.py"]
+    PlatformAPI --> FrontendAdminRouter["Frontend / Admin / Data Hub Router app/modules/frontend_admin.py"]
     PlatformAPI --> CostingRouter["Costing Router app/modules/costing.py"]
     PlatformAPI --> IntegrationsRouter["Integrations Router app/modules/integrations.py"]
     PlatformAPI --> InventoryRouter["Inventory Router app/modules/inventory.py"]
@@ -49,6 +50,18 @@ flowchart LR
     Auth --> Jwt["JWT Access Token"]
     Auth --> Passwords["Password Hashing"]
     Jwt --> RBAC["RBAC-ready User / Role / Permission Scope"]
+
+    FrontendAdminRouter --> FrontendNav["Frontend Navigation / Folder Structure"]
+    FrontendAdminRouter --> AdminDash["Admin Dashboard / Company Setup"]
+    FrontendAdminRouter --> AccessControl["RBAC / Dashboard Access / Data Scopes"]
+    FrontendAdminRouter --> WorkflowKpi["Workflows / KPIs / Alerts / Notifications"]
+    FrontendAdminRouter --> Governance["Security / Documents / Compliance"]
+    FrontendAdminRouter --> PlatformMgmt["Super Admin Platform Management"]
+    FrontendAdminRouter --> DataHub["Manufacturing Data Hub"]
+    FrontendAdminRouter --> Planning["Planning Overview"]
+    FrontendAdminRouter --> AiCommand["AI Command Center"]
+    FrontendAdminRouter --> DigitalTwin["Digital Twin / Knowledge Graph"]
+    FrontendAdminRouter --> DigitalOps["Digital Operations Center"]
 
     GenericModules --> Warehouse["Warehouse"]
     GenericModules --> Procurement["Procurement"]
@@ -170,6 +183,7 @@ flowchart LR
     Gate --> InventoryRouter
 
     Core --> Audit["Audit Helper app/audit.py"]
+    FrontendAdminRouter --> Audit
     CostingRouter --> Audit
     GenericModules --> Audit
     IntegrationsRouter --> Audit
@@ -187,7 +201,7 @@ flowchart LR
 
     PlatformAPI --> Jobs["Celery Jobs app/jobs.py"]
     Jobs --> Redis["Redis Broker"]
-    Jobs --> Scheduled["Scheduled Reports / AI Risk Scan / Expiry / Dead Stock Checks"]
+    Jobs --> Scheduled["Scheduled Reports / AI Risk Scan / Expiry / Dead Stock / Data Hub Checks"]
 
     PlatformAPI --> Copilot["AI Copilot Provider Interface app/ai_copilot"]
     Copilot --> MockProvider["Mock Provider by Default"]
@@ -217,25 +231,26 @@ flowchart LR
 5. Company, plant, department, user, role, permission, task, approval, document, and audit data is stored through SQLAlchemy models in `app/platform_models.py`.
 6. Feature flags decide whether module APIs are enabled.
 7. Generic module routers store warehouse and procurement records in `ModuleRecord`.
-8. Costing requests go through `app/modules/costing.py`.
-9. Integrations requests go through `app/modules/integrations.py`.
-10. Inventory requests go through `app/modules/inventory.py`.
-11. Manufacturing Intelligence requests go through `app/modules/manufacturing_intelligence.py`.
-12. Production requests go through `app/modules/production.py`.
-13. Maintenance requests go through `app/modules/maintenance.py`.
-14. Mobile Operations requests go through `app/modules/mobile.py`.
-15. Quality requests go through `app/modules/quality.py`.
-16. Reporting requests go through `app/modules/reporting.py`.
-17. Sales requests go through `app/modules/sales.py`.
-18. Customer Portal requests go through `app/modules/customer_portal.py`.
-19. Supplier Portal requests go through `app/modules/supplier_portal.py` and are scoped to the logged-in supplier.
-20. Inventory, Costing, Integrations, Manufacturing Intelligence, Production, Maintenance, Mobile, Quality, Reporting, Sales, Customer Portal and Supplier Portal data are validated with Pydantic schemas and returned as structured JSON.
-21. Background jobs are prepared in `app/jobs.py` using Celery and Redis.
-22. User opens the Inventory AI service Swagger at `http://127.0.0.1:8100/docs`.
-23. Inventory AI requests go through `inventory-ai-service/app/routes.py`.
-24. AI routes call rule-based logic in `ai_engine.py`, `risk_rules.py`, and `recommendations.py`.
-25. AI returns analysis, risk levels, recommendations, and draft actions only.
-26. Human approval is required before any critical operational action.
+8. Frontend/Admin/Data Hub requests go through `app/modules/frontend_admin.py`.
+9. Costing requests go through `app/modules/costing.py`.
+10. Integrations requests go through `app/modules/integrations.py`.
+11. Inventory requests go through `app/modules/inventory.py`.
+12. Manufacturing Intelligence requests go through `app/modules/manufacturing_intelligence.py`.
+13. Production requests go through `app/modules/production.py`.
+14. Maintenance requests go through `app/modules/maintenance.py`.
+15. Mobile Operations requests go through `app/modules/mobile.py`.
+16. Quality requests go through `app/modules/quality.py`.
+17. Reporting requests go through `app/modules/reporting.py`.
+18. Sales requests go through `app/modules/sales.py`.
+19. Customer Portal requests go through `app/modules/customer_portal.py`.
+20. Supplier Portal requests go through `app/modules/supplier_portal.py` and are scoped to the logged-in supplier.
+21. Inventory, Frontend/Admin/Data Hub, Costing, Integrations, Manufacturing Intelligence, Production, Maintenance, Mobile, Quality, Reporting, Sales, Customer Portal and Supplier Portal data are validated with Pydantic schemas and returned as structured JSON.
+22. Background jobs are prepared in `app/jobs.py` using Celery and Redis.
+23. User opens the Inventory AI service Swagger at `http://127.0.0.1:8100/docs`.
+24. Inventory AI requests go through `inventory-ai-service/app/routes.py`.
+25. AI routes call rule-based logic in `ai_engine.py`, `risk_rules.py`, and `recommendations.py`.
+26. AI returns analysis, risk levels, recommendations, and draft actions only.
+27. Human approval is required before any critical operational action.
 
 ## Main Platform Modules
 
@@ -252,6 +267,10 @@ flowchart LR
 | Seed data | `app/platform_seed.py` | Demo company, plant, admin user, roles, permissions and module flags |
 | Background jobs | `app/jobs.py` | Celery jobs for reports, AI risk scans, expiry checks and dead stock checks |
 | AI copilot | `app/ai_copilot/` | Provider interface with mock provider and optional OpenAI provider |
+| Frontend/Admin contracts | `app/modules/frontend_admin.py` | Frontend navigation, Admin, Platform Management, Manufacturing Data Hub, Planning, AI Command Center, Digital Twin and Digital Operations Center APIs |
+| Frontend/Admin service | `app/modules/frontend_admin_service.py` | Dashboard access logic, workflow simulation, data quality, AI readiness, mapping preview, ERP pending update decisions and operations center summaries |
+| Frontend/Admin schemas | `app/modules/frontend_admin_schemas.py` | Pydantic schemas for dashboard access, mapping preview, workflow simulation and pending update decisions |
+| Frontend/Admin models | `app/modules/frontend_admin_models.py` | SQLAlchemy table definitions for subscriptions, dashboard access, data scopes, workflows, data connections, mappings, pending ERP updates and digital twins |
 | Costing module | `app/modules/costing.py` | Dedicated Costing & Profitability APIs |
 | Costing service | `app/modules/costing_service.py` | Cost calculations, profitability, reports and Costing AI rules |
 | Costing schemas | `app/modules/costing_schemas.py` | Pydantic schemas for cost centers/elements, calculations, standard costs, variances and AI requests |
@@ -854,6 +873,30 @@ flowchart TD
     HumanApproval --> Output
 ```
 
+## Frontend, Admin and Manufacturing Data Hub Data Flow
+
+```mermaid
+flowchart TD
+    Client["React / Swagger / API Client"] --> AdminRoute["Frontend Admin Router app/modules/frontend_admin.py"]
+    AdminRoute --> AdminSchemas["Pydantic Schemas app/modules/frontend_admin_schemas.py"]
+    AdminSchemas --> AdminService["Service Layer app/modules/frontend_admin_service.py"]
+    AdminService --> Navigation["Navigation / Folder Structure Contracts"]
+    AdminService --> RBAC["Roles / Permissions / Dashboard Access"]
+    AdminService --> Scope["Company / Plant / Warehouse / Line / Department Scope"]
+    AdminService --> Workflow["Workflow / KPI / Alert / Notification Contracts"]
+    AdminService --> DataHub["Connected Systems / Catalog / Mapping / Quality / AI Readiness"]
+    DataHub --> PendingUpdates["Pending ERP Update Center"]
+    PendingUpdates --> HumanApproval["Human Approval Required"]
+    AdminService --> FutureSurfaces["Planning / AI Command Center / Digital Twin / Digital Operations"]
+    Navigation --> Output["Final JSON Output"]
+    RBAC --> Output
+    Scope --> Output
+    Workflow --> Output
+    DataHub --> Output
+    FutureSurfaces --> Output
+    HumanApproval --> Output
+```
+
 ## Inventory AI Data Flow
 
 ```mermaid
@@ -1043,3 +1086,10 @@ Manufacturing Intelligence-specific AI safety:
 
 - AI can analyze, explain, simulate, recommend and create draft actions.
 - AI cannot approve purchase orders, transfer inventory, change production schedules, release quarantine, dispatch goods, send external email without approval, write off inventory, change pricing or modify financial records.
+
+Frontend/Admin/Data Hub governance safety:
+
+- Super Admin can manage tenants, subscriptions, billing, platform feature flags, marketplaces, usage limits and global audit logs.
+- Company Admin can manage company users, roles, plants, warehouses, departments, dashboards, workflows, integrations, data mapping, notifications and security policies.
+- Company Admin cannot access other companies, enable disabled platform modules or modify platform-level settings.
+- Data Hub pending ERP updates cannot be exported or applied until a human approves or rejects the recommendation.

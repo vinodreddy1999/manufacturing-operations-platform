@@ -22,6 +22,7 @@ Implemented now:
 - Dedicated Mobile Operations module with mobile auth, device management, my-work, tasks, approvals, scan resolution, offline sync, uploads, mobile audit, notifications, Celery job hooks and rule-based AI
 - Dedicated Integrations module with provider/config registry, masked credentials, webhooks, inbound idempotency, sync jobs, mappings, file import/export, errors, retries, monitoring, Celery job hooks and rule-based AI
 - Future Manufacturing Intelligence module with command center, cross-module risks, impact graph, root cause, what-if, bottlenecks, health scores, customer/cost impacts, recommendations, Celery job hooks and draft-only intelligence actions
+- Frontend & Admin Platform contract module with navigation, admin dashboard, RBAC, dashboard access, data scopes, no-code workflow contracts, KPIs, alerts, notifications, security, documents, compliance, platform management, Manufacturing Data Hub, Planning, AI Command Center, Digital Twin and Digital Operations Center APIs
 - JWT/password security helpers
 - Optional AI provider interface: `AIProvider`, `MockAIProvider`, `OpenAIProvider`
 - Celery job declarations for reports, AI scans, expiry checks and dead-stock checks
@@ -322,3 +323,33 @@ AI safety boundary:
 
 - AI can analyze, explain, simulate, recommend and create draft actions.
 - AI cannot approve purchase orders, transfer inventory, change production schedules, release quarantine, dispatch goods, send external email without approval, write off inventory, change pricing or modify financial records.
+
+## Frontend & Admin Platform Contract Depth
+
+Implemented Frontend & Admin areas:
+
+- Frontend navigation contract for Platform Management, operations modules, external portals and intelligence surfaces
+- Recommended React frontend folder structure and reusable component catalog
+- Super Admin platform management overview for tenants, subscriptions, billing, feature flags, marketplaces and usage analytics
+- Admin dashboard metrics for users, plants, warehouses, integrations, data quality, AI readiness, approvals and actions
+- Company setup contract for profile, locations, branches, plants, warehouses, fiscal settings, currency and time zone
+- Role catalog covering Super Admin, Company Admin, plant/module managers, supervisors, operators, technicians, customer users, supplier users and viewers
+- Permission matrix for view, create, edit, delete, approve, export, import, configure and administer actions
+- Dashboard access rule engine: tenant enabled dashboard plus role permission plus user permission plus data scope permission
+- Data scope access by company, plant, warehouse, production line and department
+- No-code workflow definitions and simulation for purchase requests, maintenance requests and production changes
+- KPI framework for OEE, MTTR, MTBF, forecast accuracy, inventory turns, rejection percent, downtime and lead time
+- Alert and escalation rules with notification channel contracts
+- Security center, document management and compliance center contracts
+- Manufacturing Data Hub connected systems, catalog, mapping studio, data quality center, AI readiness center, lineage, event streaming and synchronization dashboard
+- Pending Update Center for read-only ERP integrations with draft, pending, approved, exported, applied, rejected and failed style statuses
+- Action Center, ERP Feedback Center and Data Reconciliation Center
+- Planning overview across demand, inventory, procurement, production, capacity, supply, distribution, workforce, maintenance and scenario planning
+- AI Command Center, Digital Twin, Knowledge Graph and Digital Operations Center overview contracts
+- Celery job hooks for admin dashboard refresh, data quality scans, AI readiness scans, synchronization monitoring and pending update export
+
+Governance boundary:
+
+- Company Admins can manage company users, roles, plants, warehouses, departments, dashboards, workflows, integrations, mapping, notifications and security policies.
+- Company Admins cannot access other companies, enable disabled modules or modify platform-level settings.
+- Pending ERP updates require human approval before export or writeback.
