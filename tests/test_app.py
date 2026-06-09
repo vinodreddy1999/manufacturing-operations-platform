@@ -534,3 +534,76 @@ def test_reporting_analytics_and_ai_are_draft_only():
     assert data["requires_human_approval"] is True
     assert "Modify Financial Records" in data["ai_safety"]["cannot"]
     assert "financial record" not in data["reason"]
+
+
+def test_costing_dashboard_and_inventory_landed_calculations():
+    dashboard = client.get("/costing/dashboard")
+    assert dashboard.status_code == 200
+    assert dashboard.json()["data"]["total_inventory_value"] > 0
+    assert "cost_variance_alerts" in dashboard.json()["data"]
+
+    inventory = client.post("/inventory-costing/calculate", json={"item_id": "item-copper", "quantity": 100, "unit_cost": 45, "costing_method": "FIFO"})
+    assert inventory.status_code == 200
+    assert inventory.json()["data"]["total_cost"] == 4500
+
+    landed = client.post(
+        "/landed-cost/calculate",
+        json={"purchase_order_id": "po-landed-001", "quantity": 100, "purchase_cost": 10000, "freight": 500, "duty": 250, "tax": 1000, "handling": 100, "inspection": 150, "other_charges": 0},
+    )
+    assert landed.status_code == 200
+    assert landed.json()["data"]["total_landed_cost"] == 12000
+
+
+def test_costing_production_variance_and_standard_cost_approval():
+    production = client.post(
+        "/production-costing/calculate",
+        json={
+            "production_order_id": "po-cost-001",
+            "product_id": "fg-pump-900",
+            "produced_quantity": 50,
+            "planned_material_cost": 50000,
+            "actual_material_cost": 56000,
+            "planned_labor_cost": 8000,
+            "actual_labor_cost": 9000,
+            "planned_machine_cost": 12000,
+            "actual_machine_cost": 15000,
+            "overhead_cost": 5000,
+            "wastage_cost": 2500,
+        },
+    )
+    assert production.status_code == 200
+    assert production.json()["data"]["actual_cost"] == 87500
+
+    standard = client.post(
+        "/standard-costs",
+        json={"product_id": "fg-valve-100", "standard_material_cost": 100, "standard_labor_cost": 20, "standard_machine_cost": 30, "standard_overhead_cost": 10, "effective_from": "2026-06-09"},
+    )
+    assert standard.status_code == 200
+    standard_id = standard.json()["data"]["id"]
+
+    approve = client.post(f"/standard-costs/{standard_id}/approve")
+    assert approve.status_code == 200
+    assert approve.json()["data"]["approval_status"] == "Approved"
+
+
+def test_costing_profitability_reports_and_ai_are_draft_only():
+    products = client.get("/profitability/products")
+    assert products.status_code == 200
+    assert products.json()["data"][0]["product_id"] == "fg-pump-900"
+
+    report = client.get("/costing/reports/profitability")
+    assert report.status_code == 200
+    assert report.json()["data"]["report_code"] == "PROFITABILITY"
+
+    risk = client.get("/ai/costing/risk-center")
+    assert risk.status_code == 200
+    assert "Write Off Inventory" in risk.json()["data"]["ai_safety"]["cannot"]
+
+    draft = client.post(
+        "/ai/costing/draft-action",
+        json={"action_type": "Draft cost review task", "source_type": "Variance", "source_id": "var-pump-001", "reason": "change product price and modify financial records", "owner": "finance-controller"},
+    )
+    assert draft.status_code == 200
+    data = draft.json()["data"]
+    assert data["requires_human_approval"] is True
+    assert "change product price" not in data["reason"]

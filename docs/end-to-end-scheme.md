@@ -1,6 +1,6 @@
 # End-to-End Scheme Diagram
 
-This diagram shows the current Python-only Manufacturing Operations Platform after adding the modular platform foundation, expanded Inventory module, external Customer Portal, external Supplier Portal, Reporting & Analytics, and separate `inventory-ai-service/` microservice.
+This diagram shows the current Python-only Manufacturing Operations Platform after adding the modular platform foundation, expanded Inventory module, external Customer Portal, external Supplier Portal, Reporting & Analytics, Costing & Profitability, and separate `inventory-ai-service/` microservice.
 
 There are two FastAPI services:
 
@@ -20,6 +20,7 @@ flowchart LR
 
     PlatformAPI --> Core["Core Platform Router app/core_router.py"]
     PlatformAPI --> Auth["Auth Router app/auth_router.py"]
+    PlatformAPI --> CostingRouter["Costing Router app/modules/costing.py"]
     PlatformAPI --> InventoryRouter["Inventory Router app/modules/inventory.py"]
     PlatformAPI --> ProductionRouter["Production Router app/modules/production.py"]
     PlatformAPI --> MaintenanceRouter["Maintenance Router app/modules/maintenance.py"]
@@ -48,6 +49,14 @@ flowchart LR
 
     GenericModules --> Warehouse["Warehouse"]
     GenericModules --> Procurement["Procurement"]
+
+    CostingRouter --> CostCenters["Cost Centers / Cost Elements"]
+    CostingRouter --> InventoryCost["Inventory Valuation / Landed Cost"]
+    CostingRouter --> ProductionCost["Production / Maintenance / Quality Costing"]
+    CostingRouter --> Variance["Standard Cost / Variance"]
+    CostingRouter --> Profitability["Product / Customer / Plant Profitability"]
+    CostingRouter --> CostReports["Costing Dashboard / Reports"]
+    CostingRouter --> CostingAI["Rule-Based Costing AI"]
 
     ProductionRouter --> ProdMaster["Product Master"]
     ProductionRouter --> ProdBom["BOM and Routing"]
@@ -131,6 +140,7 @@ flowchart LR
     Gate --> InventoryRouter
 
     Core --> Audit["Audit Helper app/audit.py"]
+    CostingRouter --> Audit
     GenericModules --> Audit
     InventoryRouter --> Audit
     ProductionRouter --> Audit
@@ -174,21 +184,22 @@ flowchart LR
 5. Company, plant, department, user, role, permission, task, approval, document, and audit data is stored through SQLAlchemy models in `app/platform_models.py`.
 6. Feature flags decide whether module APIs are enabled.
 7. Generic module routers store warehouse and procurement records in `ModuleRecord`.
-8. Inventory requests go through `app/modules/inventory.py`.
-9. Production requests go through `app/modules/production.py`.
-10. Maintenance requests go through `app/modules/maintenance.py`.
-11. Quality requests go through `app/modules/quality.py`.
-12. Reporting requests go through `app/modules/reporting.py`.
-13. Sales requests go through `app/modules/sales.py`.
-14. Customer Portal requests go through `app/modules/customer_portal.py`.
-15. Supplier Portal requests go through `app/modules/supplier_portal.py` and are scoped to the logged-in supplier.
-16. Inventory, Production, Maintenance, Quality, Reporting, Sales, Customer Portal and Supplier Portal data are validated with Pydantic schemas and returned as structured JSON.
-17. Background jobs are prepared in `app/jobs.py` using Celery and Redis.
-18. User opens the Inventory AI service Swagger at `http://127.0.0.1:8100/docs`.
-19. Inventory AI requests go through `inventory-ai-service/app/routes.py`.
-20. AI routes call rule-based logic in `ai_engine.py`, `risk_rules.py`, and `recommendations.py`.
-21. AI returns analysis, risk levels, recommendations, and draft actions only.
-22. Human approval is required before any critical operational action.
+8. Costing requests go through `app/modules/costing.py`.
+9. Inventory requests go through `app/modules/inventory.py`.
+10. Production requests go through `app/modules/production.py`.
+11. Maintenance requests go through `app/modules/maintenance.py`.
+12. Quality requests go through `app/modules/quality.py`.
+13. Reporting requests go through `app/modules/reporting.py`.
+14. Sales requests go through `app/modules/sales.py`.
+15. Customer Portal requests go through `app/modules/customer_portal.py`.
+16. Supplier Portal requests go through `app/modules/supplier_portal.py` and are scoped to the logged-in supplier.
+17. Inventory, Costing, Production, Maintenance, Quality, Reporting, Sales, Customer Portal and Supplier Portal data are validated with Pydantic schemas and returned as structured JSON.
+18. Background jobs are prepared in `app/jobs.py` using Celery and Redis.
+19. User opens the Inventory AI service Swagger at `http://127.0.0.1:8100/docs`.
+20. Inventory AI requests go through `inventory-ai-service/app/routes.py`.
+21. AI routes call rule-based logic in `ai_engine.py`, `risk_rules.py`, and `recommendations.py`.
+22. AI returns analysis, risk levels, recommendations, and draft actions only.
+23. Human approval is required before any critical operational action.
 
 ## Main Platform Modules
 
@@ -205,6 +216,10 @@ flowchart LR
 | Seed data | `app/platform_seed.py` | Demo company, plant, admin user, roles, permissions and module flags |
 | Background jobs | `app/jobs.py` | Celery jobs for reports, AI risk scans, expiry checks and dead stock checks |
 | AI copilot | `app/ai_copilot/` | Provider interface with mock provider and optional OpenAI provider |
+| Costing module | `app/modules/costing.py` | Dedicated Costing & Profitability APIs |
+| Costing service | `app/modules/costing_service.py` | Cost calculations, profitability, reports and Costing AI rules |
+| Costing schemas | `app/modules/costing_schemas.py` | Pydantic schemas for cost centers/elements, calculations, standard costs, variances and AI requests |
+| Costing models | `app/modules/costing_models.py` | SQLAlchemy table definitions for cost records, variances, profitability, AI risks, recommendations, reports and snapshots |
 | Production module | `app/modules/production.py` | Dedicated Production Management APIs |
 | Production service | `app/modules/production_service.py` | MRP, reservations, scheduling, costing, reports and Production AI rules |
 | Production schemas | `app/modules/production_schemas.py` | Pydantic schemas for Production requests |
@@ -242,6 +257,7 @@ flowchart LR
 | --- | --- | --- |
 | Warehouse | `/warehouses`, `/warehouse-locations`, `/warehouse-movements`, `/warehouse-occupancy` | Stores module records after feature flag validation |
 | Procurement | `/suppliers`, `/purchase-requisitions`, `/purchase-orders` | Stores supplier and purchasing module records |
+| Costing | `/costing/*`, `/cost-centers`, `/cost-elements`, `/inventory-costing`, `/landed-cost`, `/production-costing`, `/profitability/*`, `/ai/costing/*` | Dedicated Costing & Profitability module with valuations, costing calculations, profitability and AI |
 | Production | `/production/*` | Dedicated Production Management module with planning, execution, costing, reporting and AI |
 | Maintenance | `/maintenance/*`, `/machines`, `/maintenance-plans`, `/work-orders`, `/ai/maintenance/*` | Dedicated Maintenance Management module with CMMS/EAM workflows and AI |
 | Quality | `/quality/*`, `/ai/quality/*` | Dedicated Quality Management module with QMS workflows and AI |
@@ -391,6 +407,22 @@ flowchart LR
 | KPIs | `GET/POST /kpis`, `GET /kpis/{id}`, `POST /kpis/{id}/calculate` | KPI definitions and calculated snapshots |
 | Analytics | `GET /analytics/trends`, `/cross-module`, `/action-insights` | Trend analysis, cross-module risk chains and owner/action recommendations |
 | Reporting AI | `/ai/reporting/*` | Risk center, executive summary, root cause, anomalies, KPI insights, narrative and draft actions |
+
+## Costing & Profitability Views
+
+| View | Endpoint | Output |
+| --- | --- | --- |
+| Enablement and Dashboard | `GET /costing/enablement`, `GET /costing/dashboard` | Company costing flags, total inventory value, production cost, wastage, rework, scrap, maintenance, COPQ and variance alerts |
+| Cost Centers | `GET/POST /cost-centers` | Production, maintenance, quality, warehouse, admin, sales, utility, machine, line and plant cost centers |
+| Cost Elements | `GET/POST /cost-elements` | Material, labor, machine, overhead, maintenance, quality, logistics, wastage, rework and scrap elements |
+| Inventory Costing | `GET /inventory-costing`, `POST /inventory-costing/calculate` | FIFO/weighted/standard/actual cost valuation by item, batch, status and quantity |
+| Landed Cost | `GET /landed-cost`, `POST /landed-cost/calculate` | Purchase cost plus freight, duty, tax, handling, inspection and other charges |
+| Production Costing | `GET /production-costing`, `POST /production-costing/calculate` | Planned cost, actual cost, variance percent and cost per unit |
+| Maintenance and Quality Costing | `GET/POST /maintenance-costing`, `GET/POST /quality-costing` | Work order, downtime, production loss, COPQ, supplier quality and CAPA costs |
+| Allocation and Standard Cost | `GET/POST /cost-allocation-rules`, `GET/POST /standard-costs`, `POST /standard-costs/{id}/approve` | Allocation rules and approval-gated standard cost master |
+| Variance and Profitability | `GET/POST /cost-variance`, `/profitability/products`, `/customers`, `/plants` | Cost variances and product, customer and plant profitability |
+| Reports | `/costing/reports/*` | Inventory valuation, production cost, wastage cost and profitability reports |
+| Costing AI | `/ai/costing/*` | Risk center, cost increase, low margin, customer profitability, wastage, production variance, supplier cost, optimization and draft actions |
 
 ## Main Inventory Module Views
 
@@ -619,6 +651,32 @@ flowchart TD
     HumanApproval --> Output
 ```
 
+## Costing & Profitability Data Flow
+
+```mermaid
+flowchart TD
+    Client["Swagger / API Client"] --> CostRoute["Costing Router app/modules/costing.py"]
+    CostRoute --> CostSchemas["Pydantic Schemas app/modules/costing_schemas.py"]
+    CostSchemas --> CostService["Service Layer app/modules/costing_service.py"]
+    CostService --> FeatureFlags["Company Costing Feature Flags"]
+    FeatureFlags --> SensitiveAccess["Company / Plant / Role Cost Access"]
+    SensitiveAccess --> Masters["Cost Centers / Cost Elements"]
+    SensitiveAccess --> InventoryValuation["Inventory Valuation / Landed Cost"]
+    SensitiveAccess --> ProductionCosting["Production / Maintenance / Quality Costing"]
+    SensitiveAccess --> Variance["Standard Cost / Actual Cost / Variance"]
+    SensitiveAccess --> Profitability["Product / Customer / Plant Profitability"]
+    CostService --> Reports["Costing Dashboard / Reports"]
+    CostService --> CostAI["Costing AI Recommendations"]
+    CostAI --> HumanApproval["Human Approval Required"]
+    Masters --> Output["Final JSON Output"]
+    InventoryValuation --> Output
+    ProductionCosting --> Output
+    Variance --> Output
+    Profitability --> Output
+    Reports --> Output
+    HumanApproval --> Output
+```
+
 ## Inventory AI Data Flow
 
 ```mermaid
@@ -642,6 +700,7 @@ sequenceDiagram
     participant U as User
     participant P as Platform API :8000
     participant C as Core Router
+    participant K as Costing Router
     participant I as Inventory Router
     participant R as Production Router
     participant M as Maintenance Router
@@ -661,6 +720,12 @@ sequenceDiagram
     C->>S: Validate, check feature flag, read/write records
     S-->>C: Return platform data
     C-->>O: Return platform JSON
+
+    U->>P: Request /production-costing/calculate
+    P->>K: Route costing request
+    K->>S: Read seeded cost masters and transactional cost signals
+    S-->>K: Return inventory, production, maintenance, quality and profitability cost data
+    K-->>O: Return cost calculation, variance and profitability JSON
 
     U->>P: Request /inventory/dashboard
     P->>I: Route inventory request
@@ -760,3 +825,8 @@ Reporting-specific AI safety:
 
 - AI can create draft tasks, draft approval requests, draft investigations, draft email summaries and draft report notes.
 - AI cannot approve decisions, change source data, send external email without approval, modify financial records, release inventory or dispatch goods.
+
+Costing-specific AI safety:
+
+- AI can create draft cost review tasks, supplier price reviews, product pricing reviews, wastage investigations, maintenance cost reviews and margin alert emails.
+- AI cannot change product prices, change supplier contracts, approve cost allocation, write off inventory, change standard cost or modify financial records.

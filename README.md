@@ -43,6 +43,8 @@ The Supplier Portal module has been added as a dedicated external-supplier backe
 
 The Reporting & Analytics module has been added as a dedicated BI-style backend with standard report catalog, scoped report execution, CSV/Excel/PDF export flow, saved reports, scheduled email reports, dashboards, KPI definitions/snapshots, trend analytics, cross-module insights, action insights, and rule-based Reporting AI.
 
+The Costing & Profitability module has been added as a dedicated cost intelligence backend with cost centers, cost elements, inventory valuation, landed cost, production costing, maintenance and quality costing, allocation rules, standard costs, variance analysis, profitability views, costing reports, dashboard cards, and rule-based Costing AI.
+
 ## Diagram
 
 See the GitHub-rendered end-to-end scheme diagram here:
@@ -186,6 +188,14 @@ app/
                        Seeded Reporting repository
     reporting_service.py
                        Report execution, exports, dashboards, KPI calculation, analytics and AI rules
+    costing.py        Costing & Profitability API routes
+    costing_models.py SQLAlchemy tables for cost records, variances, profitability, AI risks, reports and snapshots
+    costing_schemas.py
+                       Pydantic schemas for costing calculations, standard costs, variances and AI requests
+    costing_repository.py
+                       Seeded Costing repository
+    costing_service.py
+                       Cost calculation, profitability, reports and AI rules
   ai_copilot/         AIProvider, MockAIProvider and optional OpenAIProvider interface
   jobs.py             Celery jobs for reports, AI risk scans, expiry/dead stock checks
 alembic/              Migration environment and first foundation migration
@@ -320,6 +330,22 @@ Key endpoint groups:
 - Reporting AI: `/ai/reporting/risk-center`, `/executive-summary`, `/root-cause`, `/anomalies`, `/kpi-insights`, `/report-narrative`, `/draft-action`
 
 Reporting AI is recommendation-only. It can analyze, summarize, recommend and create draft tasks or report notes; it cannot approve decisions, change source data, send external email without approval, modify financial records, release inventory, or dispatch goods.
+
+## Costing & Profitability Module
+
+Open `http://localhost:8000/docs` and use the `Costing & Profitability` and `Costing AI` tags.
+
+Key endpoint groups:
+
+- Feature flags and dashboard: `/costing/enablement`, `/costing/dashboard`
+- Masters: `/cost-centers`, `/cost-elements`
+- Calculations: `/inventory-costing`, `/landed-cost`, `/production-costing`, `/maintenance-costing`, `/quality-costing`
+- Rules and standards: `/cost-allocation-rules`, `/standard-costs`, `/standard-costs/{id}/approve`
+- Variance and profitability: `/cost-variance`, `/profitability/products`, `/profitability/customers`, `/profitability/plants`
+- Reports: `/costing/reports/inventory-valuation`, `/production-cost`, `/wastage-cost`, `/profitability`
+- Costing AI: `/ai/costing/risk-center`, `/cost-increase`, `/low-margin-products`, `/customer-profitability-risk`, `/wastage-cost-risk`, `/production-variance`, `/supplier-cost-risk`, `/cost-optimization`, `/draft-action`
+
+Costing AI is recommendation-only. It can analyze cost increases, low margin products, wastage, production variance and supplier cost risk; it cannot change product price, change supplier contracts, approve cost allocation, write off inventory, change standard cost, or modify financial records.
 
 ## Platform Foundation
 

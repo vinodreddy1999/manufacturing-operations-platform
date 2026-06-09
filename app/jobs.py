@@ -156,3 +156,43 @@ def reporting_ai_risk_scan_job(company_id: str) -> dict:
 @celery_app.task
 def reporting_executive_summary_job(company_id: str) -> dict:
     return {"company_id": company_id, "status": "REPORTING_EXECUTIVE_SUMMARY_COMPLETED", "actions_created": "draft_only"}
+
+
+@celery_app.task
+def costing_inventory_valuation_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "COSTING_INVENTORY_VALUATION_COMPLETED"}
+
+
+@celery_app.task
+def costing_production_recalculation_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "COSTING_PRODUCTION_RECALCULATION_COMPLETED"}
+
+
+@celery_app.task
+def costing_variance_analysis_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "COSTING_VARIANCE_ANALYSIS_COMPLETED"}
+
+
+@celery_app.task
+def costing_profitability_snapshot_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "COSTING_PROFITABILITY_SNAPSHOT_COMPLETED"}
+
+
+@celery_app.task
+def costing_wastage_scan_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "COSTING_WASTAGE_SCAN_COMPLETED", "actions_created": "draft_only"}
+
+
+@celery_app.task
+def costing_margin_risk_scan_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "COSTING_MARGIN_RISK_SCAN_COMPLETED", "actions_created": "draft_only"}
+
+
+@celery_app.task
+def costing_ai_risk_scan_job(company_id: str) -> dict:
+    return {"company_id": company_id, "status": "COSTING_AI_RISK_SCAN_COMPLETED", "actions_created": "draft_only"}
+
+
+@celery_app.task
+def costing_scheduled_report_job(company_id: str, report_code: str) -> dict:
+    return {"company_id": company_id, "report_code": report_code, "status": "COSTING_SCHEDULED_REPORT_COMPLETED"}

@@ -18,6 +18,7 @@ Implemented now:
 - Dedicated Customer Portal module with external-user security, customer-scoped routes, SQLAlchemy table definitions, seeded repository, service layer, Celery job hooks and rule-based AI
 - Dedicated Supplier Portal module with external-supplier security, supplier-scoped routes, SQLAlchemy table definitions, seeded repository, service layer, Celery job hooks and rule-based AI
 - Dedicated Reporting & Analytics module with report catalog, scoped report execution, exports, saved/scheduled reports, dashboards, KPI snapshots, cross-module analytics, Celery job hooks and rule-based AI
+- Dedicated Costing & Profitability module with cost centers/elements, inventory valuation, landed cost, production/maintenance/quality costing, standard costs, variance, profitability, Celery job hooks and rule-based AI
 - JWT/password security helpers
 - Optional AI provider interface: `AIProvider`, `MockAIProvider`, `OpenAIProvider`
 - Celery job declarations for reports, AI scans, expiry checks and dead-stock checks
@@ -221,3 +222,25 @@ AI safety boundary:
 
 - AI can analyze, summarize, recommend and create draft actions.
 - AI cannot approve decisions, change source data, send external email without approval, modify financial records, release inventory or dispatch goods.
+
+## Costing & Profitability Module Depth
+
+Implemented Costing & Profitability areas:
+
+- Company-level costing feature flags for inventory, production, maintenance, quality, profitability and AI
+- Cost center and cost element masters
+- Inventory costing and valuation with costing method/status
+- Landed cost calculation with freight, duty, tax, handling, inspection and other charges
+- Production costing with planned/actual cost, variance percent and cost per unit
+- Maintenance and quality costing
+- Cost allocation rules and standard cost approval workflow
+- Cost variance records
+- Product, customer and plant profitability views
+- Costing dashboard cards and costing reports
+- Rule-based Costing AI risk center, cost increase, low-margin product, customer profitability, wastage, production variance, supplier cost and optimization recommendations
+- Celery job hooks for inventory valuation, production recalculation, variance analysis, profitability snapshots, wastage scans, margin risk scans, AI risk scans and scheduled costing reports
+
+AI safety boundary:
+
+- AI can analyze, recommend and create draft actions.
+- AI cannot change product prices, change supplier contracts, approve cost allocation, write off inventory, change standard cost or modify financial records.
