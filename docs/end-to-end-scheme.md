@@ -252,6 +252,28 @@ flowchart LR
 26. AI returns analysis, risk levels, recommendations, and draft actions only.
 27. Human approval is required before any critical operational action.
 
+## Frontend & Admin Platform Views
+
+| View / Area | Endpoint Group | What It Shows or Controls |
+| --- | --- | --- |
+| Frontend Navigation | `/frontend/navigation` | Main navigation for Platform Management, operations modules, external portals and intelligence surfaces |
+| Frontend Folder Structure | `/frontend/folder-structure` | React/Vite module layout and reusable component catalog for future UI generation |
+| Platform Management | `/platform-management/overview` | Super Admin tenant, subscription, billing, feature flag, marketplace, usage and audit control surface |
+| Admin Dashboard | `/admin/dashboard` | User count, active users, plants, warehouses, integrations, data quality, AI readiness, open approvals and pending actions |
+| Company Setup | `/admin/company-setup` | Company profile, locations, branches, plants, warehouses, fiscal settings, time zone and currency |
+| Users & Roles | `/admin/users-roles` | Role catalog and permission matrix for platform and company users |
+| Dashboard Access | `/admin/access-control`, `/admin/access-control/evaluate-dashboard` | Tenant dashboard enablement, role permission, user permission and data scope permission checks |
+| Data Scope Access | `/admin/data-scopes` | Company, plant, warehouse, production line and department visibility rules |
+| Workflow Engine | `/admin/workflows`, `/admin/workflows/simulate` | No-code workflow definitions and approval-path simulation |
+| KPI Framework | `/admin/kpis` | Company-defined KPIs such as OEE, MTTR, MTBF, forecast accuracy and inventory turns |
+| Alerts & Notifications | `/admin/alerts`, `/admin/notifications` | Escalation paths and communication channels |
+| Security, Documents, Compliance | `/admin/security`, `/admin/documents`, `/admin/compliance` | SSO/MFA policy contracts, document management and compliance center coverage |
+| Manufacturing Data Hub | `/manufacturing-data-hub/*` | Connected systems, catalog, mappings, quality, AI readiness, lineage, streaming, pending ERP updates and synchronization |
+| Planning | `/planning/overview` | Demand, inventory, procurement, production, capacity, supply, distribution, workforce, maintenance and scenario planning |
+| AI Command Center | `/ai-command-center/overview` | Copilots, scenario simulator, recommendation center, AI learning, AI governance and autonomous planning mode |
+| Digital Twin | `/digital-twin/overview` | Enterprise, factory, warehouse, machine, supply chain and inventory twins plus knowledge graph |
+| Digital Operations Center | `/digital-operations-center/overview` | Executive command center, control towers, AI decision center and enterprise performance layer |
+
 ## Main Platform Modules
 
 | Area | Current Code | Purpose |
@@ -920,6 +942,7 @@ sequenceDiagram
     participant U as User
     participant P as Platform API :8000
     participant C as Core Router
+    participant FA as Frontend Admin Router
     participant K as Costing Router
     participant G as Integrations Router
     participant MI as Manufacturing Intelligence Router
@@ -943,6 +966,18 @@ sequenceDiagram
     C->>S: Validate, check feature flag, read/write records
     S-->>C: Return platform data
     C-->>O: Return platform JSON
+
+    U->>P: Request /admin/dashboard
+    P->>FA: Route admin request
+    FA->>S: Read seeded admin, RBAC, KPI, data quality and approval signals
+    S-->>FA: Return frontend/admin contract data
+    FA-->>O: Return admin dashboard JSON
+
+    U->>P: Request /manufacturing-data-hub/mappings/preview
+    P->>FA: Route data hub request
+    FA->>S: Read mapping rules and transform preview
+    S-->>FA: Return target field, transformed value and confidence
+    FA-->>O: Return mapping preview JSON
 
     U->>P: Request /production-costing/calculate
     P->>K: Route costing request
