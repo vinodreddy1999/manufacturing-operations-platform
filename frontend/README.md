@@ -76,10 +76,10 @@ Open:
 http://127.0.0.1:8080
 ```
 
-For Docker Desktop on Windows, the default Docker build argument points the browser app at:
+By default, the Docker image points the browser app at:
 
 ```text
-http://host.docker.internal:8000
+http://127.0.0.1:8000
 ```
 
 Override it if your backend is hosted elsewhere:
