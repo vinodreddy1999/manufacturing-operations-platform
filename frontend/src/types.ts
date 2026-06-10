@@ -88,3 +88,50 @@ export type DashboardAccessResult = {
   dashboard_visible: boolean;
   decision: string;
 };
+
+export type RuntimeUser = {
+  id: string;
+  email: string;
+  name: string;
+  role: 'super_admin' | 'admin' | 'user';
+  is_active: boolean;
+  permissions: string[];
+};
+
+export type RuntimeLoginResult = {
+  access_token: string;
+  token_type: string;
+  user: RuntimeUser;
+};
+
+export type ModuleRecord = {
+  id: string;
+  module_key: string;
+  record_type: string;
+  record_code: string;
+  name: string;
+  status: string;
+  quantity?: number | null;
+  payload: Record<string, unknown>;
+  created_at?: string | null;
+};
+
+export type RuntimeAnalytics = {
+  active_users: number;
+  disabled_users: number;
+  module_record_counts: Record<string, number>;
+  inventory_total_quantity: number;
+  inventory_low_stock_count: number;
+  inventory_low_stock_items: ModuleRecord[];
+};
+
+export type AuditLog = {
+  id: string;
+  actor_id?: string | null;
+  action: string;
+  entity_type: string;
+  entity_id: string;
+  old_value?: Record<string, unknown> | null;
+  new_value?: Record<string, unknown> | null;
+  created_at?: string | null;
+};

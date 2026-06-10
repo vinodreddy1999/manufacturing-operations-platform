@@ -149,6 +149,82 @@ docker push vinodreddy1999/manufacturing-operations-platform-frontend:latest
 docker push vinodreddy1999/manufacturing-operations-platform-frontend:0.1.0
 ```
 
+## Full-Stack Application Image
+
+The root `Dockerfile` now builds one deployable application image:
+
+- React frontend is built with Vite.
+- FastAPI serves both the backend APIs and the built frontend.
+- The app listens on port `8080`.
+- SQLite is used by default at `/data/mop.db` for a simple single-container run.
+- `DATABASE_URL` can point to PostgreSQL for production or Docker Compose deployments.
+
+Build:
+
+```bash
+docker build \
+  -t vinodreddy1999/manufacturing-operations-platform-fullstack:latest \
+  -t vinodreddy1999/manufacturing-operations-platform-fullstack:0.2.0 \
+  .
+```
+
+Run:
+
+```bash
+docker run -p 8080:8080 \
+  -v mop_fullstack_data:/data \
+  vinodreddy1999/manufacturing-operations-platform-fullstack:latest
+```
+
+Open:
+
+```text
+http://127.0.0.1:8080
+```
+
+Seeded login accounts:
+
+```text
+Super admin: super@mop.local / SuperAdmin123!
+Admin:       admin@mop.local / ChangeMe123!
+User:        user@mop.local / User12345!
+```
+
+Access model:
+
+- Super admin has full access and can create or update other super admins.
+- Admin can manage operational records and normal users.
+- User has read-only runtime access.
+- Disabled users cannot log in or call protected APIs.
+
+Runtime APIs added:
+
+- `POST /runtime/auth/login`
+- `GET /runtime/auth/me`
+- `GET /runtime/users`
+- `POST /runtime/users`
+- `PUT /runtime/users/{user_id}`
+- `GET /runtime/records`
+- `POST /runtime/records`
+- `PUT /runtime/records/{record_id}`
+- `DELETE /runtime/records/{record_id}`
+- `GET /runtime/inventory/items`
+- `GET /runtime/analytics/summary`
+- `GET /runtime/audit-logs`
+
+Validate the running full-stack container:
+
+```bash
+scripts/validate_fullstack.sh
+```
+
+Docker Hub push:
+
+```bash
+docker push vinodreddy1999/manufacturing-operations-platform-fullstack:latest
+docker push vinodreddy1999/manufacturing-operations-platform-fullstack:0.2.0
+```
+
 ## Demo Login
 
 Use `POST /auth/login` with:

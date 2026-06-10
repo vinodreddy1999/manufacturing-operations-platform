@@ -1,0 +1,14 @@
+.git
+.github
+.pytest_cache
+.venv
+**/__pycache__
+**/*.pyc
+*.db
+server.*.log
+repo_structure.txt~
+.backend-test.pid
+frontend/node_modules
+frontend/dist
+inventory-ai-service/.venv
+inventory-ai-service/__pycache__

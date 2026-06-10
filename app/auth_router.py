@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from .database import get_db
-from .platform_models import Role, User
+from .platform_models import User
 from .schemas import LoginRequest, LoginResponse, ModuleKey
 from .security import create_token, verify_password
 
@@ -19,14 +19,15 @@ def db_login(request: LoginRequest, db: Session = Depends(get_db)) -> LoginRespo
     user = db.query(User).filter(User.email == request.email, User.tenant_id == "tenant-demo-001").first()
     if not user or not verify_password(request.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    permissions = ["platform.admin"]
-    role = db.query(Role).filter(Role.tenant_id == user.tenant_id).first()
-    if role:
-        permissions = role.permissions
+    role_permissions = {
+        "super_admin": ["platform.super_admin", "platform.admin", "users.manage", "data.write", "data.read"],
+        "admin": ["platform.admin", "users.manage", "data.write", "data.read"],
+        "user": ["data.read"],
+    }
+    permissions = role_permissions.get(user.role or "user", role_permissions["user"])
     return LoginResponse(
         access_token=create_token(user.id, user.tenant_id, permissions),
         tenant_id=user.tenant_id,
         user_id=user.id,
         enabled_modules=[ModuleKey.INVENTORY, ModuleKey.WAREHOUSE, ModuleKey.PROCUREMENT, ModuleKey.PRODUCTION, ModuleKey.MAINTENANCE, ModuleKey.QUALITY, ModuleKey.REPORTING, ModuleKey.AI],
     )
-

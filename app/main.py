@@ -1,8 +1,11 @@
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from jose import jwt
 
 from .auth_router import router as auth_router
@@ -32,6 +35,7 @@ from .modules.sales import router as sales_router
 from .modules.supplier_portal import ai_router as supplier_portal_ai_router
 from .modules.supplier_portal import router as supplier_portal_router
 from .platform_seed import seed_platform
+from .runtime_router import ensure_runtime_schema, router as runtime_router
 from .schemas import (
     ApiResult,
     ForecastRequest,
@@ -66,10 +70,12 @@ app.add_middleware(
 )
 
 Base.metadata.create_all(bind=engine)
+ensure_runtime_schema()
 with SessionLocal() as bootstrap_db:
     seed_platform(bootstrap_db)
 
 app.include_router(auth_router)
+app.include_router(runtime_router)
 app.include_router(core_router)
 app.include_router(costing_router)
 app.include_router(costing_ai_router)
@@ -115,6 +121,8 @@ app.include_router(create_module_router("bom", "/bom"))
 app.include_router(create_module_router("routing", "/routing"))
 app.include_router(create_module_router("production_orders", "/production-orders"))
 app.include_router(create_module_router("production_schedules", "/production-schedules"))
+
+frontend_dist = Path(__file__).resolve().parent.parent / "frontend" / "dist"
 
 
 def result(module: ModuleKey, action: str, message: str, data: dict[str, Any] | list[dict[str, Any]]) -> ApiResult:
@@ -245,3 +253,20 @@ def ai_recommendation(request: RecommendationRequest) -> ApiResult:
         ],
     }
     return result(ModuleKey.AI, "recommendation", "AI recommendation generated as draft actions only.", recommendation)
+
+
+if frontend_dist.exists():
+    assets_dir = frontend_dist / "assets"
+    if assets_dir.exists():
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="frontend-assets")
+
+    @app.get("/", include_in_schema=False)
+    def serve_frontend_index() -> FileResponse:
+        return FileResponse(frontend_dist / "index.html")
+
+    @app.get("/{path:path}", include_in_schema=False)
+    def serve_frontend_app(path: str) -> FileResponse:
+        requested = frontend_dist / path
+        if requested.is_file():
+            return FileResponse(requested)
+        return FileResponse(frontend_dist / "index.html")

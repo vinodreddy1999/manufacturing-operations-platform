@@ -1,4 +1,5 @@
-import { useMemo } from 'react';
+import { FormEvent, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { NavLink, Route, Routes } from 'react-router-dom';
 import {
   Activity,
@@ -11,7 +12,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 
-import { apiConfig } from '../services/api';
+import { apiConfig, backend } from '../services/api';
 import { AdminPage } from '../pages/AdminPage';
 import { DataHubPage } from '../pages/DataHubPage';
 import { DashboardPage } from '../pages/DashboardPage';
@@ -28,6 +29,26 @@ const navItems = [
 
 export function App() {
   const baseUrl = useMemo(() => apiConfig.baseUrl, []);
+  const [sessionVersion, setSessionVersion] = useState(0);
+  const session = useQuery({
+    queryKey: ['runtime-session', sessionVersion],
+    queryFn: backend.currentUser,
+    retry: false,
+  });
+
+  if (session.isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background px-4">
+        <div className="rounded-lg border border-border bg-white px-5 py-4 text-sm text-muted-foreground shadow-sm">Checking secure session...</div>
+      </div>
+    );
+  }
+
+  if (session.isError || !session.data) {
+    return <LoginScreen onLogin={() => setSessionVersion((value) => value + 1)} baseUrl={baseUrl} />;
+  }
+
+  const user = session.data;
 
   return (
     <div className="min-h-screen bg-background">
@@ -67,14 +88,25 @@ export function App() {
               <button className="focus-ring rounded-md border border-border p-2 lg:hidden" aria-label="Open navigation">
                 <Menu className="h-4 w-4" />
               </button>
-              <div>
-                <p className="text-sm font-semibold text-foreground">Manufacturing Operations Platform</p>
-                <p className="text-xs text-muted-foreground">Backend source of truth: {baseUrl}</p>
-              </div>
+            <div>
+              <p className="text-sm font-semibold text-foreground">Manufacturing Operations Platform</p>
+              <p className="text-xs text-muted-foreground">Backend source of truth: {baseUrl}</p>
             </div>
-            <div className="hidden items-center gap-2 rounded-full border border-border bg-slate-50 px-3 py-1.5 text-xs text-slate-600 sm:flex">
-              <Activity className="h-3.5 w-3.5 text-primary" />
-              Live API mode
+          </div>
+            <div className="flex items-center gap-3">
+              <div className="hidden items-center gap-2 rounded-full border border-border bg-slate-50 px-3 py-1.5 text-xs text-slate-600 sm:flex">
+                <Activity className="h-3.5 w-3.5 text-primary" />
+                {user.name} / {user.role.replace('_', ' ')}
+              </div>
+              <button
+                className="focus-ring rounded-md border border-border px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                onClick={() => {
+                  backend.logout();
+                  setSessionVersion((value) => value + 1);
+                }}
+              >
+                Sign out
+              </button>
             </div>
           </div>
           <nav className="flex gap-1 overflow-x-auto border-t border-border px-3 py-2 lg:hidden">
@@ -105,6 +137,65 @@ export function App() {
             <Route path="/intelligence" element={<IntelligencePage />} />
           </Routes>
         </main>
+      </div>
+    </div>
+  );
+}
+
+function LoginScreen({ onLogin, baseUrl }: { onLogin: () => void; baseUrl: string }) {
+  const [email, setEmail] = useState('super@mop.local');
+  const [password, setPassword] = useState('SuperAdmin123!');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSubmitting(true);
+    setError('');
+    try {
+      await backend.login(email, password);
+      onLogin();
+    } catch (loginError) {
+      setError(loginError instanceof Error ? loginError.message : 'Login failed');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+      <div className="w-full max-w-md rounded-lg border border-border bg-white p-6 shadow-sm">
+        <div className="mb-6 flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+            <Boxes className="h-5 w-5" />
+          </div>
+          <div>
+            <h1 className="text-lg font-semibold text-foreground">Manufacturing Operations Platform</h1>
+            <p className="text-xs text-muted-foreground">Full-stack runtime: {baseUrl}</p>
+          </div>
+        </div>
+
+        <form className="space-y-4" onSubmit={submit}>
+          <label className="block text-sm font-medium text-slate-700">
+            Email
+            <input className="mt-1 w-full rounded-md border border-border px-3 py-2 text-sm" value={email} onChange={(event) => setEmail(event.target.value)} />
+          </label>
+          <label className="block text-sm font-medium text-slate-700">
+            Password
+            <input className="mt-1 w-full rounded-md border border-border px-3 py-2 text-sm" type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
+          </label>
+          {error ? <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div> : null}
+          <button className="focus-ring w-full rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60" disabled={submitting}>
+            {submitting ? 'Signing in...' : 'Sign in'}
+          </button>
+        </form>
+
+        <div className="mt-5 rounded-md bg-slate-50 p-3 text-xs text-slate-600">
+          <p className="font-semibold text-slate-700">Seeded access</p>
+          <p>Super admin: super@mop.local / SuperAdmin123!</p>
+          <p>Admin: admin@mop.local / ChangeMe123!</p>
+          <p>User: user@mop.local / User12345!</p>
+        </div>
       </div>
     </div>
   );

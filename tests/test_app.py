@@ -890,3 +890,58 @@ def test_planning_ai_command_digital_twin_and_operations_center():
     operations = client.get("/digital-operations-center/overview")
     assert operations.status_code == 200
     assert "AI Decision Center" in operations.json()["data"]["executive_layer"]
+
+
+def test_runtime_login_users_records_analytics_and_audit():
+    login = client.post("/runtime/auth/login", json={"email": "super@mop.local", "password": "SuperAdmin123!"})
+    assert login.status_code == 200
+    token = login.json()["data"]["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    users = client.get("/runtime/users", headers=headers)
+    assert users.status_code == 200
+    assert any(user["role"] == "super_admin" for user in users.json()["data"])
+
+    created = client.post(
+        "/runtime/records",
+        headers=headers,
+        json={
+            "module_key": "inventory",
+            "record_type": "raw_material",
+            "record_code": "RM-PYTEST-001",
+            "name": "Pytest Steel",
+            "status": "AVAILABLE",
+            "quantity": 12,
+            "payload": {"reorder_level": 20, "uom": "kg"},
+        },
+    )
+    assert created.status_code == 200
+    record_id = created.json()["data"]["id"]
+
+    updated = client.put(f"/runtime/records/{record_id}", headers=headers, json={"quantity": 40, "status": "AVAILABLE"})
+    assert updated.status_code == 200
+    assert updated.json()["data"]["quantity"] == 40
+
+    analytics = client.get("/runtime/analytics/summary", headers=headers)
+    assert analytics.status_code == 200
+    assert "inventory_total_quantity" in analytics.json()["data"]
+
+    audit = client.get("/runtime/audit-logs", headers=headers)
+    assert audit.status_code == 200
+    assert any(log["entity_type"] == "module_record" for log in audit.json()["data"])
+
+
+def test_runtime_user_role_is_read_only():
+    login = client.post("/runtime/auth/login", json={"email": "user@mop.local", "password": "User12345!"})
+    assert login.status_code == 200
+    token = login.json()["data"]["access_token"]
+
+    read = client.get("/runtime/analytics/summary", headers={"Authorization": f"Bearer {token}"})
+    assert read.status_code == 200
+
+    write = client.post(
+        "/runtime/records",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"module_key": "inventory", "record_type": "raw_material", "record_code": "DENIED", "name": "Denied", "quantity": 1, "payload": {}},
+    )
+    assert write.status_code == 403

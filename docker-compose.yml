@@ -17,10 +17,21 @@ services:
 
   platform-api:
     build: .
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
     environment:
       DATABASE_URL: postgresql+psycopg2://mop:mop@postgres:5432/mop
     ports:
       - "8000:8000"
+    depends_on:
+      - postgres
+      - redis
+
+  fullstack-app:
+    build: .
+    environment:
+      DATABASE_URL: postgresql+psycopg2://mop:mop@postgres:5432/mop
+    ports:
+      - "8080:8080"
     depends_on:
       - postgres
       - redis

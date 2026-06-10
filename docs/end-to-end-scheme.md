@@ -1128,3 +1128,48 @@ Frontend/Admin/Data Hub governance safety:
 - Company Admin can manage company users, roles, plants, warehouses, departments, dashboards, workflows, integrations, data mapping, notifications and security policies.
 - Company Admin cannot access other companies, enable disabled platform modules or modify platform-level settings.
 - Data Hub pending ERP updates cannot be exported or applied until a human approves or rejects the recommendation.
+
+## Full-Stack Runtime Deployment
+
+The application now supports a single Docker image that serves the React frontend and FastAPI backend together on port `8080`.
+
+```mermaid
+flowchart LR
+    Browser["Browser / User"] --> UI["React Frontend\nserved by FastAPI"]
+    UI --> Auth["Runtime Auth\nPOST /runtime/auth/login"]
+    Auth --> RBAC["RBAC\nsuper_admin / admin / user"]
+    UI --> CRUD["Runtime CRUD APIs\nGET / POST / PUT / DELETE"]
+    CRUD --> DB["Database\nSQLite / PostgreSQL"]
+    CRUD --> Analytics["Analytics API\n/runtime/analytics/summary"]
+    CRUD --> Audit["Audit Logs\n/runtime/audit-logs"]
+    Analytics --> UI
+    Audit --> UI
+```
+
+Runtime access model:
+
+- Super Admin is the supreme access level and can manage all users, including other super admins.
+- Admin can manage users and operational records but cannot override super admin authority.
+- User can read runtime data and analytics but cannot write records.
+- Disabled users cannot authenticate or call protected APIs.
+
+Container flow:
+
+```mermaid
+sequenceDiagram
+    participant D as Docker Image
+    participant F as React Build
+    participant A as FastAPI
+    participant DB as Database
+    participant U as User
+
+    D->>F: Build frontend with Vite
+    D->>A: Copy frontend dist into backend image
+    A->>DB: Create tables and seed users/data
+    U->>A: Open http://127.0.0.1:8080
+    A-->>U: Serve React UI
+    U->>A: Login and call runtime APIs
+    A->>DB: Read/write operational data
+    DB-->>A: Return records and analytics
+    A-->>U: Render dashboard, admin and operations views
+```

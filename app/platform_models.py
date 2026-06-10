@@ -58,6 +58,7 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(200), index=True)
     name: Mapped[str] = mapped_column(String(200))
     password_hash: Mapped[str] = mapped_column(String(300))
+    role: Mapped[str] = mapped_column(String(40), default="user")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
@@ -181,4 +182,3 @@ class ModuleRecord(Base, TenantScopedMixin):
     quantity: Mapped[float | None] = mapped_column(Float, nullable=True)
     payload: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-
