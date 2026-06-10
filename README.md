@@ -74,6 +74,81 @@ Open:
 - Swagger API docs: `http://localhost:8000/docs`
 - Module registry: `http://localhost:8000/modules`
 
+## Frontend
+
+A production-oriented React/Vite frontend is available in:
+
+```text
+frontend/
+```
+
+It uses live backend responses only. No frontend mock data is used.
+
+Stack:
+
+- React
+- TypeScript
+- Vite
+- React Router
+- Tailwind CSS
+- React Query
+- Axios
+- Recharts
+- shadcn-style local UI components
+
+Run locally:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open:
+
+```text
+http://127.0.0.1:5173
+```
+
+The frontend reads the backend URL from:
+
+```text
+VITE_API_BASE_URL=http://127.0.0.1:8000
+```
+
+Build:
+
+```bash
+cd frontend
+npm run build
+```
+
+Docker build and run:
+
+```bash
+cd frontend
+docker build \
+  -t vinodreddy1999/manufacturing-operations-platform-frontend:latest \
+  -t vinodreddy1999/manufacturing-operations-platform-frontend:0.1.0 \
+  .
+docker run -p 8080:8080 vinodreddy1999/manufacturing-operations-platform-frontend:latest
+```
+
+Open:
+
+```text
+http://127.0.0.1:8080
+```
+
+Docker Compose also includes a `frontend` service exposed on port `8080`.
+
+Docker Hub push:
+
+```bash
+docker push vinodreddy1999/manufacturing-operations-platform-frontend:latest
+docker push vinodreddy1999/manufacturing-operations-platform-frontend:0.1.0
+```
+
 ## Demo Login
 
 Use `POST /auth/login` with:

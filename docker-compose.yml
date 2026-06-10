@@ -25,6 +25,16 @@ services:
       - postgres
       - redis
 
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: http://localhost:8000
+    ports:
+      - "8080:8080"
+    depends_on:
+      - platform-api
+
   worker:
     build: .
     command: celery -A app.jobs.celery_app worker --loglevel=info
@@ -36,4 +46,3 @@ services:
 
 volumes:
   mop_postgres_data:
-
