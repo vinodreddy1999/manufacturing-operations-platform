@@ -12,6 +12,20 @@ import { StatusBadge } from '../components/StatusBadge';
 import { backend } from '../services/api';
 import type { RuntimeUser } from '../types';
 
+const roleOptions: Array<{ value: RuntimeUser['role']; label: string }> = [
+  { value: 'user', label: 'User' },
+  { value: 'operator', label: 'Operator' },
+  { value: 'supervisor', label: 'Supervisor' },
+  { value: 'team_manager', label: 'Team Manager' },
+  { value: 'organization_admin', label: 'Organization Admin' },
+  { value: 'account_owner', label: 'Account Owner' },
+  { value: 'auditor', label: 'Auditor' },
+  { value: 'qa_tester', label: 'QA/Tester' },
+  { value: 'custom', label: 'Custom Role' },
+  { value: 'admin', label: 'Admin' },
+  { value: 'super_admin', label: 'Super Admin' },
+];
+
 export function AdminPage() {
   const queryClient = useQueryClient();
   const [newUser, setNewUser] = useState({ email: '', name: '', password: 'User12345!', role: 'user' as RuntimeUser['role'], is_active: true });
@@ -82,9 +96,11 @@ export function AdminPage() {
             <input className="rounded-md border border-border px-3 py-2 text-sm" placeholder="Email" value={newUser.email} onChange={(event) => setNewUser({ ...newUser, email: event.target.value })} required />
             <input className="rounded-md border border-border px-3 py-2 text-sm" placeholder="Password" value={newUser.password} onChange={(event) => setNewUser({ ...newUser, password: event.target.value })} required />
             <select className="rounded-md border border-border px-3 py-2 text-sm" value={newUser.role} onChange={(event) => setNewUser({ ...newUser, role: event.target.value as RuntimeUser['role'] })}>
-              <option value="user">User</option>
-              <option value="admin">Admin</option>
-              <option value="super_admin">Super Admin</option>
+              {roleOptions.map((role) => (
+                <option key={role.value} value={role.value}>
+                  {role.label}
+                </option>
+              ))}
             </select>
             <button className="rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60" disabled={createUser.isPending}>
               {createUser.isPending ? 'Saving...' : 'Add User'}
@@ -98,9 +114,11 @@ export function AdminPage() {
               { key: 'email', label: 'Email' },
               { key: 'role', label: 'Role', render: (value, row) => (
                 <select className="rounded-md border border-border px-2 py-1 text-xs" value={String(value)} onChange={(event) => updateUser.mutate({ id: String(row.id), payload: { role: event.target.value as RuntimeUser['role'] } })}>
-                  <option value="user">User</option>
-                  <option value="admin">Admin</option>
-                  <option value="super_admin">Super Admin</option>
+                  {roleOptions.map((role) => (
+                    <option key={role.value} value={role.value}>
+                      {role.label}
+                    </option>
+                  ))}
                 </select>
               ) },
               { key: 'is_active', label: 'Access', render: (value, row) => (

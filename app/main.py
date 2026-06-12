@@ -11,6 +11,7 @@ from jose import jwt
 from .auth_router import router as auth_router
 from .core_router import create_module_router, router as core_router
 from .database import Base, SessionLocal, engine
+from .enterprise import configure_enterprise, enterprise_router
 from .modules.customer_portal import ai_router as customer_portal_ai_router
 from .modules.customer_portal import router as customer_portal_router
 from .modules.costing import ai_router as costing_ai_router
@@ -52,9 +53,10 @@ JWT_ALGORITHM = "HS256"
 
 app = FastAPI(
     title="Manufacturing Operations Platform - Python Backend",
-    version="0.1.0",
+    version="0.2.1",
     description="Python/FastAPI implementation of the MOP backend modules.",
 )
+configure_enterprise(app)
 
 app.add_middleware(
     CORSMiddleware,
@@ -76,6 +78,8 @@ with SessionLocal() as bootstrap_db:
 
 app.include_router(auth_router)
 app.include_router(runtime_router)
+app.include_router(runtime_router, prefix="/api/v1")
+app.include_router(enterprise_router)
 app.include_router(core_router)
 app.include_router(costing_router)
 app.include_router(costing_ai_router)

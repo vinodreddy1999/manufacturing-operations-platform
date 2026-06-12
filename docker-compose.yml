@@ -1,59 +1,125 @@
 services:
   postgres:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: mop
-      POSTGRES_PASSWORD: mop
-      POSTGRES_DB: mop
+      POSTGRES_USER: ${POSTGRES_USER:-mop}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mop}
+      POSTGRES_DB: ${POSTGRES_DB:-mop}
     ports:
       - "5432:5432"
     volumes:
       - mop_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mop} -d ${POSTGRES_DB:-mop}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:7-alpine
+    restart: unless-stopped
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  pgadmin:
+    image: dpage/pgadmin4:8
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@mop.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-ChangeMe123!}
+    ports:
+      - "5050:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - mop_pgadmin_data:/var/lib/pgadmin
 
   platform-api:
     build: .
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql+psycopg2://mop:mop@postgres:5432/mop
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-mop}:${POSTGRES_PASSWORD:-mop}@postgres:5432/${POSTGRES_DB:-mop}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
     ports:
       - "8000:8000"
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready').read()"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
 
   fullstack-app:
     build: .
+    restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql+psycopg2://mop:mop@postgres:5432/mop
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-mop}:${POSTGRES_PASSWORD:-mop}@postgres:5432/${POSTGRES_DB:-mop}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
     ports:
       - "8080:8080"
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/ready').read()"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
 
   frontend:
     build:
       context: ./frontend
       args:
         VITE_API_BASE_URL: http://localhost:8000
+    restart: unless-stopped
     ports:
       - "8080:8080"
     depends_on:
-      - platform-api
+      platform-api:
+        condition: service_healthy
 
   worker:
     build: .
     command: celery -A app.jobs.celery_app worker --loglevel=info
+    restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql+psycopg2://mop:mop@postgres:5432/mop
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-mop}:${POSTGRES_PASSWORD:-mop}@postgres:5432/${POSTGRES_DB:-mop}
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./deploy/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      fullstack-app:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
 
 volumes:
   mop_postgres_data:
+  mop_pgadmin_data:

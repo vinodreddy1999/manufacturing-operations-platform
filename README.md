@@ -164,7 +164,7 @@ Build:
 ```bash
 docker build \
   -t vinodreddy1999/manufacturing-operations-platform-fullstack:latest \
-  -t vinodreddy1999/manufacturing-operations-platform-fullstack:0.2.0 \
+  -t vinodreddy1999/manufacturing-operations-platform-fullstack:0.2.1 \
   .
 ```
 
@@ -200,6 +200,7 @@ Access model:
 Runtime APIs added:
 
 - `POST /runtime/auth/login`
+- `POST /api/v1/runtime/auth/login`
 - `GET /runtime/auth/me`
 - `GET /runtime/users`
 - `POST /runtime/users`
@@ -212,6 +213,31 @@ Runtime APIs added:
 - `GET /runtime/analytics/summary`
 - `GET /runtime/audit-logs`
 
+Enterprise endpoints:
+
+- `GET /health`
+- `GET /ready`
+- `GET /live`
+- `GET /metrics`
+- `GET /traffic`
+- `GET /info`
+- `GET /swagger`
+- `GET /openapi.json`
+
+Enterprise roles:
+
+- `super_admin`
+- `account_owner`
+- `organization_admin`
+- `team_manager`
+- `supervisor`
+- `operator`
+- `auditor`
+- `qa_tester`
+- `custom`
+- `admin`
+- `user`
+
 Validate the running full-stack container:
 
 ```bash
@@ -222,7 +248,32 @@ Docker Hub push:
 
 ```bash
 docker push vinodreddy1999/manufacturing-operations-platform-fullstack:latest
-docker push vinodreddy1999/manufacturing-operations-platform-fullstack:0.2.0
+docker push vinodreddy1999/manufacturing-operations-platform-fullstack:0.2.1
+```
+
+Docker Compose enterprise services:
+
+- `fullstack-app`: integrated frontend + backend
+- `platform-api`: backend-only API service
+- `frontend`: standalone frontend service for split deployment
+- `postgres`: PostgreSQL database
+- `pgadmin`: PostgreSQL administration UI
+- `redis`: cache and worker broker
+- `worker`: Celery worker
+- `nginx`: reverse proxy with security headers
+
+Compose run:
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+Kubernetes and Helm starter manifests are available in:
+
+```text
+deploy/kubernetes/
+deploy/helm/
 ```
 
 ## Demo Login

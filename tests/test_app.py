@@ -12,6 +12,26 @@ def test_health():
     assert response.json()["status"] == "ok"
 
 
+def test_enterprise_observability_endpoints():
+    assert client.get("/live").json()["success"] is True
+    assert client.get("/ready").json()["success"] is True
+
+    info = client.get("/info")
+    assert info.status_code == 200
+    assert "manufacturing" in info.json()["data"]["industries"]
+
+    metrics = client.get("/metrics")
+    assert metrics.status_code == 200
+    assert "mop_requests_total" in metrics.text
+
+    traffic = client.get("/traffic")
+    assert traffic.status_code == 200
+    assert "requests" in traffic.json()["data"]
+
+    swagger = client.get("/swagger", follow_redirects=False)
+    assert swagger.status_code in {307, 308}
+
+
 def test_modules_are_available():
     response = client.get("/modules")
     assert response.status_code == 200
@@ -901,6 +921,7 @@ def test_runtime_login_users_records_analytics_and_audit():
     users = client.get("/runtime/users", headers=headers)
     assert users.status_code == 200
     assert any(user["role"] == "super_admin" for user in users.json()["data"])
+    assert any(user["role"] == "account_owner" for user in users.json()["data"])
 
     created = client.post(
         "/runtime/records",
@@ -945,3 +966,13 @@ def test_runtime_user_role_is_read_only():
         json={"module_key": "inventory", "record_type": "raw_material", "record_code": "DENIED", "name": "Denied", "quantity": 1, "payload": {}},
     )
     assert write.status_code == 403
+
+
+def test_versioned_runtime_api_alias():
+    login = client.post("/api/v1/runtime/auth/login", json={"email": "super@mop.local", "password": "SuperAdmin123!"})
+    assert login.status_code == 200
+    token = login.json()["data"]["access_token"]
+
+    response = client.get("/api/v1/runtime/analytics/summary", headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 200
+    assert response.json()["action"] == "analytics_summary"

@@ -20,8 +20,16 @@ def db_login(request: LoginRequest, db: Session = Depends(get_db)) -> LoginRespo
     if not user or not verify_password(request.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     role_permissions = {
-        "super_admin": ["platform.super_admin", "platform.admin", "users.manage", "data.write", "data.read"],
-        "admin": ["platform.admin", "users.manage", "data.write", "data.read"],
+        "super_admin": ["platform.super_admin", "platform.admin", "account.override", "organization.override", "team.override", "users.manage", "roles.manage", "data.write", "data.read", "audit.read"],
+        "account_owner": ["account.override", "organization.override", "team.override", "users.manage", "roles.manage", "data.write", "data.read", "audit.read"],
+        "organization_admin": ["organization.override", "team.override", "users.manage", "data.write", "data.read", "audit.read"],
+        "team_manager": ["team.override", "data.write", "data.read"],
+        "supervisor": ["data.write", "data.read"],
+        "operator": ["data.read"],
+        "auditor": ["data.read", "audit.read"],
+        "qa_tester": ["quality.write", "data.read"],
+        "custom": ["data.read"],
+        "admin": ["platform.admin", "users.manage", "data.write", "data.read", "audit.read"],
         "user": ["data.read"],
     }
     permissions = role_permissions.get(user.role or "user", role_permissions["user"])

@@ -32,7 +32,11 @@ def seed_platform(db: Session) -> None:
 
     seed_users = [
         ("user-super-001", "super@mop.local", "MOP Super Admin", "super_admin", "SuperAdmin123!"),
+        ("user-owner-001", "owner@mop.local", "MOP Account Owner", "account_owner", "Owner12345!"),
         ("user-admin-001", "admin@mop.local", "MOP Admin", "admin", "ChangeMe123!"),
+        ("user-manager-001", "manager@mop.local", "MOP Team Manager", "team_manager", "Manager123!"),
+        ("user-auditor-001", "auditor@mop.local", "MOP Auditor", "auditor", "Auditor123!"),
+        ("user-qa-001", "qa@mop.local", "MOP QA Tester", "qa_tester", "QaTester123!"),
         ("user-viewer-001", "user@mop.local", "MOP User", "user", "User12345!"),
     ]
     for user_id, email, name, role, password in seed_users:
@@ -56,8 +60,16 @@ def seed_platform(db: Session) -> None:
             user.is_active = True
 
     roles = [
-        ("role-super-admin", "Super Admin", ["platform.super_admin", "platform.admin", "users.manage", "data.write", "data.read"]),
-        ("role-admin", "Admin", ["platform.admin", "users.manage", "data.write", "data.read"]),
+        ("role-super-admin", "Super Admin", ["platform.super_admin", "platform.admin", "account.override", "organization.override", "team.override", "users.manage", "roles.manage", "data.write", "data.read", "audit.read"]),
+        ("role-account-owner", "Account Owner", ["account.override", "organization.override", "team.override", "users.manage", "roles.manage", "data.write", "data.read", "audit.read"]),
+        ("role-organization-admin", "Organization Admin", ["organization.override", "team.override", "users.manage", "data.write", "data.read", "audit.read"]),
+        ("role-team-manager", "Team Manager", ["team.override", "data.write", "data.read"]),
+        ("role-supervisor", "Supervisor", ["data.write", "data.read"]),
+        ("role-operator", "Operator/User", ["data.read"]),
+        ("role-auditor", "Auditor", ["data.read", "audit.read"]),
+        ("role-qa-tester", "QA/Tester", ["quality.write", "data.read"]),
+        ("role-custom", "Custom Role", ["data.read"]),
+        ("role-admin", "Admin", ["platform.admin", "users.manage", "data.write", "data.read", "audit.read"]),
         ("role-user", "User", ["data.read"]),
     ]
     for role_id, name, permissions in roles:
@@ -67,7 +79,21 @@ def seed_platform(db: Session) -> None:
         else:
             role.permissions = permissions
 
-    permission_keys = ["platform.super_admin", "platform.admin", "users.manage", "data.write", "data.read", "inventory.read", "feature_flags.manage"]
+    permission_keys = [
+        "platform.super_admin",
+        "platform.admin",
+        "account.override",
+        "organization.override",
+        "team.override",
+        "users.manage",
+        "roles.manage",
+        "data.write",
+        "data.read",
+        "audit.read",
+        "quality.write",
+        "inventory.read",
+        "feature_flags.manage",
+    ]
     for key in permission_keys:
         if not db.query(Permission).filter(Permission.key == key).first():
             db.add(Permission(id=str(uuid4()), key=key, description=key))

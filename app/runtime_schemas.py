@@ -3,7 +3,19 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 
-RoleName = Literal["super_admin", "admin", "user"]
+RoleName = Literal[
+    "super_admin",
+    "account_owner",
+    "organization_admin",
+    "team_manager",
+    "supervisor",
+    "operator",
+    "auditor",
+    "qa_tester",
+    "custom",
+    "admin",
+    "user",
+]
 
 
 class RuntimeEnvelope(BaseModel):

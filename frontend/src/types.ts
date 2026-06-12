@@ -93,7 +93,18 @@ export type RuntimeUser = {
   id: string;
   email: string;
   name: string;
-  role: 'super_admin' | 'admin' | 'user';
+  role:
+    | 'super_admin'
+    | 'account_owner'
+    | 'organization_admin'
+    | 'team_manager'
+    | 'supervisor'
+    | 'operator'
+    | 'auditor'
+    | 'qa_tester'
+    | 'custom'
+    | 'admin'
+    | 'user';
   is_active: boolean;
   permissions: string[];
 };

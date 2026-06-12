@@ -1,0 +1,16 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mop-fullstack
+spec:
+  rules:
+    - host: mop.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: mop-fullstack
+                port:
+                  number: 8080

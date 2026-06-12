@@ -28,8 +28,16 @@ COMPANY_ID = "company-c"
 PLANT_ID = "plant-north"
 
 ROLE_PERMISSIONS = {
-    "super_admin": ["platform.super_admin", "platform.admin", "users.manage", "data.write", "data.read"],
-    "admin": ["platform.admin", "users.manage", "data.write", "data.read"],
+    "super_admin": ["platform.super_admin", "platform.admin", "account.override", "organization.override", "team.override", "users.manage", "roles.manage", "data.write", "data.read", "audit.read"],
+    "account_owner": ["account.override", "organization.override", "team.override", "users.manage", "roles.manage", "data.write", "data.read", "audit.read"],
+    "organization_admin": ["organization.override", "team.override", "users.manage", "data.write", "data.read", "audit.read"],
+    "team_manager": ["team.override", "data.write", "data.read"],
+    "supervisor": ["data.write", "data.read"],
+    "operator": ["data.read"],
+    "auditor": ["data.read", "audit.read"],
+    "qa_tester": ["quality.write", "data.read"],
+    "custom": ["data.read"],
+    "admin": ["platform.admin", "users.manage", "data.write", "data.read", "audit.read"],
     "user": ["data.read"],
 }
 
@@ -95,7 +103,8 @@ def current_user(request: Request, db: Session = Depends(get_db)) -> User:
 
 def require_any(*roles: str):
     def dependency(user: User = Depends(current_user)) -> User:
-        if user.role not in roles and user.role != "super_admin":
+        override_roles = {"super_admin", "account_owner"}
+        if user.role not in roles and user.role not in override_roles:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient access")
         return user
 
@@ -151,8 +160,8 @@ def create_user(payload: UserCreate, actor: User = Depends(require_any("admin"))
     existing = db.query(User).filter(User.email == payload.email, User.tenant_id == TENANT_ID).first()
     if existing:
         raise HTTPException(status_code=409, detail="Email already exists")
-    if payload.role == "super_admin" and actor.role != "super_admin":
-        raise HTTPException(status_code=403, detail="Only super admin can create another super admin")
+    if payload.role in {"super_admin", "account_owner"} and actor.role != "super_admin":
+        raise HTTPException(status_code=403, detail="Only super admin can create top-level override users")
     user = User(
         id=f"user-{uuid4()}",
         tenant_id=TENANT_ID,
@@ -176,10 +185,10 @@ def update_user(user_id: str, payload: UserUpdate, actor: User = Depends(require
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    if user.role == "super_admin" and actor.role != "super_admin":
-        raise HTTPException(status_code=403, detail="Only super admin can update super admin")
-    if payload.role == "super_admin" and actor.role != "super_admin":
-        raise HTTPException(status_code=403, detail="Only super admin can grant super admin")
+    if user.role in {"super_admin", "account_owner"} and actor.role != "super_admin":
+        raise HTTPException(status_code=403, detail="Only super admin can update top-level override users")
+    if payload.role in {"super_admin", "account_owner"} and actor.role != "super_admin":
+        raise HTTPException(status_code=403, detail="Only super admin can grant top-level override roles")
     old_value = serialize_user(user)
     if payload.name is not None:
         user.name = payload.name

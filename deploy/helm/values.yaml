@@ -1,0 +1,12 @@
+image:
+  repository: vinodreddy1999/manufacturing-operations-platform-fullstack
+  tag: "0.2.1"
+  pullPolicy: IfNotPresent
+
+replicaCount: 2
+
+service:
+  port: 8080
+
+env:
+  LOG_LEVEL: INFO
