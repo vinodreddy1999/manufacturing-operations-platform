@@ -63,6 +63,9 @@ def serialize_user(user: User) -> dict[str, Any]:
     role = user.role or "user"
     return {
         "id": user.id,
+        "tenant_id": user.tenant_id,
+        "company_id": user.company_id,
+        "plant_id": user.plant_id,
         "email": user.email,
         "name": user.name,
         "role": role,
@@ -74,6 +77,9 @@ def serialize_user(user: User) -> dict[str, Any]:
 def serialize_record(record: ModuleRecord) -> dict[str, Any]:
     return {
         "id": record.id,
+        "tenant_id": record.tenant_id,
+        "company_id": record.company_id,
+        "plant_id": record.plant_id,
         "module_key": record.module_key,
         "record_type": record.record_type,
         "record_code": record.record_code,
@@ -165,8 +171,8 @@ def create_user(payload: UserCreate, actor: User = Depends(require_any("admin"))
     user = User(
         id=f"user-{uuid4()}",
         tenant_id=TENANT_ID,
-        company_id=COMPANY_ID,
-        plant_id=PLANT_ID,
+        company_id=payload.company_id or COMPANY_ID,
+        plant_id=payload.plant_id or PLANT_ID,
         email=payload.email,
         name=payload.name,
         password_hash=hash_password(payload.password),
@@ -205,10 +211,20 @@ def update_user(user_id: str, payload: UserUpdate, actor: User = Depends(require
 
 
 @router.get("/records", response_model=RuntimeEnvelope)
-def list_records(module_key: str | None = None, _: User = Depends(current_user), db: Session = Depends(get_db)) -> RuntimeEnvelope:
+def list_records(
+    module_key: str | None = None,
+    company_id: str | None = None,
+    plant_id: str | None = None,
+    _: User = Depends(current_user),
+    db: Session = Depends(get_db),
+) -> RuntimeEnvelope:
     query = db.query(ModuleRecord)
     if module_key:
         query = query.filter(ModuleRecord.module_key == module_key)
+    if company_id:
+        query = query.filter(ModuleRecord.company_id == company_id)
+    if plant_id:
+        query = query.filter(ModuleRecord.plant_id == plant_id)
     records = query.order_by(ModuleRecord.module_key, ModuleRecord.record_code).all()
     return runtime_result("list_records", "Database-backed module records.", [serialize_record(record) for record in records])
 
@@ -218,8 +234,8 @@ def create_record(payload: ModuleRecordCreate, actor: User = Depends(require_any
     record = ModuleRecord(
         id=f"record-{uuid4()}",
         tenant_id=TENANT_ID,
-        company_id=COMPANY_ID,
-        plant_id=PLANT_ID,
+        company_id=payload.company_id or actor.company_id or COMPANY_ID,
+        plant_id=payload.plant_id or actor.plant_id or PLANT_ID,
         module_key=payload.module_key,
         record_type=payload.record_type,
         record_code=payload.record_code,
@@ -265,7 +281,7 @@ def delete_record(record_id: str, actor: User = Depends(require_any("admin")), d
 
 @router.get("/inventory/items", response_model=RuntimeEnvelope)
 def inventory_items(user: User = Depends(current_user), db: Session = Depends(get_db)) -> RuntimeEnvelope:
-    return list_records("inventory", user, db)
+    return list_records("inventory", None, None, user, db)
 
 
 @router.get("/analytics/summary", response_model=RuntimeEnvelope)
@@ -277,8 +293,14 @@ def analytics_summary(_: User = Depends(current_user), db: Session = Depends(get
     total_quantity = sum(record.quantity or 0 for record in inventory)
     low_stock = [record for record in inventory if (record.quantity or 0) <= float((record.payload or {}).get("reorder_level", 0))]
     by_module: dict[str, int] = {}
+    by_company: dict[str, int] = {}
+    inventory_by_company: dict[str, float] = {}
     for record in records:
         by_module[record.module_key] = by_module.get(record.module_key, 0) + 1
+        company_id = record.company_id or "unassigned"
+        by_company[company_id] = by_company.get(company_id, 0) + 1
+        if record.module_key == "inventory":
+            inventory_by_company[company_id] = inventory_by_company.get(company_id, 0) + (record.quantity or 0)
     return runtime_result(
         "analytics_summary",
         "Live database analytics for visualization.",
@@ -286,6 +308,8 @@ def analytics_summary(_: User = Depends(current_user), db: Session = Depends(get
             "active_users": active_users,
             "disabled_users": disabled_users,
             "module_record_counts": by_module,
+            "company_record_counts": by_company,
+            "inventory_quantity_by_company": inventory_by_company,
             "inventory_total_quantity": total_quantity,
             "inventory_low_stock_count": len(low_stock),
             "inventory_low_stock_items": [serialize_record(record) for record in low_stock],

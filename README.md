@@ -164,16 +164,22 @@ Build:
 ```bash
 docker build \
   -t vinodreddy1999/manufacturing-operations-platform-fullstack:latest \
-  -t vinodreddy1999/manufacturing-operations-platform-fullstack:0.2.1 \
+  -t vinodreddy1999/manufacturing-operations-platform-fullstack:0.2.2 \
   .
 ```
 
 Run:
 
 ```bash
-docker run -p 8080:8080 \
+docker run --name mop-fullstack -p 8080:8080 \
   -v mop_fullstack_data:/data \
   vinodreddy1999/manufacturing-operations-platform-fullstack:latest
+```
+
+Seed full-scale multi-company demo data after the container is running:
+
+```bash
+docker exec mop-fullstack python scripts/seed_enterprise_data.py
 ```
 
 Open:
@@ -248,7 +254,7 @@ Docker Hub push:
 
 ```bash
 docker push vinodreddy1999/manufacturing-operations-platform-fullstack:latest
-docker push vinodreddy1999/manufacturing-operations-platform-fullstack:0.2.1
+docker push vinodreddy1999/manufacturing-operations-platform-fullstack:0.2.2
 ```
 
 Docker Compose enterprise services:

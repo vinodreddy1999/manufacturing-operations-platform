@@ -84,7 +84,15 @@ export const backend = {
   },
   currentUser: () => getEnvelope<RuntimeUser>('/runtime/auth/me'),
   users: () => getEnvelope<RuntimeUser[]>('/runtime/users'),
-  createUser: async (payload: { email: string; name: string; password: string; role: RuntimeUser['role']; is_active: boolean }) => {
+  createUser: async (payload: {
+    email: string;
+    name: string;
+    password: string;
+    role: RuntimeUser['role'];
+    is_active: boolean;
+    company_id?: string | null;
+    plant_id?: string | null;
+  }) => {
     const response = await api.post<ApiEnvelope<RuntimeUser>>('/runtime/users', payload);
     return response.data.data;
   },

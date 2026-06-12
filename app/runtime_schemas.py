@@ -31,6 +31,9 @@ class LoginPayload(BaseModel):
 
 class SessionUser(BaseModel):
     id: str
+    tenant_id: str
+    company_id: str | None = None
+    plant_id: str | None = None
     email: str
     name: str
     role: RoleName
@@ -50,6 +53,8 @@ class UserCreate(BaseModel):
     password: str = Field(min_length=8)
     role: RoleName = "user"
     is_active: bool = True
+    company_id: str | None = None
+    plant_id: str | None = None
 
 
 class UserUpdate(BaseModel):
@@ -60,6 +65,8 @@ class UserUpdate(BaseModel):
 
 
 class ModuleRecordCreate(BaseModel):
+    company_id: str | None = None
+    plant_id: str | None = None
     module_key: str = Field(min_length=2)
     record_type: str = Field(min_length=2)
     record_code: str = Field(min_length=2)
@@ -70,6 +77,8 @@ class ModuleRecordCreate(BaseModel):
 
 
 class ModuleRecordUpdate(BaseModel):
+    company_id: str | None = None
+    plant_id: str | None = None
     record_type: str | None = None
     record_code: str | None = None
     name: str | None = None

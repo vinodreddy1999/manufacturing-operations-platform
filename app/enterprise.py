@@ -120,7 +120,7 @@ def info() -> dict[str, Any]:
     return success_response(
         {
             "name": "Manufacturing Operations Platform",
-            "version": "0.2.1",
+            "version": "0.2.2",
             "runtime": "python-fastapi-react",
             "api_version": "v1",
             "industries": [

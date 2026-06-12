@@ -91,6 +91,9 @@ export type DashboardAccessResult = {
 
 export type RuntimeUser = {
   id: string;
+  tenant_id: string;
+  company_id?: string | null;
+  plant_id?: string | null;
   email: string;
   name: string;
   role:
@@ -117,6 +120,9 @@ export type RuntimeLoginResult = {
 
 export type ModuleRecord = {
   id: string;
+  tenant_id?: string;
+  company_id?: string | null;
+  plant_id?: string | null;
   module_key: string;
   record_type: string;
   record_code: string;
@@ -131,6 +137,8 @@ export type RuntimeAnalytics = {
   active_users: number;
   disabled_users: number;
   module_record_counts: Record<string, number>;
+  company_record_counts?: Record<string, number>;
+  inventory_quantity_by_company?: Record<string, number>;
   inventory_total_quantity: number;
   inventory_low_stock_count: number;
   inventory_low_stock_items: ModuleRecord[];

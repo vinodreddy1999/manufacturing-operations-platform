@@ -21,14 +21,23 @@ MODULE_KEYS = [
     "integrations",
 ]
 
+COMPANY_SEEDS = [
+    ("company-c", "Company C", "CO-C", "plant-north", "North Plant", "PLANT-NORTH", "dept-ops", "Operations", "OPS"),
+    ("company-apex", "Apex Components Ltd", "APEX", "plant-apex-hyd", "Apex Hyderabad Plant", "APEX-HYD", "dept-apex-ops", "Apex Operations", "APX-OPS"),
+    ("company-nova", "Nova Textiles Pvt Ltd", "NOVA", "plant-nova-srt", "Nova Surat Mill", "NOVA-SRT", "dept-nova-prod", "Nova Production", "NOV-PROD"),
+    ("company-fresh", "FreshFoods Processing Co", "FRESH", "plant-fresh-pune", "FreshFoods Pune Plant", "FRESH-PUNE", "dept-fresh-qa", "FreshFoods Quality", "FR-QA"),
+    ("company-med", "MedSure Pharma", "MED", "plant-med-vizag", "MedSure Vizag Facility", "MED-VZG", "dept-med-compliance", "MedSure Compliance", "MED-COMP"),
+]
+
 
 def seed_platform(db: Session) -> None:
-    if not db.query(Company).filter(Company.id == "company-c").first():
-        db.add(Company(id="company-c", tenant_id="tenant-demo-001", name="Company C", code="CO-C"))
-    if not db.query(Plant).filter(Plant.id == "plant-north").first():
-        db.add(Plant(id="plant-north", tenant_id="tenant-demo-001", company_id="company-c", name="North Plant", code="PLANT-NORTH"))
-    if not db.query(Department).filter(Department.id == "dept-ops").first():
-        db.add(Department(id="dept-ops", tenant_id="tenant-demo-001", company_id="company-c", plant_id="plant-north", name="Operations", code="OPS"))
+    for company_id, company_name, company_code, plant_id, plant_name, plant_code, dept_id, dept_name, dept_code in COMPANY_SEEDS:
+        if not db.query(Company).filter(Company.id == company_id).first():
+            db.add(Company(id=company_id, tenant_id="tenant-demo-001", name=company_name, code=company_code))
+        if not db.query(Plant).filter(Plant.id == plant_id).first():
+            db.add(Plant(id=plant_id, tenant_id="tenant-demo-001", company_id=company_id, name=plant_name, code=plant_code))
+        if not db.query(Department).filter(Department.id == dept_id).first():
+            db.add(Department(id=dept_id, tenant_id="tenant-demo-001", company_id=company_id, plant_id=plant_id, name=dept_name, code=dept_code))
 
     seed_users = [
         ("user-super-001", "super@mop.local", "MOP Super Admin", "super_admin", "SuperAdmin123!"),
@@ -72,12 +81,14 @@ def seed_platform(db: Session) -> None:
         ("role-admin", "Admin", ["platform.admin", "users.manage", "data.write", "data.read", "audit.read"]),
         ("role-user", "User", ["data.read"]),
     ]
-    for role_id, name, permissions in roles:
-        role = db.query(Role).filter(Role.id == role_id).first()
-        if not role:
-            db.add(Role(id=role_id, tenant_id="tenant-demo-001", company_id="company-c", name=name, permissions=permissions))
-        else:
-            role.permissions = permissions
+    for company_id, *_ in COMPANY_SEEDS:
+        for role_id, name, permissions in roles:
+            company_role_id = f"{role_id}-{company_id}"
+            role = db.query(Role).filter(Role.id == company_role_id).first()
+            if not role:
+                db.add(Role(id=company_role_id, tenant_id="tenant-demo-001", company_id=company_id, name=name, permissions=permissions))
+            else:
+                role.permissions = permissions
 
     permission_keys = [
         "platform.super_admin",
@@ -98,9 +109,10 @@ def seed_platform(db: Session) -> None:
         if not db.query(Permission).filter(Permission.key == key).first():
             db.add(Permission(id=str(uuid4()), key=key, description=key))
 
-    for module_key in MODULE_KEYS:
-        if not db.query(FeatureFlag).filter(FeatureFlag.tenant_id == "tenant-demo-001", FeatureFlag.company_id == "company-c", FeatureFlag.module_key == module_key).first():
-            db.add(FeatureFlag(id=str(uuid4()), tenant_id="tenant-demo-001", company_id="company-c", module_key=module_key, enabled=True))
+    for company_id, *_ in COMPANY_SEEDS:
+        for module_key in MODULE_KEYS:
+            if not db.query(FeatureFlag).filter(FeatureFlag.tenant_id == "tenant-demo-001", FeatureFlag.company_id == company_id, FeatureFlag.module_key == module_key).first():
+                db.add(FeatureFlag(id=str(uuid4()), tenant_id="tenant-demo-001", company_id=company_id, module_key=module_key, enabled=True))
 
     records = [
         ("inv-steel-001", "inventory", "raw_material", "RM-STEEL-001", "Stainless Steel Coil", "AVAILABLE", 1240.0, {"uom": "kg", "reorder_level": 500, "warehouse": "WH-A", "bin": "A-01-01", "unit_cost": 82}),
