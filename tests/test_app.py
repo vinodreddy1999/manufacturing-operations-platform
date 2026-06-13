@@ -145,6 +145,16 @@ def test_feature_flag_toggle_for_selected_company():
     assert response.json()["enabled"] is True
 
 
+def test_registered_modules_have_company_allocations():
+    module_keys = {item["key"].lower() for item in client.get("/modules").json()}
+    company_c_flags = {
+        item["module_key"]
+        for item in client.get("/feature-flags").json()
+        if item["company_id"] == "company-c"
+    }
+    assert module_keys.issubset(company_c_flags)
+
+
 def test_generic_module_record_create():
     response = client.post(
         "/purchase-orders",

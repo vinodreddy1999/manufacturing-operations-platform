@@ -25,12 +25,15 @@ export function OperationsPage() {
     quantity: 0,
     payload: { uom: 'ea', reorder_level: 10, warehouse: 'WH-A', bin: 'A-01-01' } as Record<string, unknown>,
   });
-  const [inventory, modules, records, analytics] = useQueries({
+  const [selectedModule, setSelectedModule] = useState('inventory');
+  const [inventory, modules, records, analytics, companies, featureFlags] = useQueries({
     queries: [
       { queryKey: ['inventory-dashboard'], queryFn: backend.inventoryDashboard },
       { queryKey: ['modules'], queryFn: backend.modules },
       { queryKey: ['runtime-records'], queryFn: () => backend.records() },
       { queryKey: ['runtime-analytics'], queryFn: backend.analytics },
+      { queryKey: ['companies'], queryFn: backend.companies },
+      { queryKey: ['feature-flags'], queryFn: backend.featureFlags },
     ],
   });
   const createRecord = useMutation({
@@ -59,12 +62,35 @@ export function OperationsPage() {
     () => Object.entries(analytics.data?.module_record_counts ?? {}).map(([module, count]) => ({ module, count })),
     [analytics.data?.module_record_counts],
   );
+  const moduleOptions = useMemo(
+    () => (modules.data ?? []).map((module) => ({ key: module.key.toLowerCase(), label: module.label ?? module.key })),
+    [modules.data],
+  );
+  const selectedModuleLabel = moduleOptions.find((module) => module.key === selectedModule)?.label ?? selectedModule.toUpperCase();
+  const companyNameById = useMemo(
+    () => new Map((companies.data ?? []).map((company) => [company.id, company.name])),
+    [companies.data],
+  );
+  const moduleAllocationRows = useMemo(() => {
+    const flags = featureFlags.data ?? [];
+    return (companies.data ?? []).map((company) => {
+      const flag = flags.find((item) => item.company_id === company.id && item.module_key.toLowerCase() === selectedModule);
+      return {
+        company_id: company.id,
+        company_name: company.name,
+        company_code: company.code,
+        module_key: selectedModule,
+        allocation: flag?.enabled ? 'Enabled' : 'Disabled',
+      };
+    });
+  }, [companies.data, featureFlags.data, selectedModule]);
+  const allocatedCompanies = moduleAllocationRows.filter((row) => row.allocation === 'Enabled');
 
-  if ([inventory, modules, records, analytics].some((query) => query.isLoading)) {
+  if ([inventory, modules, records, analytics, companies, featureFlags].some((query) => query.isLoading)) {
     return <LoadingState label="Loading operations data from backend APIs" />;
   }
 
-  const firstError = [inventory, modules, records, analytics].find((query) => query.isError)?.error;
+  const firstError = [inventory, modules, records, analytics, companies, featureFlags].find((query) => query.isError)?.error;
   if (firstError) {
     return <ErrorState error={firstError} title="Operations API integration failed" />;
   }
@@ -166,15 +192,37 @@ export function OperationsPage() {
       </div>
 
       <div className="mt-6">
-        <Panel title="Registered Backend Modules" description="Rendered from /modules.">
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {(modules.data ?? []).map((module) => (
-              <div key={module.key} className="rounded-md border border-border bg-white px-3 py-2 text-sm">
-                <p className="font-medium text-foreground">{module.label ?? module.key}</p>
-                <p className="text-xs text-muted-foreground">{module.key}</p>
-              </div>
-            ))}
+        <Panel title="Registered Backend Modules" description="Select a module to see which companies have it allocated from live /feature-flags data.">
+          <div className="mb-4 grid gap-3 md:grid-cols-[minmax(240px,360px)_1fr]">
+            <label className="block text-sm font-medium text-slate-700">
+              Module
+              <select className="mt-1 w-full rounded-md border border-border px-3 py-2 text-sm" value={selectedModule} onChange={(event) => setSelectedModule(event.target.value)}>
+                {moduleOptions.map((module) => (
+                  <option key={module.key} value={module.key}>
+                    {module.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="rounded-md border border-border bg-slate-50 px-3 py-2 text-sm text-slate-700">
+              <p className="font-semibold text-foreground">{selectedModuleLabel}</p>
+              <p className="text-xs text-muted-foreground">
+                Allocated to {allocatedCompanies.length} of {companies.data?.length ?? 0} companies:
+                {' '}
+                {allocatedCompanies.map((company) => companyNameById.get(company.company_id) ?? company.company_id).join(', ') || 'none'}
+              </p>
+            </div>
           </div>
+          <DataTable
+            rows={moduleAllocationRows}
+            emptyTitle="No company allocations"
+            columns={[
+              { key: 'company_name', label: 'Company' },
+              { key: 'company_code', label: 'Code' },
+              { key: 'module_key', label: 'Selected Module' },
+              { key: 'allocation', label: 'Allocation', render: (value) => <StatusBadge status={String(value)} /> },
+            ]}
+          />
         </Panel>
       </div>
     </>

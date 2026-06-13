@@ -7,8 +7,11 @@ from .security import hash_password
 
 
 MODULE_KEYS = [
+    "auth",
+    "platform",
     "inventory",
     "warehouse",
+    "supplier",
     "procurement",
     "production",
     "maintenance",
@@ -17,6 +20,8 @@ MODULE_KEYS = [
     "reporting",
     "costing",
     "forecasting",
+    "supply_chain",
+    "ai",
     "ai_copilot",
     "integrations",
 ]
