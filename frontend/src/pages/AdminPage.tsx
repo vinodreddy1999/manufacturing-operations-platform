@@ -1,4 +1,4 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useMemo, useState } from 'react';
 import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, LockKeyhole, Route, Workflow } from 'lucide-react';
 
@@ -28,6 +28,8 @@ const roleOptions: Array<{ value: RuntimeUser['role']; label: string }> = [
 
 export function AdminPage() {
   const queryClient = useQueryClient();
+  const [selectedCompanyId, setSelectedCompanyId] = useState('company-c');
+  const [newCompany, setNewCompany] = useState({ name: '', code: '' });
   const [newUser, setNewUser] = useState({
     email: '',
     name: '',
@@ -56,6 +58,17 @@ export function AdminPage() {
       queryClient.invalidateQueries({ queryKey: ['runtime-audit-logs'] });
     },
   });
+  const createCompany = useMutation({
+    mutationFn: backend.createCompany,
+    onSuccess: (company) => {
+      setNewCompany({ name: '', code: '' });
+      setSelectedCompanyId(company.id);
+      setNewUser((current) => ({ ...current, company_id: company.id }));
+      queryClient.invalidateQueries({ queryKey: ['companies'] });
+      queryClient.invalidateQueries({ queryKey: ['feature-flags'] });
+      queryClient.invalidateQueries({ queryKey: ['runtime-audit-logs'] });
+    },
+  });
   const updateUser = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: Partial<Pick<RuntimeUser, 'name' | 'role' | 'is_active'>> }) => backend.updateUser(id, payload),
     onSuccess: () => {
@@ -80,9 +93,12 @@ export function AdminPage() {
     return <ErrorState error={firstError} title="Admin API integration failed" />;
   }
 
-  const companyNameById = new Map((companies.data ?? []).map((company) => [company.id, company.name]));
+  const companyNameById = useMemo(() => new Map((companies.data ?? []).map((company) => [company.id, company.name])), [companies.data]);
   const companyRows = companies.data ?? [];
-  const moduleRows = (featureFlags.data ?? []).map((flag) => ({
+  const selectedCompany = companyRows.find((company) => company.id === selectedCompanyId) ?? companyRows[0];
+  const effectiveCompanyId = selectedCompany?.id ?? selectedCompanyId;
+  const companyUsers = (users.data ?? []).filter((user) => user.company_id === effectiveCompanyId);
+  const moduleRows = (featureFlags.data ?? []).filter((flag) => flag.company_id === effectiveCompanyId).map((flag) => ({
     ...flag,
     company_name: companyNameById.get(flag.company_id) ?? flag.company_id,
     status: flag.enabled ? 'Enabled' : 'Disabled',
@@ -96,7 +112,12 @@ export function AdminPage() {
 
   function submitUser(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    createUser.mutate(newUser);
+    createUser.mutate({ ...newUser, company_id: effectiveCompanyId });
+  }
+
+  function submitCompany(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    createCompany.mutate(newCompany);
   }
 
   return (
@@ -115,8 +136,45 @@ export function AdminPage() {
       </div>
 
       <div className="mt-6 grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-        <Panel title="User Access Control" description="Create users, assign roles, assign company scope, and enable or disable access. Super admin has the highest authority.">
-          <form className="mb-4 grid gap-3 md:grid-cols-6" onSubmit={submitUser}>
+        <Panel title="Company Setup" description="Create a company, select it, then manage its users and module access below.">
+          <form className="mb-4 grid gap-3 md:grid-cols-[1fr_160px_140px]" onSubmit={submitCompany}>
+            <input className="rounded-md border border-border px-3 py-2 text-sm" placeholder="Company name" value={newCompany.name} onChange={(event) => setNewCompany({ ...newCompany, name: event.target.value })} required />
+            <input className="rounded-md border border-border px-3 py-2 text-sm uppercase" placeholder="Code" value={newCompany.code} onChange={(event) => setNewCompany({ ...newCompany, code: event.target.value.toUpperCase() })} required />
+            <button className="rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60" disabled={createCompany.isPending}>
+              {createCompany.isPending ? 'Creating...' : 'Add Company'}
+            </button>
+          </form>
+          <label className="block text-sm font-medium text-slate-700">
+            Selected company
+            <select className="mt-1 w-full rounded-md border border-border px-3 py-2 text-sm" value={effectiveCompanyId} onChange={(event) => {
+              setSelectedCompanyId(event.target.value);
+              setNewUser((current) => ({ ...current, company_id: event.target.value }));
+            }}>
+              {companyRows.map((company) => (
+                <option key={company.id} value={company.id}>
+                  {company.name} ({company.code})
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-md border border-border bg-slate-50 px-3 py-2">
+              <p className="text-xs text-muted-foreground">Company ID</p>
+              <p className="text-sm font-semibold text-foreground">{effectiveCompanyId}</p>
+            </div>
+            <div className="rounded-md border border-border bg-slate-50 px-3 py-2">
+              <p className="text-xs text-muted-foreground">Users</p>
+              <p className="text-sm font-semibold text-foreground">{companyUsers.length}</p>
+            </div>
+            <div className="rounded-md border border-border bg-slate-50 px-3 py-2">
+              <p className="text-xs text-muted-foreground">Enabled modules</p>
+              <p className="text-sm font-semibold text-foreground">{moduleRows.filter((row) => row.enabled).length} / {moduleRows.length}</p>
+            </div>
+          </div>
+        </Panel>
+
+        <Panel title="Company Users" description="Create users for the selected company and manage only that company's users.">
+          <form className="mb-4 grid gap-3 md:grid-cols-5" onSubmit={submitUser}>
             <input className="rounded-md border border-border px-3 py-2 text-sm" placeholder="Name" value={newUser.name} onChange={(event) => setNewUser({ ...newUser, name: event.target.value })} required />
             <input className="rounded-md border border-border px-3 py-2 text-sm" placeholder="Email" value={newUser.email} onChange={(event) => setNewUser({ ...newUser, email: event.target.value })} required />
             <input className="rounded-md border border-border px-3 py-2 text-sm" placeholder="Password" value={newUser.password} onChange={(event) => setNewUser({ ...newUser, password: event.target.value })} required />
@@ -127,20 +185,13 @@ export function AdminPage() {
                 </option>
               ))}
             </select>
-            <select className="rounded-md border border-border px-3 py-2 text-sm" value={newUser.company_id} onChange={(event) => setNewUser({ ...newUser, company_id: event.target.value })}>
-              {companyRows.map((company) => (
-                <option key={company.id} value={company.id}>
-                  {company.name}
-                </option>
-              ))}
-            </select>
             <button className="rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60" disabled={createUser.isPending}>
               {createUser.isPending ? 'Saving...' : 'Add User'}
             </button>
           </form>
           <DataTable
-            rows={users.data ?? []}
-            emptyTitle="No users"
+            rows={companyUsers}
+            emptyTitle="No users for selected company"
             columns={[
               { key: 'name', label: 'Name' },
               { key: 'email', label: 'Email' },
@@ -163,25 +214,11 @@ export function AdminPage() {
           />
         </Panel>
 
-        <Panel title="Companies" description="Super admin company visibility from /companies.">
-          <DataTable
-            rows={companyRows}
-            emptyTitle="No companies"
-            columns={[
-              { key: 'name', label: 'Company' },
-              { key: 'code', label: 'Code' },
-              { key: 'id', label: 'Company ID' },
-              { key: 'is_active', label: 'Status', render: (value) => <StatusBadge status={value ? 'Active' : 'Disabled'} /> },
-            ]}
-          />
-        </Panel>
-
-        <Panel title="Company Module Controls" description="Enable or disable backend modules per company using live feature flags.">
+        <Panel title="Selected Company Modules" description={`Enable or disable modules for ${selectedCompany?.name ?? 'the selected company'}.`}>
           <DataTable
             rows={moduleRows}
             emptyTitle="No module flags"
             columns={[
-              { key: 'company_name', label: 'Company' },
               { key: 'module_key', label: 'Module' },
               { key: 'status', label: 'Status', render: (value) => <StatusBadge status={String(value)} /> },
               { key: 'enabled', label: 'Action', render: (value, row) => (

@@ -164,7 +164,7 @@ Build:
 ```bash
 docker build \
   -t vinodreddy1999/manufacturing-operations-platform-fullstack:latest \
-  -t vinodreddy1999/manufacturing-operations-platform-fullstack:0.2.4 \
+  -t vinodreddy1999/manufacturing-operations-platform-fullstack:0.2.5 \
   .
 ```
 
@@ -254,7 +254,7 @@ Docker Hub push:
 
 ```bash
 docker push vinodreddy1999/manufacturing-operations-platform-fullstack:latest
-docker push vinodreddy1999/manufacturing-operations-platform-fullstack:0.2.4
+docker push vinodreddy1999/manufacturing-operations-platform-fullstack:0.2.5
 ```
 
 Docker Compose enterprise services:

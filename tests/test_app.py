@@ -155,6 +155,20 @@ def test_registered_modules_have_company_allocations():
     assert module_keys.issubset(company_c_flags)
 
 
+def test_create_company_initializes_module_allocations():
+    company = client.post("/companies", json={"name": "Pytest Company", "code": "PYTCO"})
+    assert company.status_code in {200, 409}
+
+    module_keys = {item["key"].lower() for item in client.get("/modules").json()}
+    company_flags = {
+        item["module_key"]: item["enabled"]
+        for item in client.get("/feature-flags").json()
+        if item["company_id"] == "company-pytco"
+    }
+    assert module_keys.issubset(set(company_flags))
+    assert all(company_flags[key] for key in module_keys)
+
+
 def test_generic_module_record_create():
     response = client.post(
         "/purchase-orders",

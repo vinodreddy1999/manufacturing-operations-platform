@@ -20,19 +20,30 @@ from .platform_schemas import (
     ModuleRecordRequest,
     TaskRequest,
 )
+from .platform_seed import MODULE_KEYS
 from .security import hash_password
 
 router = APIRouter(tags=["Core Platform"])
 
 
 def as_dict(row):
-    return {key: value for key, value in row.__dict__.items() if not key.startswith("_")}
+    return {
+        key: value.isoformat() if hasattr(value, "isoformat") else value
+        for key, value in row.__dict__.items()
+        if not key.startswith("_")
+    }
 
 
 @router.post("/companies")
 def create_company(request: CreateCompanyRequest, db: Session = Depends(get_db)):
-    row = Company(id=f"company-{request.code.lower()}", tenant_id=request.tenant_id, name=request.name, code=request.code)
+    normalized_code = request.code.strip().lower()
+    company_id = f"company-{normalized_code}"
+    if db.query(Company).filter(Company.id == company_id).first():
+        raise HTTPException(status_code=409, detail="Company code already exists")
+    row = Company(id=company_id, tenant_id=request.tenant_id, name=request.name, code=request.code.strip().upper())
     db.add(row)
+    for module_key in MODULE_KEYS:
+        db.add(FeatureFlag(id=str(uuid4()), tenant_id=request.tenant_id, company_id=row.id, module_key=module_key, enabled=True))
     db.commit()
     db.refresh(row)
     audit(db, action="CREATE_COMPANY", entity_type="Company", entity_id=row.id, tenant_id=request.tenant_id, company_id=row.id, new_value=as_dict(row))

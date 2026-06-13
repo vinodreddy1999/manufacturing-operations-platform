@@ -64,6 +64,14 @@ export const backend = {
     const response = await api.get<Company[]>('/companies');
     return response.data;
   },
+  createCompany: async (payload: { name: string; code: string }) => {
+    const response = await api.post<Company>('/companies', {
+      tenant_id: 'tenant-demo-001',
+      name: payload.name,
+      code: payload.code,
+    });
+    return response.data;
+  },
   featureFlags: async () => {
     const response = await api.get<FeatureFlag[]>('/feature-flags');
     return response.data;
