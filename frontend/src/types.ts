@@ -89,6 +89,24 @@ export type DashboardAccessResult = {
   decision: string;
 };
 
+export type Company = {
+  id: string;
+  tenant_id: string;
+  name: string;
+  code: string;
+  is_active: boolean;
+  created_at?: string;
+};
+
+export type FeatureFlag = {
+  id: string;
+  tenant_id: string;
+  company_id: string;
+  module_key: string;
+  enabled: boolean;
+  rules?: Record<string, unknown>;
+};
+
 export type RuntimeUser = {
   id: string;
   tenant_id: string;

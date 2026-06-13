@@ -125,6 +125,26 @@ def test_feature_flag_toggle():
     assert response.json()["enabled"] is True
 
 
+def test_feature_flag_toggle_for_selected_company():
+    response = client.post("/feature-flags/inventory/disable?company_id=company-apex")
+    assert response.status_code == 200
+    assert response.json()["company_id"] == "company-apex"
+    assert response.json()["module_key"] == "inventory"
+    assert response.json()["enabled"] is False
+
+    flags = client.get("/feature-flags")
+    assert flags.status_code == 200
+    apex_inventory = [
+        flag for flag in flags.json()
+        if flag["company_id"] == "company-apex" and flag["module_key"] == "inventory"
+    ][0]
+    assert apex_inventory["enabled"] is False
+
+    response = client.post("/feature-flags/inventory/enable?company_id=company-apex")
+    assert response.status_code == 200
+    assert response.json()["enabled"] is True
+
+
 def test_generic_module_record_create():
     response = client.post(
         "/purchase-orders",

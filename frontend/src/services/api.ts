@@ -8,6 +8,8 @@ import type {
   ConnectedSystem,
   DashboardAccessResult,
   DataQuality,
+  Company,
+  FeatureFlag,
   HealthResponse,
   InventoryDashboard,
   AuditLog,
@@ -56,6 +58,23 @@ export const backend = {
   },
   modules: async () => {
     const response = await api.get<ModuleInfo[]>('/modules');
+    return response.data;
+  },
+  companies: async () => {
+    const response = await api.get<Company[]>('/companies');
+    return response.data;
+  },
+  featureFlags: async () => {
+    const response = await api.get<FeatureFlag[]>('/feature-flags');
+    return response.data;
+  },
+  setFeatureFlag: async (payload: { company_id: string; module_key: string; enabled: boolean }) => {
+    const response = await api.post<FeatureFlag>('/feature-flags', {
+      tenant_id: 'tenant-demo-001',
+      company_id: payload.company_id,
+      module_key: payload.module_key,
+      enabled: payload.enabled,
+    });
     return response.data;
   },
   navigation: () => getEnvelope<NavigationSection[]>('/frontend/navigation'),

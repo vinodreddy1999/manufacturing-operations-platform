@@ -143,13 +143,13 @@ def list_feature_flags(db: Session = Depends(get_db)):
 
 
 @router.post("/feature-flags/{module_key}/enable")
-def enable_module(module_key: str, db: Session = Depends(get_db)):
-    return set_feature_flag(FeatureFlagRequest(module_key=module_key, enabled=True), db)
+def enable_module(module_key: str, company_id: str = "company-c", tenant_id: str = "tenant-demo-001", db: Session = Depends(get_db)):
+    return set_feature_flag(FeatureFlagRequest(tenant_id=tenant_id, company_id=company_id, module_key=module_key, enabled=True), db)
 
 
 @router.post("/feature-flags/{module_key}/disable")
-def disable_module(module_key: str, db: Session = Depends(get_db)):
-    return set_feature_flag(FeatureFlagRequest(module_key=module_key, enabled=False), db)
+def disable_module(module_key: str, company_id: str = "company-c", tenant_id: str = "tenant-demo-001", db: Session = Depends(get_db)):
+    return set_feature_flag(FeatureFlagRequest(tenant_id=tenant_id, company_id=company_id, module_key=module_key, enabled=False), db)
 
 
 @router.post("/tasks")
@@ -222,4 +222,3 @@ def create_module_router(module_key: str, prefix: str) -> APIRouter:
         return as_dict(row)
 
     return module_router
-
