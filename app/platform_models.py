@@ -182,3 +182,16 @@ class ModuleRecord(Base, TenantScopedMixin):
     quantity: Mapped[float | None] = mapped_column(Float, nullable=True)
     payload: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class AppMetadata(Base, TenantScopedMixin):
+    __tablename__ = "app_metadata"
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True)
+    category: Mapped[str] = mapped_column(String(80), index=True)
+    record_key: Mapped[str] = mapped_column(String(120), index=True)
+    name: Mapped[str | None] = mapped_column(String(250), nullable=True)
+    payload: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (UniqueConstraint("tenant_id", "company_id", "plant_id", "category", "record_key"),)

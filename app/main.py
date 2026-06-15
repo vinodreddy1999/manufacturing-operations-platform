@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -10,8 +10,9 @@ from jose import jwt
 
 from .auth_router import router as auth_router
 from .core_router import create_module_router, router as core_router
-from .database import Base, SessionLocal, engine
+from .database import Base, SessionLocal, engine, get_db
 from .enterprise import configure_enterprise, enterprise_router
+from .metadata_store import first_metadata, list_metadata, upsert_metadata
 from .modules.customer_portal import ai_router as customer_portal_ai_router
 from .modules.customer_portal import router as customer_portal_router
 from .modules.costing import ai_router as costing_ai_router
@@ -36,6 +37,7 @@ from .modules.sales import router as sales_router
 from .modules.supplier_portal import ai_router as supplier_portal_ai_router
 from .modules.supplier_portal import router as supplier_portal_router
 from .platform_seed import seed_platform
+from .platform_models import AppMetadata, FeatureFlag, ModuleRecord, User
 from .runtime_router import ensure_runtime_schema, router as runtime_router
 from .schemas import (
     ApiResult,
@@ -155,69 +157,109 @@ def health() -> dict[str, str]:
 
 
 @app.get("/modules")
-def list_modules() -> list[dict[str, Any]]:
-    return [module.model_dump() for module in MODULES]
+def list_modules(db=Depends(get_db)) -> list[dict[str, Any]]:
+    modules = list_metadata(db, "module_definition")
+    return modules or [module.model_dump() for module in MODULES]
 
 
 @app.post("/auth/login", response_model=LoginResponse)
-def login(request: LoginRequest) -> LoginResponse:
-    tenant = store.tenants.get(request.tenant_slug)
-    user = store.users.get(request.email)
-    if not tenant or not user or user["tenant_slug"] != request.tenant_slug or user["password"] != request.password:
+def login(request: LoginRequest, db=Depends(get_db)) -> LoginResponse:
+    tenant = first_metadata(db, "tenant", request.tenant_slug)
+    user = db.query(User).filter(User.email == request.email).first()
+    if not tenant or not user or not user.is_active:
         raise HTTPException(status_code=401, detail="Invalid tenant or credentials")
+    from .security import verify_password
+    if not verify_password(request.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid tenant or credentials")
+    company_id = user.company_id or "company-c"
+    enabled_flags = (
+        db.query(FeatureFlag)
+        .filter(FeatureFlag.tenant_id == tenant["id"], FeatureFlag.company_id == company_id, FeatureFlag.enabled.is_(True))
+        .all()
+    )
+    enabled_modules: list[ModuleKey] = []
+    for flag in enabled_flags:
+        key = flag.module_key.upper()
+        if key in ModuleKey.__members__:
+            enabled_modules.append(ModuleKey[key])
     return LoginResponse(
-        access_token=make_token(user, tenant),
+        access_token=make_token(
+            {
+                "id": user.id,
+                "permissions": ["platform.admin"] if user.role in {"admin", "super_admin", "account_owner", "organization_admin"} else ["platform.read"],
+            },
+            tenant,
+        ),
         tenant_id=tenant["id"],
-        user_id=user["id"],
-        enabled_modules=tenant["enabled_modules"],
+        user_id=user.id,
+        enabled_modules=enabled_modules or tenant["enabled_modules"],
     )
 
 
 @app.get("/platform/overview", response_model=ApiResult)
-def platform_overview() -> ApiResult:
+def platform_overview(db=Depends(get_db)) -> ApiResult:
     return result(
         ModuleKey.PLATFORM,
         "overview",
         "Platform tenant, company, plant and feature flag summary.",
         {
-            "tenant": store.snapshot(store.tenants["precision-components"]),
-            "companies": store.snapshot(store.companies),
-            "plants": store.snapshot(store.plants),
-            "enabled_modules": [module.key for module in MODULES],
+            "tenant": first_metadata(db, "tenant", "precision-components") or store.snapshot(store.tenants["precision-components"]),
+            "companies": [row.payload for row in db.query(AppMetadata).filter(AppMetadata.category == "company").all()] or store.snapshot(store.companies),
+            "plants": [row.payload for row in db.query(AppMetadata).filter(AppMetadata.category == "plant").all()] or store.snapshot(store.plants),
+            "enabled_modules": [module["key"] for module in list_modules(db)],
         },
     )
 
 
 
 @app.get("/warehouse/locations", response_model=ApiResult)
-def warehouse_locations() -> ApiResult:
-    return result(ModuleKey.WAREHOUSE, "list_locations", "Warehouse hierarchy and bin occupancy.", store.snapshot(store.locations))
+def warehouse_locations(db=Depends(get_db)) -> ApiResult:
+    return result(ModuleKey.WAREHOUSE, "list_locations", "Warehouse hierarchy and bin occupancy.", list_metadata(db, "location", company_id="company-c", plant_id="plant-north"))
 
 
 @app.get("/supplier/suppliers", response_model=ApiResult)
-def suppliers() -> ApiResult:
-    return result(ModuleKey.SUPPLIER, "list_suppliers", "Supplier ratings and delivery reliability.", store.snapshot(store.suppliers))
+def suppliers(db=Depends(get_db)) -> ApiResult:
+    return result(ModuleKey.SUPPLIER, "list_suppliers", "Supplier ratings and delivery reliability.", list_metadata(db, "supplier", company_id="company-c"))
 
 
 @app.post("/procurement/requisitions", response_model=ApiResult)
-def create_requisition(request: PurchaseRequisitionRequest) -> ApiResult:
-    requisition = store.create_record(store.requisitions, {**request.model_dump(), "status": "PENDING_APPROVAL"})
+def create_requisition(request: PurchaseRequisitionRequest, db=Depends(get_db)) -> ApiResult:
+    requisition = {
+        "id": f"pr-{datetime.now(timezone.utc).timestamp()}",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        **request.model_dump(),
+        "status": "PENDING_APPROVAL",
+    }
+    upsert_metadata(
+        db,
+        category="procurement_requisition",
+        record_key=requisition["id"],
+        row_id=requisition["id"],
+        company_id="company-c",
+        plant_id="plant-north",
+        payload=requisition,
+        name=request.item_id,
+    )
+    db.commit()
     return result(ModuleKey.PROCUREMENT, "create_requisition", "Purchase requisition created for approval.", requisition)
 
 
 @app.get("/procurement/requisitions", response_model=ApiResult)
-def list_requisitions() -> ApiResult:
-    return result(ModuleKey.PROCUREMENT, "list_requisitions", "Purchase requisition work queue.", store.snapshot(store.requisitions))
+def list_requisitions(db=Depends(get_db)) -> ApiResult:
+    return result(ModuleKey.PROCUREMENT, "list_requisitions", "Purchase requisition work queue.", list_metadata(db, "procurement_requisition", company_id="company-c", plant_id="plant-north"))
 
 
 @app.get("/reporting/kpis", response_model=ApiResult)
-def reporting_kpis() -> ApiResult:
+def reporting_kpis(db=Depends(get_db)) -> ApiResult:
+    requisitions = list_metadata(db, "procurement_requisition", company_id="company-c", plant_id="plant-north")
+    work_orders = db.query(ModuleRecord).filter(ModuleRecord.module_key == "maintenance", ModuleRecord.company_id == "company-c").count()
+    inspections = list_metadata(db, "stock_count", company_id="company-c", plant_id="plant-north")
     kpis = {
         "inventory_value": 18400000,
-        "pending_approvals": len(store.requisitions),
-        "open_maintenance_work_orders": len(store.work_orders),
+        "pending_approvals": len(requisitions),
+        "open_maintenance_work_orders": work_orders,
         "warehouse_occupancy_percent": 76,
-        "quality_inspections": len(store.inspections),
+        "quality_inspections": len(inspections),
     }
     return result(ModuleKey.REPORTING, "kpis", "Operational KPI dashboard output.", kpis)
 

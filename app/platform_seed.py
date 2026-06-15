@@ -2,9 +2,11 @@ from uuid import uuid4
 
 from sqlalchemy.orm import Session
 
+from .metadata_store import upsert_metadata
 from .modules.frontend_admin_models import DataCatalogEntry, DataMappingRule, ManufacturingDataConnection, PendingErpUpdate
 from .platform_models import Company, Department, FeatureFlag, ModuleRecord, Permission, Plant, Role, User
 from .security import hash_password
+from .store import MODULES, store
 
 
 MODULE_KEYS = [
@@ -37,6 +39,25 @@ COMPANY_SEEDS = [
 
 
 def seed_platform(db: Session) -> None:
+    upsert_metadata(
+        db,
+        category="tenant",
+        record_key="precision-components",
+        row_id="meta-tenant-precision-components",
+        payload=store.snapshot(store.tenants["precision-components"]),
+        name="Precision Components Demo",
+    )
+    for module in MODULES:
+        module_payload = module.model_dump()
+        upsert_metadata(
+            db,
+            category="module_definition",
+            record_key=str(module.key),
+            row_id=f"meta-module-{str(module.key).lower()}",
+            payload=module_payload,
+            name=module.name,
+        )
+
     for company_id, company_name, company_code, plant_id, plant_name, plant_code, dept_id, dept_name, dept_code in COMPANY_SEEDS:
         if not db.query(Company).filter(Company.id == company_id).first():
             db.add(Company(id=company_id, tenant_id="tenant-demo-001", name=company_name, code=company_code))
@@ -44,6 +65,191 @@ def seed_platform(db: Session) -> None:
             db.add(Plant(id=plant_id, tenant_id="tenant-demo-001", company_id=company_id, name=plant_name, code=plant_code))
         if not db.query(Department).filter(Department.id == dept_id).first():
             db.add(Department(id=dept_id, tenant_id="tenant-demo-001", company_id=company_id, plant_id=plant_id, name=dept_name, code=dept_code))
+        upsert_metadata(
+            db,
+            category="company",
+            record_key=company_id,
+            row_id=f"meta-company-{company_id}",
+            company_id=company_id,
+            payload={"id": company_id, "tenant_id": "tenant-demo-001", "name": company_name, "code": company_code, "is_active": True},
+            name=company_name,
+        )
+        upsert_metadata(
+            db,
+            category="plant",
+            record_key=plant_id,
+            row_id=f"meta-plant-{plant_id}",
+            company_id=company_id,
+            plant_id=plant_id,
+            payload={"id": plant_id, "tenant_id": "tenant-demo-001", "company_id": company_id, "name": plant_name, "code": plant_code, "timezone": "Asia/Kolkata"},
+            name=plant_name,
+        )
+
+    for warehouse in store.warehouses:
+        upsert_metadata(
+            db,
+            category="warehouse",
+            record_key=warehouse["id"],
+            row_id=f"meta-warehouse-{warehouse['id']}",
+            company_id="company-c",
+            plant_id=warehouse.get("plant_id"),
+            payload=warehouse,
+            name=warehouse.get("name"),
+        )
+    for item in store.inventory_items:
+        upsert_metadata(
+            db,
+            category="inventory_item",
+            record_key=item["id"],
+            row_id=f"meta-item-{item['id']}",
+            company_id="company-c",
+            plant_id="plant-north",
+            payload=item,
+            name=item.get("description"),
+        )
+    for balance in store.balances:
+        upsert_metadata(
+            db,
+            category="inventory_balance",
+            record_key=f"{balance['item_id']}::{balance['location_id']}",
+            row_id=f"meta-balance-{balance['item_id']}-{balance['location_id']}",
+            company_id="company-c",
+            plant_id="plant-north",
+            payload=balance,
+            name=balance["item_id"],
+        )
+    for location in store.locations:
+        upsert_metadata(
+            db,
+            category="location",
+            record_key=location["id"],
+            row_id=f"meta-location-{location['id']}",
+            company_id="company-c",
+            plant_id="plant-north",
+            payload=location,
+            name=location.get("code"),
+        )
+    for supplier in store.suppliers:
+        upsert_metadata(
+            db,
+            category="supplier",
+            record_key=supplier["id"],
+            row_id=f"meta-supplier-{supplier['id']}",
+            company_id="company-c",
+            payload=supplier,
+            name=supplier.get("name"),
+        )
+    for link in store.supplier_links:
+        upsert_metadata(
+            db,
+            category="supplier_link",
+            record_key=f"{link['item_id']}::{link['supplier_id']}::{link['role']}",
+            row_id=f"meta-supplier-link-{link['item_id']}-{link['supplier_id']}-{link['role'].lower()}",
+            company_id="company-c",
+            plant_id="plant-north",
+            payload=link,
+            name=link.get("supplier_name"),
+        )
+    for batch in store.batches:
+        key = batch["serial_number"] or batch["batch_number"]
+        upsert_metadata(
+            db,
+            category="batch",
+            record_key=key,
+            row_id=f"meta-batch-{key.lower().replace(' ', '-')}",
+            company_id="company-c",
+            plant_id="plant-north",
+            payload=batch,
+            name=batch.get("batch_number"),
+        )
+    for reservation in store.reservations:
+        upsert_metadata(
+            db,
+            category="inventory_reservation",
+            record_key=reservation["id"],
+            row_id=f"meta-reservation-{reservation['id']}",
+            company_id="company-c",
+            plant_id="plant-north",
+            payload=reservation,
+            name=reservation.get("reserved_for"),
+        )
+    for movement in store.seed_movements:
+        upsert_metadata(
+            db,
+            category="inventory_movement",
+            record_key=movement["id"],
+            row_id=f"meta-movement-{movement['id']}",
+            company_id="company-c",
+            plant_id="plant-north",
+            payload=movement,
+            name=movement.get("movement_type"),
+        )
+    for count in store.stock_counts:
+        upsert_metadata(
+            db,
+            category="stock_count",
+            record_key=count["id"],
+            row_id=f"meta-stock-count-{count['id']}",
+            company_id="company-c",
+            plant_id="plant-north",
+            payload=count,
+            name=count.get("count_type"),
+        )
+    for index, row in enumerate(store.non_moving_stock, start=1):
+        upsert_metadata(
+            db,
+            category="non_moving_stock",
+            record_key=f"non-moving-{index}",
+            row_id=f"meta-non-moving-{index}",
+            company_id="company-c",
+            plant_id="plant-north",
+            payload=row,
+            name=row.get("item_id"),
+        )
+    for index, row in enumerate(store.slow_moving_stock, start=1):
+        upsert_metadata(
+            db,
+            category="slow_moving_stock",
+            record_key=f"slow-moving-{index}",
+            row_id=f"meta-slow-moving-{index}",
+            company_id="company-c",
+            plant_id="plant-north",
+            payload=row,
+            name=row.get("item_id"),
+        )
+    for index, row in enumerate(store.expiry_actions, start=1):
+        upsert_metadata(
+            db,
+            category="expiry_action",
+            record_key=f"expiry-action-{index}",
+            row_id=f"meta-expiry-action-{index}",
+            company_id="company-c",
+            plant_id="plant-north",
+            payload=row,
+            name=row.get("item_id"),
+        )
+    for index, row in enumerate(store.fifo_layers, start=1):
+        upsert_metadata(
+            db,
+            category="fifo_layer",
+            record_key=row["receipt_id"],
+            row_id=f"meta-fifo-layer-{index}",
+            company_id="company-c",
+            plant_id="plant-north",
+            payload=row,
+            name=row.get("item_id"),
+        )
+    for index, row in enumerate(store.inventory_reports, start=1):
+        upsert_metadata(
+            db,
+            category="inventory_report",
+            record_key=f"inventory-report-{index}",
+            row_id=f"meta-inventory-report-{index}",
+            company_id="company-c",
+            plant_id="plant-north",
+            payload=row,
+            name=row.get("report"),
+        )
 
     seed_users = [
         ("user-super-001", "super@mop.local", "MOP Super Admin", "super_admin", "SuperAdmin123!"),

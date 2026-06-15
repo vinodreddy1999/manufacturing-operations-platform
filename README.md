@@ -29,6 +29,16 @@ It now also includes a modular-monolith platform foundation with:
 - Redis/Celery background job hooks
 - Optional AI provider interface for future LLM copilot integrations
 
+Application metadata is now stored in the database rather than only in process memory for the shared runtime paths. This includes:
+
+- tenant metadata
+- module definitions
+- company and plant metadata
+- warehouse, supplier, and inventory reference metadata
+- inventory reservations, movements, counts, and mobile scan metadata
+- procurement requisition metadata
+- admin/data hub/company feature metadata
+
 The Production module has been expanded into a dedicated backend package with product master, BOM, routing, work centers, lines, machines, production orders, MRP, reservations, scheduling, logs, downtime, WIP, losses, costing, reports, dashboard, task/notification queues, and rule-based Production AI.
 
 The Maintenance module has also been expanded into a dedicated CMMS/EAM-style backend package with machine registry, capability configuration, maintenance plans, breakdown work orders, spare mapping/reservation/consumption, downtime, shutdown windows, assignments, vendors, documents, machine history, lifecycle, costing, reports, dashboard, MTTR/MTBF, health scoring, and rule-based Maintenance AI.

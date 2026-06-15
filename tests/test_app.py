@@ -1,6 +1,8 @@
 from fastapi.testclient import TestClient
 
+from app.database import SessionLocal
 from app.main import app
+from app.platform_models import AppMetadata
 
 
 client = TestClient(app)
@@ -112,6 +114,20 @@ def test_inventory_mobile_scan():
     )
     assert response.status_code == 200
     assert response.json()["data"]["sync_status"] == "SYNCED"
+
+
+def test_inventory_metadata_is_persisted_in_database():
+    scan = client.post(
+        "/inventory/mobile/scan",
+        json={"action": "COUNT_STOCK", "item_id": "item-steel", "location_id": "bin-a-01-01", "quantity": 3},
+    )
+    assert scan.status_code == 200
+    scan_id = scan.json()["data"]["id"]
+
+    with SessionLocal() as db:
+        row = db.query(AppMetadata).filter(AppMetadata.category == "inventory_mobile_scan", AppMetadata.record_key == scan_id).first()
+        assert row is not None
+        assert row.payload["action"] == "COUNT_STOCK"
 
 
 def test_core_company_seed_available():
