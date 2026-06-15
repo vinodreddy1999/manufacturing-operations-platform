@@ -6,6 +6,8 @@ import type {
   ApiEnvelope,
   CommandCenter,
   ConnectedSystem,
+  DataCatalogEntry,
+  DataMappingRule,
   DashboardAccessResult,
   DataQuality,
   Company,
@@ -90,6 +92,44 @@ export const backend = {
   dataQuality: () => getEnvelope<DataQuality>('/manufacturing-data-hub/data-quality'),
   aiReadiness: () => getEnvelope<AiReadiness>('/manufacturing-data-hub/ai-readiness'),
   connectedSystems: () => getEnvelope<ConnectedSystem[]>('/manufacturing-data-hub/connected-systems'),
+  createConnectedSystem: async (payload: Omit<ConnectedSystem, 'id'>) => {
+    const response = await api.post<ApiEnvelope<ConnectedSystem>>('/manufacturing-data-hub/connected-systems', payload);
+    return response.data.data;
+  },
+  updateConnectedSystem: async (id: string, payload: Omit<ConnectedSystem, 'id'>) => {
+    const response = await api.put<ApiEnvelope<ConnectedSystem>>(`/manufacturing-data-hub/connected-systems/${id}`, payload);
+    return response.data.data;
+  },
+  deleteConnectedSystem: async (id: string) => {
+    const response = await api.delete<ApiEnvelope<{ id: string }>>(`/manufacturing-data-hub/connected-systems/${id}`);
+    return response.data.data;
+  },
+  dataCatalog: () => getEnvelope<DataCatalogEntry[]>('/manufacturing-data-hub/catalog'),
+  createDataCatalogEntry: async (payload: Omit<DataCatalogEntry, 'id'>) => {
+    const response = await api.post<ApiEnvelope<DataCatalogEntry>>('/manufacturing-data-hub/catalog', payload);
+    return response.data.data;
+  },
+  updateDataCatalogEntry: async (id: string, payload: Omit<DataCatalogEntry, 'id'>) => {
+    const response = await api.put<ApiEnvelope<DataCatalogEntry>>(`/manufacturing-data-hub/catalog/${id}`, payload);
+    return response.data.data;
+  },
+  deleteDataCatalogEntry: async (id: string) => {
+    const response = await api.delete<ApiEnvelope<{ id: string }>>(`/manufacturing-data-hub/catalog/${id}`);
+    return response.data.data;
+  },
+  dataMappings: () => getEnvelope<DataMappingRule[]>('/manufacturing-data-hub/mappings'),
+  createDataMapping: async (payload: Omit<DataMappingRule, 'id'>) => {
+    const response = await api.post<ApiEnvelope<DataMappingRule>>('/manufacturing-data-hub/mappings', payload);
+    return response.data.data;
+  },
+  updateDataMapping: async (id: string, payload: Omit<DataMappingRule, 'id'>) => {
+    const response = await api.put<ApiEnvelope<DataMappingRule>>(`/manufacturing-data-hub/mappings/${id}`, payload);
+    return response.data.data;
+  },
+  deleteDataMapping: async (id: string) => {
+    const response = await api.delete<ApiEnvelope<{ id: string }>>(`/manufacturing-data-hub/mappings/${id}`);
+    return response.data.data;
+  },
   commandCenter: () => getEnvelope<CommandCenter>('/manufacturing-intelligence/command-center'),
   inventoryDashboard: () => getEnvelope<InventoryDashboard>('/inventory/dashboard'),
   evaluateDashboardAccess: async () => {

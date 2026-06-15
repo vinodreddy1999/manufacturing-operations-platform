@@ -133,7 +133,7 @@ def test_feature_flag_toggle():
 
 
 def test_feature_flag_toggle_for_selected_company():
-    headers = runtime_headers("admin@mop.local", "ChangeMe123!")
+    headers = runtime_headers("super@mop.local", "SuperAdmin123!")
     response = client.post("/feature-flags/inventory/disable?company_id=company-apex", headers=headers)
     assert response.status_code == 200
     assert response.json()["company_id"] == "company-apex"
@@ -164,7 +164,7 @@ def test_registered_modules_have_company_allocations():
 
 
 def test_create_company_initializes_module_allocations():
-    headers = runtime_headers("admin@mop.local", "ChangeMe123!")
+    headers = runtime_headers("super@mop.local", "SuperAdmin123!")
     company = client.post("/companies", headers=headers, json={"tenant_id": "tenant-demo-001", "name": "Pytest Company", "code": "PYTCO"})
     assert company.status_code in {200, 409}
 
@@ -890,7 +890,7 @@ def test_frontend_navigation_admin_dashboard_and_access_control():
     assert "Platform Management" in sections
     assert "Intelligence" in sections
 
-    dashboard = client.get("/admin/dashboard")
+    dashboard = client.get("/admin/dashboard", headers=runtime_headers("admin@mop.local", "ChangeMe123!"))
     assert dashboard.status_code == 200
     data = dashboard.json()["data"]
     assert data["user_count"] >= data["active_users"]
@@ -924,23 +924,25 @@ def test_admin_workflow_kpis_and_compliance_contracts():
 
 
 def test_manufacturing_data_hub_mapping_quality_and_pending_update():
-    systems = client.get("/manufacturing-data-hub/connected-systems")
+    headers = runtime_headers("admin@mop.local", "ChangeMe123!")
+    systems = client.get("/manufacturing-data-hub/connected-systems", headers=headers)
     assert systems.status_code == 200
-    assert any(system["system_name"] == "SAP S/4HANA" for system in systems.json()["data"])
+    assert all(system["company_id"] == "company-c" for system in systems.json()["data"])
 
     preview = client.post(
         "/manufacturing-data-hub/mappings/preview",
+        headers=headers,
         json={"source_system": "SAP S/4HANA", "source_field": "SAP Material Code", "source_value": " rm-stl-001 ", "target_entity": "InventoryItem"},
     )
     assert preview.status_code == 200
     assert preview.json()["data"]["target_field"] == "SKU"
     assert preview.json()["data"]["transformed_value"] == "RM-STL-001"
 
-    quality = client.get("/manufacturing-data-hub/data-quality")
+    quality = client.get("/manufacturing-data-hub/data-quality", headers=headers)
     assert quality.status_code == 200
     assert quality.json()["data"]["overall_score"] > 80
 
-    decision = client.post("/manufacturing-data-hub/pending-updates/erp-upd-001/decision", json={"decided_by": "company-admin", "decision": "Approved", "comment": "Approved for ERP export"})
+    decision = client.post("/manufacturing-data-hub/pending-updates/erp-upd-company-c-001/decision", headers=headers, json={"decided_by": "company-admin", "decision": "Approved", "comment": "Approved for ERP export"})
     assert decision.status_code == 200
     assert decision.json()["data"]["approval_status"] == "Approved"
     assert decision.json()["data"]["erp_status"] == "Export Ready"
@@ -1075,6 +1077,10 @@ def test_core_platform_endpoints_require_auth_and_admin():
     assert restore.status_code == 200
     assert restore.json()["enabled"] is True
 
+    company_scope = client.get("/companies", headers=admin_headers)
+    assert company_scope.status_code == 200
+    assert [row["id"] for row in company_scope.json()] == ["company-c"]
+
 
 def test_runtime_user_role_is_read_only():
     login = client.post("/runtime/auth/login", json={"email": "user@mop.local", "password": "User12345!"})
@@ -1090,6 +1096,51 @@ def test_runtime_user_role_is_read_only():
         json={"module_key": "inventory", "record_type": "raw_material", "record_code": "DENIED", "name": "Denied", "quantity": 1, "payload": {}},
     )
     assert write.status_code == 403
+
+
+def test_runtime_admin_is_company_scoped():
+    login = client.post("/runtime/auth/login", json={"email": "admin@mop.local", "password": "ChangeMe123!"})
+    assert login.status_code == 200
+    headers = {"Authorization": f"Bearer {login.json()['data']['access_token']}"}
+
+    users = client.get("/runtime/users", headers=headers)
+    assert users.status_code == 200
+    assert all(user["company_id"] == "company-c" for user in users.json()["data"])
+
+    records = client.get("/runtime/records", headers=headers)
+    assert records.status_code == 200
+    assert all(record["company_id"] == "company-c" for record in records.json()["data"])
+
+
+def test_datahub_requires_admin_and_is_company_scoped():
+    operator_login = client.post("/runtime/auth/login", json={"email": "operator@mop.local", "password": "Operator123!"})
+    assert operator_login.status_code == 200
+    operator_headers = {"Authorization": f"Bearer {operator_login.json()['data']['access_token']}"}
+    denied = client.get("/manufacturing-data-hub/connected-systems", headers=operator_headers)
+    assert denied.status_code == 403
+
+    admin_login = client.post("/runtime/auth/login", json={"email": "admin@mop.local", "password": "ChangeMe123!"})
+    assert admin_login.status_code == 200
+    admin_headers = {"Authorization": f"Bearer {admin_login.json()['data']['access_token']}"}
+
+    systems = client.get("/manufacturing-data-hub/connected-systems", headers=admin_headers)
+    assert systems.status_code == 200
+    assert all(item["company_id"] == "company-c" for item in systems.json()["data"])
+
+    created = client.post(
+        "/manufacturing-data-hub/connected-systems",
+        headers=admin_headers,
+        json={
+            "system_name": "Company C WMS",
+            "system_type": "WMS",
+            "connection_status": "Healthy",
+            "last_sync": "2026-06-15T10:00:00Z",
+            "health_score": 96,
+            "record_count": 5500,
+        },
+    )
+    assert created.status_code == 200
+    assert created.json()["data"]["company_id"] == "company-c"
 
 
 def test_versioned_runtime_api_alias():

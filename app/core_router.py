@@ -35,8 +35,12 @@ def as_dict(row):
     }
 
 
+def has_override_scope(user: User) -> bool:
+    return (user.role or "user") in {"super_admin", "account_owner"}
+
+
 @router.post("/companies")
-def create_company(request: CreateCompanyRequest, db: Session = Depends(get_db), _: User = Depends(require_any("admin"))):
+def create_company(request: CreateCompanyRequest, db: Session = Depends(get_db), _: User = Depends(require_any("super_admin"))):
     normalized_code = request.code.strip().lower()
     company_id = f"company-{normalized_code}"
     if db.query(Company).filter(Company.id == company_id).first():
@@ -52,12 +56,17 @@ def create_company(request: CreateCompanyRequest, db: Session = Depends(get_db),
 
 
 @router.get("/companies")
-def list_companies(db: Session = Depends(get_db), _: User = Depends(current_user)):
-    return [as_dict(row) for row in db.query(Company).all()]
+def list_companies(db: Session = Depends(get_db), actor: User = Depends(current_user)):
+    query = db.query(Company)
+    if not has_override_scope(actor):
+        query = query.filter(Company.id == actor.company_id)
+    return [as_dict(row) for row in query.all()]
 
 
 @router.post("/plants")
-def create_plant(request: CreatePlantRequest, db: Session = Depends(get_db), _: User = Depends(require_any("admin"))):
+def create_plant(request: CreatePlantRequest, db: Session = Depends(get_db), actor: User = Depends(require_any("admin"))):
+    if not has_override_scope(actor) and request.company_id != actor.company_id:
+        raise HTTPException(status_code=403, detail="Cannot create plants for another company")
     row = Plant(id=f"plant-{request.code.lower()}", tenant_id=request.tenant_id, company_id=request.company_id, name=request.name, code=request.code, timezone=request.timezone)
     db.add(row)
     db.commit()
@@ -67,12 +76,17 @@ def create_plant(request: CreatePlantRequest, db: Session = Depends(get_db), _: 
 
 
 @router.get("/plants")
-def list_plants(db: Session = Depends(get_db), _: User = Depends(current_user)):
-    return [as_dict(row) for row in db.query(Plant).all()]
+def list_plants(db: Session = Depends(get_db), actor: User = Depends(current_user)):
+    query = db.query(Plant)
+    if not has_override_scope(actor):
+        query = query.filter(Plant.company_id == actor.company_id)
+    return [as_dict(row) for row in query.all()]
 
 
 @router.post("/departments")
-def create_department(request: CreateDepartmentRequest, db: Session = Depends(get_db), _: User = Depends(require_any("admin"))):
+def create_department(request: CreateDepartmentRequest, db: Session = Depends(get_db), actor: User = Depends(require_any("admin"))):
+    if not has_override_scope(actor) and request.company_id != actor.company_id:
+        raise HTTPException(status_code=403, detail="Cannot create departments for another company")
     row = Department(id=f"dept-{request.code.lower()}", tenant_id=request.tenant_id, company_id=request.company_id, plant_id=request.plant_id, name=request.name, code=request.code)
     db.add(row)
     db.commit()
@@ -81,12 +95,17 @@ def create_department(request: CreateDepartmentRequest, db: Session = Depends(ge
 
 
 @router.get("/departments")
-def list_departments(db: Session = Depends(get_db), _: User = Depends(current_user)):
-    return [as_dict(row) for row in db.query(Department).all()]
+def list_departments(db: Session = Depends(get_db), actor: User = Depends(current_user)):
+    query = db.query(Department)
+    if not has_override_scope(actor):
+        query = query.filter(Department.company_id == actor.company_id)
+    return [as_dict(row) for row in query.all()]
 
 
 @router.post("/users")
-def create_user(request: CreateUserRequest, db: Session = Depends(get_db), _: User = Depends(require_any("admin"))):
+def create_user(request: CreateUserRequest, db: Session = Depends(get_db), actor: User = Depends(require_any("admin"))):
+    if not has_override_scope(actor) and request.company_id != actor.company_id:
+        raise HTTPException(status_code=403, detail="Cannot create core users for another company")
     row = User(id=str(uuid4()), tenant_id=request.tenant_id, company_id=request.company_id, plant_id=request.plant_id, email=request.email, name=request.name, password_hash=hash_password(request.password))
     db.add(row)
     db.commit()
@@ -100,7 +119,9 @@ def list_users(db: Session = Depends(get_db), _: User = Depends(require_any("adm
 
 
 @router.post("/roles")
-def create_role(request: CreateRoleRequest, db: Session = Depends(get_db), _: User = Depends(require_any("admin"))):
+def create_role(request: CreateRoleRequest, db: Session = Depends(get_db), actor: User = Depends(require_any("admin"))):
+    if not has_override_scope(actor) and request.company_id != actor.company_id:
+        raise HTTPException(status_code=403, detail="Cannot create roles for another company")
     row = Role(id=str(uuid4()), tenant_id=request.tenant_id, company_id=request.company_id, name=request.name, permissions=request.permissions)
     db.add(row)
     db.commit()
@@ -128,7 +149,9 @@ def list_permissions(db: Session = Depends(get_db), _: User = Depends(require_an
 
 
 @router.post("/feature-flags")
-def set_feature_flag(request: FeatureFlagRequest, db: Session = Depends(get_db), _: User = Depends(require_any("admin"))):
+def set_feature_flag(request: FeatureFlagRequest, db: Session = Depends(get_db), actor: User = Depends(require_any("admin"))):
+    if not has_override_scope(actor) and request.company_id != actor.company_id:
+        raise HTTPException(status_code=403, detail="Cannot manage feature flags for another company")
     row = (
         db.query(FeatureFlag)
         .filter(
@@ -150,8 +173,11 @@ def set_feature_flag(request: FeatureFlagRequest, db: Session = Depends(get_db),
 
 
 @router.get("/feature-flags")
-def list_feature_flags(db: Session = Depends(get_db), _: User = Depends(current_user)):
-    return [as_dict(row) for row in db.query(FeatureFlag).all()]
+def list_feature_flags(db: Session = Depends(get_db), actor: User = Depends(current_user)):
+    query = db.query(FeatureFlag)
+    if not has_override_scope(actor):
+        query = query.filter(FeatureFlag.company_id == actor.company_id)
+    return [as_dict(row) for row in query.all()]
 
 
 @router.post("/feature-flags/{module_key}/enable")

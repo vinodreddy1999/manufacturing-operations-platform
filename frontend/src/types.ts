@@ -57,12 +57,35 @@ export type AiReadiness = {
 
 export type ConnectedSystem = {
   id: string;
+  company_id?: string;
   system_name: string;
   system_type: string;
   connection_status: string;
   last_sync: string;
   health_score: number;
   record_count: number;
+};
+
+export type DataCatalogEntry = {
+  id: string;
+  company_id?: string;
+  data_type: string;
+  source_system: string;
+  owner: string;
+  ai_ready: boolean;
+  quality_score: number;
+  lineage: Record<string, unknown>;
+};
+
+export type DataMappingRule = {
+  id: string;
+  company_id?: string;
+  source_system: string;
+  source_field: string;
+  target_entity: string;
+  target_field: string;
+  transform_rule?: string | null;
+  confidence: number;
 };
 
 export type CommandCenter = {

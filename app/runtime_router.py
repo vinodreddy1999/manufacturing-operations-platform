@@ -26,6 +26,7 @@ router = APIRouter(prefix="/runtime", tags=["Runtime Application"])
 TENANT_ID = "tenant-demo-001"
 COMPANY_ID = "company-c"
 PLANT_ID = "plant-north"
+OVERRIDE_ROLES = {"super_admin", "account_owner"}
 
 ROLE_PERMISSIONS = {
     "super_admin": ["platform.super_admin", "platform.admin", "account.override", "organization.override", "team.override", "users.manage", "roles.manage", "data.write", "data.read", "audit.read"],
@@ -57,6 +58,10 @@ def runtime_result(action: str, message: str, data: Any) -> RuntimeEnvelope:
 
 def permissions_for(role: str) -> list[str]:
     return ROLE_PERMISSIONS.get(role, ROLE_PERMISSIONS["user"])
+
+
+def has_override_scope(user: User) -> bool:
+    return (user.role or "user") in OVERRIDE_ROLES
 
 
 def serialize_user(user: User) -> dict[str, Any]:
@@ -109,8 +114,7 @@ def current_user(request: Request, db: Session = Depends(get_db)) -> User:
 
 def require_any(*roles: str):
     def dependency(user: User = Depends(current_user)) -> User:
-        override_roles = {"super_admin", "account_owner"}
-        if user.role not in roles and user.role not in override_roles:
+        if user.role not in roles and user.role not in OVERRIDE_ROLES:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient access")
         return user
 
@@ -157,7 +161,11 @@ def me(user: User = Depends(current_user)) -> RuntimeEnvelope:
 
 @router.get("/users", response_model=RuntimeEnvelope)
 def list_users(_: User = Depends(require_any("admin")), db: Session = Depends(get_db)) -> RuntimeEnvelope:
-    users = db.query(User).filter(User.tenant_id == TENANT_ID).order_by(User.email).all()
+    actor = _
+    query = db.query(User).filter(User.tenant_id == TENANT_ID)
+    if not has_override_scope(actor):
+        query = query.filter(User.company_id == actor.company_id)
+    users = query.order_by(User.email).all()
     return runtime_result("list_users", "Users with access status and roles.", [serialize_user(user) for user in users])
 
 
@@ -168,10 +176,13 @@ def create_user(payload: UserCreate, actor: User = Depends(require_any("admin"))
         raise HTTPException(status_code=409, detail="Email already exists")
     if payload.role in {"super_admin", "account_owner"} and actor.role != "super_admin":
         raise HTTPException(status_code=403, detail="Only super admin can create top-level override users")
+    target_company_id = payload.company_id or actor.company_id or COMPANY_ID
+    if not has_override_scope(actor) and target_company_id != actor.company_id:
+        raise HTTPException(status_code=403, detail="Cannot create users for another company")
     user = User(
         id=f"user-{uuid4()}",
         tenant_id=TENANT_ID,
-        company_id=payload.company_id or COMPANY_ID,
+        company_id=target_company_id,
         plant_id=payload.plant_id or PLANT_ID,
         email=payload.email,
         name=payload.name,
@@ -191,6 +202,8 @@ def update_user(user_id: str, payload: UserUpdate, actor: User = Depends(require
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    if not has_override_scope(actor) and user.company_id != actor.company_id:
+        raise HTTPException(status_code=403, detail="Cannot manage users from another company")
     if user.role in {"super_admin", "account_owner"} and actor.role != "super_admin":
         raise HTTPException(status_code=403, detail="Only super admin can update top-level override users")
     if payload.role in {"super_admin", "account_owner"} and actor.role != "super_admin":
@@ -215,10 +228,12 @@ def list_records(
     module_key: str | None = None,
     company_id: str | None = None,
     plant_id: str | None = None,
-    _: User = Depends(current_user),
+    actor: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> RuntimeEnvelope:
     query = db.query(ModuleRecord)
+    if not has_override_scope(actor):
+        query = query.filter(ModuleRecord.company_id == actor.company_id)
     if module_key:
         query = query.filter(ModuleRecord.module_key == module_key)
     if company_id:
@@ -231,10 +246,13 @@ def list_records(
 
 @router.post("/records", response_model=RuntimeEnvelope)
 def create_record(payload: ModuleRecordCreate, actor: User = Depends(require_any("admin")), db: Session = Depends(get_db)) -> RuntimeEnvelope:
+    target_company_id = payload.company_id or actor.company_id or COMPANY_ID
+    if not has_override_scope(actor) and target_company_id != actor.company_id:
+        raise HTTPException(status_code=403, detail="Cannot create records for another company")
     record = ModuleRecord(
         id=f"record-{uuid4()}",
         tenant_id=TENANT_ID,
-        company_id=payload.company_id or actor.company_id or COMPANY_ID,
+        company_id=target_company_id,
         plant_id=payload.plant_id or actor.plant_id or PLANT_ID,
         module_key=payload.module_key,
         record_type=payload.record_type,
@@ -257,6 +275,8 @@ def update_record(record_id: str, payload: ModuleRecordUpdate, actor: User = Dep
     record = db.get(ModuleRecord, record_id)
     if not record:
         raise HTTPException(status_code=404, detail="Record not found")
+    if not has_override_scope(actor) and record.company_id != actor.company_id:
+        raise HTTPException(status_code=403, detail="Cannot modify records from another company")
     old_value = serialize_record(record)
     updates = payload.model_dump(exclude_unset=True)
     for key, value in updates.items():
@@ -272,6 +292,8 @@ def delete_record(record_id: str, actor: User = Depends(require_any("admin")), d
     record = db.get(ModuleRecord, record_id)
     if not record:
         raise HTTPException(status_code=404, detail="Record not found")
+    if not has_override_scope(actor) and record.company_id != actor.company_id:
+        raise HTTPException(status_code=403, detail="Cannot delete records from another company")
     old_value = serialize_record(record)
     db.delete(record)
     audit(db, actor, "DELETE", "module_record", record_id, old_value, None)
@@ -286,10 +308,16 @@ def inventory_items(user: User = Depends(current_user), db: Session = Depends(ge
 
 @router.get("/analytics/summary", response_model=RuntimeEnvelope)
 def analytics_summary(_: User = Depends(current_user), db: Session = Depends(get_db)) -> RuntimeEnvelope:
-    records = db.query(ModuleRecord).all()
+    actor = _
+    record_query = db.query(ModuleRecord)
+    user_query = db.query(User)
+    if not has_override_scope(actor):
+        record_query = record_query.filter(ModuleRecord.company_id == actor.company_id)
+        user_query = user_query.filter(User.company_id == actor.company_id)
+    records = record_query.all()
     inventory = [record for record in records if record.module_key == "inventory"]
-    active_users = db.query(User).filter(User.is_active.is_(True)).count()
-    disabled_users = db.query(User).filter(User.is_active.is_(False)).count()
+    active_users = user_query.filter(User.is_active.is_(True)).count()
+    disabled_users = user_query.filter(User.is_active.is_(False)).count()
     total_quantity = sum(record.quantity or 0 for record in inventory)
     low_stock = [record for record in inventory if (record.quantity or 0) <= float((record.payload or {}).get("reorder_level", 0))]
     by_module: dict[str, int] = {}
@@ -319,7 +347,11 @@ def analytics_summary(_: User = Depends(current_user), db: Session = Depends(get
 
 @router.get("/audit-logs", response_model=RuntimeEnvelope)
 def audit_logs(_: User = Depends(require_any("admin")), db: Session = Depends(get_db)) -> RuntimeEnvelope:
-    logs = db.query(AuditLog).order_by(AuditLog.created_at.desc()).limit(50).all()
+    actor = _
+    query = db.query(AuditLog)
+    if not has_override_scope(actor):
+        query = query.filter(AuditLog.company_id == actor.company_id)
+    logs = query.order_by(AuditLog.created_at.desc()).limit(50).all()
     data = [
         {
             "id": log.id,

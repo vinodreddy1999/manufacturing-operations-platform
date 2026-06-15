@@ -2,6 +2,7 @@ from uuid import uuid4
 
 from sqlalchemy.orm import Session
 
+from .modules.frontend_admin_models import DataCatalogEntry, DataMappingRule, ManufacturingDataConnection, PendingErpUpdate
 from .platform_models import Company, Department, FeatureFlag, ModuleRecord, Permission, Plant, Role, User
 from .security import hash_password
 
@@ -124,6 +125,113 @@ def seed_platform(db: Session) -> None:
         for module_key in MODULE_KEYS:
             if not db.query(FeatureFlag).filter(FeatureFlag.tenant_id == "tenant-demo-001", FeatureFlag.company_id == company_id, FeatureFlag.module_key == module_key).first():
                 db.add(FeatureFlag(id=str(uuid4()), tenant_id="tenant-demo-001", company_id=company_id, module_key=module_key, enabled=True))
+
+    for company_id, company_name, company_code, plant_id, plant_name, *_ in COMPANY_SEEDS:
+        if not db.query(ManufacturingDataConnection).filter(ManufacturingDataConnection.id == f"conn-{company_id}-erp").first():
+            db.add(
+                ManufacturingDataConnection(
+                    id=f"conn-{company_id}-erp",
+                    company_id=company_id,
+                    system_name=f"{company_name} ERP",
+                    system_type="ERP",
+                    connection_status="Healthy",
+                    last_sync="2026-06-15T09:00:00Z",
+                    health_score=92,
+                    record_count=24000,
+                )
+            )
+        if not db.query(ManufacturingDataConnection).filter(ManufacturingDataConnection.id == f"conn-{company_id}-mes").first():
+            db.add(
+                ManufacturingDataConnection(
+                    id=f"conn-{company_id}-mes",
+                    company_id=company_id,
+                    system_name=f"{company_name} MES",
+                    system_type="MES",
+                    connection_status="Warning",
+                    last_sync="2026-06-15T08:40:00Z",
+                    health_score=78,
+                    record_count=8200,
+                )
+            )
+        if not db.query(DataCatalogEntry).filter(DataCatalogEntry.id == f"catalog-{company_id}-inventory").first():
+            db.add(
+                DataCatalogEntry(
+                    id=f"catalog-{company_id}-inventory",
+                    company_id=company_id,
+                    data_type="Inventory",
+                    source_system=f"{company_name} ERP",
+                    owner="Inventory Manager",
+                    ai_ready=True,
+                    quality_score=91,
+                    lineage={"plant": plant_name, "plant_id": plant_id, "warehouse": f"{company_code}-MAIN"},
+                )
+            )
+        if not db.query(DataCatalogEntry).filter(DataCatalogEntry.id == f"catalog-{company_id}-production").first():
+            db.add(
+                DataCatalogEntry(
+                    id=f"catalog-{company_id}-production",
+                    company_id=company_id,
+                    data_type="Production",
+                    source_system=f"{company_name} MES",
+                    owner="Production Manager",
+                    ai_ready=True,
+                    quality_score=86,
+                    lineage={"plant": plant_name, "plant_id": plant_id, "warehouse": f"{company_code}-FG"},
+                )
+            )
+        if not db.query(DataCatalogEntry).filter(DataCatalogEntry.id == f"catalog-{company_id}-machines").first():
+            db.add(
+                DataCatalogEntry(
+                    id=f"catalog-{company_id}-machines",
+                    company_id=company_id,
+                    data_type="Machine Data",
+                    source_system=f"{company_name} PLC",
+                    owner="Maintenance Manager",
+                    ai_ready=False,
+                    quality_score=74,
+                    lineage={"plant": plant_name, "plant_id": plant_id, "warehouse": f"{company_code}-MRO"},
+                )
+            )
+        if not db.query(DataMappingRule).filter(DataMappingRule.id == f"map-{company_id}-material").first():
+            db.add(
+                DataMappingRule(
+                    id=f"map-{company_id}-material",
+                    company_id=company_id,
+                    source_system=f"{company_name} ERP",
+                    source_field="Material Code",
+                    target_entity="InventoryItem",
+                    target_field="sku",
+                    transform_rule="trim_uppercase",
+                    confidence=0.98,
+                )
+            )
+        if not db.query(DataMappingRule).filter(DataMappingRule.id == f"map-{company_id}-plant").first():
+            db.add(
+                DataMappingRule(
+                    id=f"map-{company_id}-plant",
+                    company_id=company_id,
+                    source_system=f"{company_name} ERP",
+                    source_field="Plant",
+                    target_entity="Plant",
+                    target_field="plant_code",
+                    transform_rule="lookup_company_plant",
+                    confidence=0.95,
+                )
+            )
+        if not db.query(PendingErpUpdate).filter(PendingErpUpdate.id == f"erp-upd-{company_id}-001").first():
+            db.add(
+                PendingErpUpdate(
+                    id=f"erp-upd-{company_id}-001",
+                    company_id=company_id,
+                    recommendation=f"Increase safety stock for {company_name} item-steel",
+                    entity_type="InventoryItem",
+                    entity_id=f"{company_id}-item-steel",
+                    current_value={"safety_stock": 500},
+                    recommended_value={"safety_stock": 750},
+                    approval_status="Pending",
+                    erp_status="Draft",
+                )
+            )
 
     records = [
         ("inv-steel-001", "inventory", "raw_material", "RM-STEEL-001", "Stainless Steel Coil", "AVAILABLE", 1240.0, {"uom": "kg", "reorder_level": 500, "warehouse": "WH-A", "bin": "A-01-01", "unit_cost": 82}),

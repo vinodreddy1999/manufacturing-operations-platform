@@ -140,7 +140,7 @@ Open:
 http://127.0.0.1:8080
 ```
 
-Docker Compose also includes a `frontend` service exposed on port `8080`.
+Docker Compose also includes a standalone `frontend` service exposed on port `8081`.
 
 Docker Hub push:
 
@@ -164,7 +164,7 @@ Build:
 ```bash
 docker build \
   -t vinodreddy1999/manufacturing-operations-platform-fullstack:latest \
-  -t vinodreddy1999/manufacturing-operations-platform-fullstack:0.2.6 \
+  -t vinodreddy1999/manufacturing-operations-platform-fullstack:0.2.7 \
   .
 ```
 
@@ -199,9 +199,21 @@ User:        user@mop.local / User12345!
 Access model:
 
 - Super admin has full access and can create or update other super admins.
-- Admin can manage operational records and normal users.
-- User has read-only runtime access.
+- Admin is scoped to its own company and can manage only its company users, records, and DataHub metadata.
+- User has read-only runtime access and cannot access DataHub.
 - Disabled users cannot log in or call protected APIs.
+
+Multi-tenant validation helper:
+
+```bash
+python scripts/validate_multitenant_access.py
+```
+
+Expected validation highlights:
+
+- `admin@mop.local` only sees `company-c`
+- `super@mop.local` sees all companies
+- standard users receive `403` for DataHub routes
 
 Runtime APIs added:
 
@@ -218,6 +230,30 @@ Runtime APIs added:
 - `GET /runtime/inventory/items`
 - `GET /runtime/analytics/summary`
 - `GET /runtime/audit-logs`
+
+## Docker Compose Stack
+
+Run the full stack with PostgreSQL, Redis, backend API, full-stack app, standalone frontend, worker, nginx, and pgAdmin:
+
+```bash
+docker compose up -d --build
+```
+
+Default ports:
+
+- `8080`: full-stack app (frontend + backend served together)
+- `8081`: standalone frontend
+- `8000`: backend API only
+- `5432`: PostgreSQL
+- `5050`: pgAdmin
+- `80`: nginx reverse proxy
+
+Compose notes:
+
+- PostgreSQL is the primary metadata store in compose deployments.
+- Services share the `mop-network` Docker bridge network.
+- `seed-enterprise-data` runs once after the app is healthy and creates multi-company demo users and records.
+- pgAdmin uses `admin@mop.localhost.com / ChangeMe123!` by default.
 
 Enterprise endpoints:
 

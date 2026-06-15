@@ -33,3 +33,30 @@ class PendingUpdateDecisionRequest(BaseModel):
     decided_by: str = Field(default="company-admin")
     decision: str = Field(pattern="^(Approved|Rejected)$")
     comment: str | None = None
+
+
+class DataHubConnectionRequest(BaseModel):
+    system_name: str
+    system_type: str
+    connection_status: str
+    last_sync: str | None = None
+    health_score: float = Field(ge=0, le=100)
+    record_count: int = Field(ge=0, default=0)
+
+
+class DataCatalogEntryRequest(BaseModel):
+    data_type: str
+    source_system: str
+    owner: str
+    ai_ready: bool = False
+    quality_score: float = Field(ge=0, le=100)
+    lineage: dict[str, Any] = Field(default_factory=dict)
+
+
+class DataMappingRuleRequest(BaseModel):
+    source_system: str
+    source_field: str
+    target_entity: str
+    target_field: str
+    transform_rule: str | None = None
+    confidence: float = Field(ge=0, le=1)

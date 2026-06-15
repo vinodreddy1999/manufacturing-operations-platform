@@ -10,7 +10,7 @@ import { Panel } from '../components/Panel';
 import { StatCard } from '../components/StatCard';
 import { StatusBadge } from '../components/StatusBadge';
 import { AccessDeniedState } from '../components/AccessDeniedState';
-import { canManagePlatform } from '../lib/rbac';
+import { canCreateCompanies, canManagePlatform } from '../lib/rbac';
 import { backend } from '../services/api';
 import type { RuntimeUser } from '../types';
 
@@ -30,6 +30,7 @@ const roleOptions: Array<{ value: RuntimeUser['role']; label: string }> = [
 
 export function AdminPage({ user }: { user: RuntimeUser }) {
   const queryClient = useQueryClient();
+  const allowCompanyCreation = canCreateCompanies(user);
   const [selectedCompanyId, setSelectedCompanyId] = useState('company-c');
   const [newCompany, setNewCompany] = useState({ name: '', code: '' });
   const [newUser, setNewUser] = useState({
@@ -148,13 +149,19 @@ export function AdminPage({ user }: { user: RuntimeUser }) {
 
       <div className="mt-6 grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
         <Panel title="Company Setup" description="Create a company, select it, then manage its users and module access below.">
-          <form className="mb-4 grid gap-3 md:grid-cols-[1fr_160px_140px]" onSubmit={submitCompany}>
-            <input className="rounded-md border border-border px-3 py-2 text-sm" placeholder="Company name" value={newCompany.name} onChange={(event) => setNewCompany({ ...newCompany, name: event.target.value })} required />
-            <input className="rounded-md border border-border px-3 py-2 text-sm uppercase" placeholder="Code" value={newCompany.code} onChange={(event) => setNewCompany({ ...newCompany, code: event.target.value.toUpperCase() })} required />
-            <button className="rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60" disabled={createCompany.isPending}>
-              {createCompany.isPending ? 'Creating...' : 'Add Company'}
-            </button>
-          </form>
+          {allowCompanyCreation ? (
+            <form className="mb-4 grid gap-3 md:grid-cols-[1fr_160px_140px]" onSubmit={submitCompany}>
+              <input className="rounded-md border border-border px-3 py-2 text-sm" placeholder="Company name" value={newCompany.name} onChange={(event) => setNewCompany({ ...newCompany, name: event.target.value })} required />
+              <input className="rounded-md border border-border px-3 py-2 text-sm uppercase" placeholder="Code" value={newCompany.code} onChange={(event) => setNewCompany({ ...newCompany, code: event.target.value.toUpperCase() })} required />
+              <button className="rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60" disabled={createCompany.isPending}>
+                {createCompany.isPending ? 'Creating...' : 'Add Company'}
+              </button>
+            </form>
+          ) : (
+            <div className="mb-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+              Company creation is reserved for super admin and account owner roles. Your workspace remains limited to your assigned company.
+            </div>
+          )}
           <label className="block text-sm font-medium text-slate-700">
             Selected company
             <select className="mt-1 w-full rounded-md border border-border px-3 py-2 text-sm" value={effectiveCompanyId} onChange={(event) => {
