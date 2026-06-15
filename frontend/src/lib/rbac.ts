@@ -35,3 +35,11 @@ export function canWriteOperationalData(user: RuntimeUser) {
 export function canReadAuditLogs(user: RuntimeUser) {
   return user.permissions.includes('audit.read');
 }
+
+export function canEditExecutiveMetrics(user: RuntimeUser) {
+  return ['admin', 'super_admin'].includes(user.role);
+}
+
+export function canUseDataHubUploads(user: RuntimeUser) {
+  return ['admin', 'super_admin'].includes(user.role);
+}

@@ -18,7 +18,9 @@ import type {
   ModuleRecord,
   ModuleInfo,
   NavigationSection,
+  OperationalFootprint,
   RuntimeAnalytics,
+  DataHubUpload,
   RuntimeLoginResult,
   RuntimeUser,
 } from '../types';
@@ -89,8 +91,17 @@ export const backend = {
   },
   navigation: () => getEnvelope<NavigationSection[]>('/frontend/navigation'),
   adminDashboard: () => getEnvelope<AdminDashboard>('/admin/dashboard'),
+  operationalFootprint: () => getEnvelope<OperationalFootprint>('/admin/operational-footprint'),
+  updateOperationalFootprint: async (payload: OperationalFootprint) => {
+    const response = await api.put<ApiEnvelope<OperationalFootprint>>('/admin/operational-footprint', payload);
+    return response.data.data;
+  },
   dataQuality: () => getEnvelope<DataQuality>('/manufacturing-data-hub/data-quality'),
   aiReadiness: () => getEnvelope<AiReadiness>('/manufacturing-data-hub/ai-readiness'),
+  updateAiReadiness: async (payload: { readiness: AiReadiness['readiness'] }) => {
+    const response = await api.put<ApiEnvelope<AiReadiness>>('/manufacturing-data-hub/ai-readiness', payload);
+    return response.data.data;
+  },
   connectedSystems: () => getEnvelope<ConnectedSystem[]>('/manufacturing-data-hub/connected-systems'),
   createConnectedSystem: async (payload: Omit<ConnectedSystem, 'id'>) => {
     const response = await api.post<ApiEnvelope<ConnectedSystem>>('/manufacturing-data-hub/connected-systems', payload);
@@ -128,6 +139,19 @@ export const backend = {
   },
   deleteDataMapping: async (id: string) => {
     const response = await api.delete<ApiEnvelope<{ id: string }>>(`/manufacturing-data-hub/mappings/${id}`);
+    return response.data.data;
+  },
+  uploads: () => getEnvelope<DataHubUpload[]>('/manufacturing-data-hub/uploads'),
+  uploadFile: async (file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    const response = await api.post<ApiEnvelope<DataHubUpload>>('/manufacturing-data-hub/uploads', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data.data;
+  },
+  createCloudSource: async (payload: { provider: string; resource_name: string; resource_url: string; file_format: string; sync_mode: string }) => {
+    const response = await api.post<ApiEnvelope<DataHubUpload>>('/manufacturing-data-hub/cloud-sources', payload);
     return response.data.data;
   },
   commandCenter: () => getEnvelope<CommandCenter>('/manufacturing-intelligence/command-center'),

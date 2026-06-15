@@ -130,6 +130,58 @@ def test_inventory_metadata_is_persisted_in_database():
         assert row.payload["action"] == "COUNT_STOCK"
 
 
+def test_admin_can_update_ai_readiness_overrides():
+    headers = runtime_headers("admin@mop.local", "ChangeMe123!")
+    response = client.put(
+        "/manufacturing-data-hub/ai-readiness",
+        headers=headers,
+        json={
+            "readiness": [
+                {"area": "ERP AI Readiness", "score": 88, "ready": True},
+                {"area": "Quality AI Readiness", "score": 76, "ready": True},
+            ]
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["data"]["overall_ai_readiness"] == 82
+
+
+def test_admin_can_update_operational_footprint():
+    headers = runtime_headers("admin@mop.local", "ChangeMe123!")
+    response = client.put(
+        "/admin/operational-footprint",
+        headers=headers,
+        json={"plants": 9, "warehouses": 14, "integrations": 11, "open_approvals": 6},
+    )
+    assert response.status_code == 200
+    data = client.get("/admin/operational-footprint", headers=headers).json()["data"]
+    assert data["plants"] == 9
+    assert data["warehouses"] == 14
+
+
+def test_admin_can_upload_datahub_file_manifest():
+    headers = runtime_headers("admin@mop.local", "ChangeMe123!")
+    response = client.post(
+        "/manufacturing-data-hub/uploads",
+        headers=headers,
+        files={"file": ("erp-export.csv", b"material,qty\nRM-001,25\nRM-002,40\n", "text/csv")},
+    )
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["source"] == "local_upload"
+    assert data["metadata"]["preview"]["columns"] == ["material", "qty"]
+
+
+def test_non_admin_cannot_upload_datahub_file():
+    headers = runtime_headers("user@mop.local", "User12345!")
+    response = client.post(
+        "/manufacturing-data-hub/uploads",
+        headers=headers,
+        files={"file": ("erp-export.csv", b"material,qty\nRM-001,25\n", "text/csv")},
+    )
+    assert response.status_code == 403
+
+
 def test_core_company_seed_available():
     response = client.get("/companies", headers=runtime_headers())
     assert response.status_code == 200

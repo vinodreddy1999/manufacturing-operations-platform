@@ -195,3 +195,34 @@ export type AuditLog = {
   new_value?: Record<string, unknown> | null;
   created_at?: string | null;
 };
+
+export type OperationalFootprint = {
+  user_count?: number;
+  active_users?: number;
+  plants: number;
+  warehouses: number;
+  integrations: number;
+  open_approvals: number;
+};
+
+export type DataHubUpload = {
+  id: string;
+  company_id?: string | null;
+  source: 'local_upload' | 'cloud_link' | string;
+  provider: string;
+  resource_name: string;
+  file_format: string;
+  resource_url?: string | null;
+  uploaded_by: string;
+  status: string;
+  metadata?: {
+    content_type?: string;
+    size_bytes?: number;
+    sync_mode?: string;
+    preview?: {
+      detected_format?: string;
+      columns?: string[];
+      sample_rows?: Array<Record<string, unknown>>;
+    };
+  };
+};

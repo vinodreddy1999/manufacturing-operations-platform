@@ -1,23 +1,30 @@
 from statistics import mean
 from typing import Any
 from uuid import uuid4
+from io import BytesIO
+from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException
+import pandas as pd
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from . import frontend_admin_models  # noqa: F401
 from ..database import get_db
-from ..platform_models import User
+from ..metadata_store import first_metadata, list_metadata, upsert_metadata
+from ..platform_models import AppMetadata, User
 from ..platform_models import Plant
 from ..runtime_router import current_user, require_any
 from .frontend_admin_repository import frontend_admin_repo
 from .frontend_admin_schemas import (
+    AiReadinessOverrideRequest,
+    CloudSourceUploadRequest,
     DataCatalogEntryRequest,
     DataHubConnectionRequest,
     DashboardAccessRequest,
     DataMappingRuleRequest,
     DataMappingPreviewRequest,
     FrontendAdminApiResult,
+    OperationalFootprintRequest,
     PendingUpdateDecisionRequest,
     WorkflowSimulationRequest,
 )
@@ -43,6 +50,140 @@ def has_override_scope(user: User) -> bool:
 
 def scoped_company_id(user: User) -> str | None:
     return None if has_override_scope(user) else user.company_id
+
+
+def can_edit_executive_metrics(user: User) -> bool:
+    return (user.role or "user") in {"admin", "super_admin"}
+
+
+def require_executive_editor(user: User = Depends(current_user)) -> User:
+    if not can_edit_executive_metrics(user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admin and super admin users can modify executive dashboard metrics",
+        )
+    return user
+
+
+def ai_readiness_payload(row: frontend_admin_models.DataCatalogEntry) -> dict[str, Any]:
+    return {
+        "area": f"{row.data_type} AI Readiness",
+        "score": row.quality_score if row.ai_ready else max(row.quality_score - 20, 0),
+        "ready": row.ai_ready,
+    }
+
+
+def merged_ai_readiness(actor: User, db: Session) -> dict[str, Any]:
+    company_id = scoped_company_id(actor)
+    query = db.query(frontend_admin_models.DataCatalogEntry)
+    if company_id:
+        query = query.filter(frontend_admin_models.DataCatalogEntry.company_id == company_id)
+    rows = query.all()
+    base_rows = [ai_readiness_payload(row) for row in rows]
+    overrides = {
+        item["area"]: item
+        for item in list_metadata(
+            db,
+            "ai_readiness_override",
+            company_id=actor.company_id,
+        )
+    }
+    readiness = [overrides.get(item["area"], item) for item in base_rows]
+    if not readiness:
+        readiness = list(overrides.values())
+    overall = round(mean(item["score"] for item in readiness), 2) if readiness else 0
+    return {"overall_ai_readiness": overall, "readiness": readiness}
+
+
+def computed_operational_footprint(actor: User, db: Session) -> dict[str, int]:
+    user_query = db.query(User)
+    plant_query = db.query(Plant)
+    connection_query = db.query(frontend_admin_models.ManufacturingDataConnection)
+    catalog_query = db.query(frontend_admin_models.DataCatalogEntry)
+    pending_query = db.query(frontend_admin_models.PendingErpUpdate)
+    company_id = scoped_company_id(actor)
+    if company_id:
+        user_query = user_query.filter(User.company_id == company_id)
+        plant_query = plant_query.filter(Plant.company_id == company_id)
+        connection_query = connection_query.filter(frontend_admin_models.ManufacturingDataConnection.company_id == company_id)
+        catalog_query = catalog_query.filter(frontend_admin_models.DataCatalogEntry.company_id == company_id)
+        pending_query = pending_query.filter(frontend_admin_models.PendingErpUpdate.company_id == company_id)
+    catalog_rows = catalog_query.all()
+    return {
+        "user_count": user_query.count(),
+        "active_users": user_query.filter(User.is_active.is_(True)).count(),
+        "plants": plant_query.count(),
+        "warehouses": len({(row.lineage or {}).get("warehouse") for row in catalog_rows if (row.lineage or {}).get("warehouse")}),
+        "integrations": connection_query.count(),
+        "open_approvals": len([row for row in pending_query.all() if row.approval_status == "Pending"]),
+    }
+
+
+def merged_operational_footprint(actor: User, db: Session) -> dict[str, int]:
+    base = computed_operational_footprint(actor, db)
+    override = first_metadata(
+        db,
+        "operational_footprint_override",
+        "dashboard",
+        company_id=actor.company_id,
+    )
+    if override:
+        base.update(
+            {
+                "plants": int(override.get("plants", base["plants"])),
+                "warehouses": int(override.get("warehouses", base["warehouses"])),
+                "integrations": int(override.get("integrations", base["integrations"])),
+                "open_approvals": int(override.get("open_approvals", base["open_approvals"])),
+            }
+        )
+    return base
+
+
+def upload_manifest_payload(
+    *,
+    company_id: str | None,
+    source: str,
+    provider: str,
+    resource_name: str,
+    file_format: str,
+    resource_url: str | None,
+    uploaded_by: str,
+    metadata: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    return {
+        "id": f"upload-{uuid4()}",
+        "company_id": company_id,
+        "source": source,
+        "provider": provider,
+        "resource_name": resource_name,
+        "file_format": file_format,
+        "resource_url": resource_url,
+        "uploaded_by": uploaded_by,
+        "status": "ready",
+        "metadata": metadata or {},
+    }
+
+
+def extract_upload_preview(filename: str, content: bytes) -> dict[str, Any]:
+    suffix = Path(filename).suffix.lower()
+    preview: dict[str, Any] = {"detected_format": suffix.lstrip(".") or "unknown"}
+    if suffix in {".csv", ".tsv"}:
+        separator = "\t" if suffix == ".tsv" else ","
+        frame = pd.read_csv(BytesIO(content), sep=separator, nrows=5)
+        preview["columns"] = list(frame.columns)
+        preview["sample_rows"] = frame.fillna("").to_dict(orient="records")
+    elif suffix in {".xls", ".xlsx", ".xlsm"}:
+        frame = pd.read_excel(BytesIO(content), nrows=5)
+        preview["columns"] = list(frame.columns)
+        preview["sample_rows"] = frame.fillna("").to_dict(orient="records")
+    elif suffix in {".json"}:
+        frame = pd.read_json(BytesIO(content)).head(5)
+        preview["columns"] = list(frame.columns)
+        preview["sample_rows"] = frame.fillna("").to_dict(orient="records")
+    else:
+        preview["columns"] = []
+        preview["sample_rows"] = []
+    return preview
 
 
 def serialize_connection(row: frontend_admin_models.ManufacturingDataConnection) -> dict[str, Any]:
@@ -108,41 +249,61 @@ def admin_dashboard(
     db: Session = Depends(get_db),
 ) -> FrontendAdminApiResult:
     user_query = db.query(User)
-    plant_query = db.query(Plant)
-    connection_query = db.query(frontend_admin_models.ManufacturingDataConnection)
     catalog_query = db.query(frontend_admin_models.DataCatalogEntry)
     pending_query = db.query(frontend_admin_models.PendingErpUpdate)
     company_id = scoped_company_id(actor)
     if company_id:
         user_query = user_query.filter(User.company_id == company_id)
-        plant_query = plant_query.filter(Plant.company_id == company_id)
-        connection_query = connection_query.filter(frontend_admin_models.ManufacturingDataConnection.company_id == company_id)
         catalog_query = catalog_query.filter(frontend_admin_models.DataCatalogEntry.company_id == company_id)
         pending_query = pending_query.filter(frontend_admin_models.PendingErpUpdate.company_id == company_id)
-
     catalog_rows = catalog_query.all()
     pending_rows = pending_query.all()
     data_quality = round(mean([row.quality_score for row in catalog_rows]), 2) if catalog_rows else 0
-    readiness_rows = [
-        row.quality_score if row.ai_ready else max(row.quality_score - 20, 0)
-        for row in catalog_rows
-    ]
-    ai_readiness = round(mean(readiness_rows), 2) if readiness_rows else 0
+    ai_readiness = merged_ai_readiness(actor, db)["overall_ai_readiness"]
+    footprint = merged_operational_footprint(actor, db)
     return result(
         "admin_dashboard",
         "Admin dashboard metrics.",
         {
             "user_count": user_query.count(),
             "active_users": user_query.filter(User.is_active.is_(True)).count(),
-            "plants": plant_query.count(),
-            "warehouses": len({(row.lineage or {}).get("warehouse") for row in catalog_rows if (row.lineage or {}).get("warehouse")}),
-            "integrations": connection_query.count(),
+            "plants": footprint["plants"],
+            "warehouses": footprint["warehouses"],
+            "integrations": footprint["integrations"],
             "data_quality": data_quality,
             "ai_readiness": ai_readiness,
-            "open_approvals": len([row for row in pending_rows if row.approval_status == "Pending"]),
+            "open_approvals": footprint["open_approvals"],
             "pending_actions": len(pending_rows),
         },
     )
+
+
+@admin_router.get("/operational-footprint", response_model=FrontendAdminApiResult)
+def operational_footprint(
+    actor: User = Depends(require_any("admin")),
+    db: Session = Depends(get_db),
+) -> FrontendAdminApiResult:
+    return result("operational_footprint", "Operational footprint metrics.", merged_operational_footprint(actor, db))
+
+
+@admin_router.put("/operational-footprint", response_model=FrontendAdminApiResult)
+def update_operational_footprint(
+    request: OperationalFootprintRequest,
+    actor: User = Depends(require_executive_editor),
+    db: Session = Depends(get_db),
+) -> FrontendAdminApiResult:
+    payload = request.model_dump()
+    upsert_metadata(
+        db,
+        category="operational_footprint_override",
+        record_key="dashboard",
+        row_id=f"footprint-{actor.company_id or 'platform'}",
+        company_id=actor.company_id,
+        payload=payload,
+        name="Operational Footprint Override",
+    )
+    db.commit()
+    return result("update_operational_footprint", "Operational footprint updated.", payload)
 
 
 @admin_router.get("/company-setup", response_model=FrontendAdminApiResult)
@@ -448,22 +609,104 @@ def ai_readiness(
     actor: User = Depends(require_any("admin")),
     db: Session = Depends(get_db),
 ) -> FrontendAdminApiResult:
-    query = db.query(frontend_admin_models.DataCatalogEntry)
-    company_id = scoped_company_id(actor)
-    if company_id:
-        query = query.filter(frontend_admin_models.DataCatalogEntry.company_id == company_id)
-    rows = query.all()
-    if not rows:
-        return result("ai_readiness", "AI readiness center scores.", {"overall_ai_readiness": 0, "readiness": []})
-    readiness = [
-        {
-            "area": f"{row.data_type} AI Readiness",
-            "score": row.quality_score if row.ai_ready else max(row.quality_score - 20, 0),
-            "ready": row.ai_ready,
-        }
-        for row in rows
-    ]
-    return result("ai_readiness", "AI readiness center scores.", {"overall_ai_readiness": round(mean(item["score"] for item in readiness), 2), "readiness": readiness})
+    return result("ai_readiness", "AI readiness center scores.", merged_ai_readiness(actor, db))
+
+
+@data_hub_router.put("/ai-readiness", response_model=FrontendAdminApiResult)
+def update_ai_readiness(
+    request: AiReadinessOverrideRequest,
+    actor: User = Depends(require_executive_editor),
+    db: Session = Depends(get_db),
+) -> FrontendAdminApiResult:
+    rows = []
+    for item in request.readiness:
+        payload = item.model_dump()
+        upsert_metadata(
+            db,
+            category="ai_readiness_override",
+            record_key=item.area,
+            row_id=f"air-{uuid4()}",
+            company_id=actor.company_id,
+            payload=payload,
+            name=item.area,
+        )
+        rows.append(payload)
+    db.commit()
+    overall = round(mean(item["score"] for item in rows), 2) if rows else 0
+    return result("update_ai_readiness", "AI readiness overrides updated.", {"overall_ai_readiness": overall, "readiness": rows})
+
+
+@data_hub_router.get("/uploads", response_model=FrontendAdminApiResult)
+def uploads(
+    actor: User = Depends(require_any("admin")),
+    db: Session = Depends(get_db),
+) -> FrontendAdminApiResult:
+    rows = list_metadata(db, "datahub_upload", company_id=actor.company_id)
+    return result("uploads", "Stored DataHub upload manifests.", rows)
+
+
+@data_hub_router.post("/uploads", response_model=FrontendAdminApiResult)
+async def create_upload(
+    file: UploadFile = File(...),
+    actor: User = Depends(require_executive_editor),
+    db: Session = Depends(get_db),
+) -> FrontendAdminApiResult:
+    content = await file.read()
+    preview = extract_upload_preview(file.filename or "upload", content)
+    payload = upload_manifest_payload(
+        company_id=actor.company_id,
+        source="local_upload",
+        provider="Local Computer",
+        resource_name=file.filename or "upload",
+        file_format=preview["detected_format"],
+        resource_url=None,
+        uploaded_by=actor.email,
+        metadata={
+            "content_type": file.content_type,
+            "size_bytes": len(content),
+            "preview": preview,
+        },
+    )
+    upsert_metadata(
+        db,
+        category="datahub_upload",
+        record_key=payload["id"],
+        row_id=payload["id"],
+        company_id=actor.company_id,
+        payload=payload,
+        name=payload["resource_name"],
+    )
+    db.commit()
+    return result("create_upload", "DataHub file uploaded and profiled.", payload)
+
+
+@data_hub_router.post("/cloud-sources", response_model=FrontendAdminApiResult)
+def create_cloud_source(
+    request: CloudSourceUploadRequest,
+    actor: User = Depends(require_executive_editor),
+    db: Session = Depends(get_db),
+) -> FrontendAdminApiResult:
+    payload = upload_manifest_payload(
+        company_id=actor.company_id,
+        source="cloud_link",
+        provider=request.provider,
+        resource_name=request.resource_name,
+        file_format=request.file_format,
+        resource_url=request.resource_url,
+        uploaded_by=actor.email,
+        metadata={"sync_mode": request.sync_mode},
+    )
+    upsert_metadata(
+        db,
+        category="datahub_upload",
+        record_key=payload["id"],
+        row_id=payload["id"],
+        company_id=actor.company_id,
+        payload=payload,
+        name=payload["resource_name"],
+    )
+    db.commit()
+    return result("create_cloud_source", "Cloud storage source linked for DataHub intake.", payload)
 
 
 @data_hub_router.get("/lineage", response_model=FrontendAdminApiResult)

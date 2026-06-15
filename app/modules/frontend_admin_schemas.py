@@ -60,3 +60,28 @@ class DataMappingRuleRequest(BaseModel):
     target_field: str
     transform_rule: str | None = None
     confidence: float = Field(ge=0, le=1)
+
+
+class AiReadinessOverrideItem(BaseModel):
+    area: str
+    score: float = Field(ge=0, le=100)
+    ready: bool = False
+
+
+class AiReadinessOverrideRequest(BaseModel):
+    readiness: list[AiReadinessOverrideItem]
+
+
+class OperationalFootprintRequest(BaseModel):
+    plants: int = Field(ge=0)
+    warehouses: int = Field(ge=0)
+    integrations: int = Field(ge=0)
+    open_approvals: int = Field(ge=0)
+
+
+class CloudSourceUploadRequest(BaseModel):
+    provider: str
+    resource_name: str
+    resource_url: str
+    file_format: str
+    sync_mode: str = Field(default="manual")

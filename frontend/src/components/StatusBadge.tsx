@@ -15,10 +15,10 @@ export function StatusBadge({ status }: StatusBadgeProps) {
         : 'neutral';
 
   const classes = {
-    good: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-    warn: 'border-amber-200 bg-amber-50 text-amber-700',
-    bad: 'border-red-200 bg-red-50 text-red-700',
-    neutral: 'border-slate-200 bg-slate-50 text-slate-700',
+    good: 'border-emerald-300/25 bg-emerald-400/10 text-emerald-100',
+    warn: 'border-amber-300/25 bg-amber-400/10 text-amber-100',
+    bad: 'border-red-300/25 bg-red-400/10 text-red-100',
+    neutral: 'border-white/15 bg-white/8 text-slate-200',
   }[state];
 
   const Icon = {

@@ -3,23 +3,24 @@
 @tailwind utilities;
 
 :root {
-  --background: 36 100% 98%;
-  --foreground: 222 47% 11%;
-  --muted: 36 44% 94%;
-  --muted-foreground: 215 16% 40%;
-  --card: 0 0% 100%;
-  --card-foreground: 222 47% 11%;
-  --border: 28 39% 88%;
-  --primary: 204 90% 40%;
-  --primary-foreground: 210 40% 98%;
+  --background: 224 45% 7%;
+  --foreground: 210 40% 98%;
+  --muted: 222 29% 16%;
+  --muted-foreground: 215 20% 72%;
+  --card: 224 38% 12%;
+  --card-foreground: 210 40% 98%;
+  --border: 215 28% 24%;
+  --primary: 190 95% 55%;
+  --primary-foreground: 222 47% 11%;
   --destructive: 0 84% 60%;
 }
 
 html {
   background:
-    radial-gradient(circle at top left, rgba(251, 191, 36, 0.18), transparent 24%),
-    radial-gradient(circle at top right, rgba(14, 116, 144, 0.16), transparent 28%),
-    linear-gradient(180deg, #fffdfa 0%, #f7f3eb 100%);
+    radial-gradient(circle at 10% 15%, rgba(34, 211, 238, 0.18), transparent 20%),
+    radial-gradient(circle at 85% 18%, rgba(168, 85, 247, 0.2), transparent 24%),
+    radial-gradient(circle at 60% 80%, rgba(59, 130, 246, 0.14), transparent 18%),
+    linear-gradient(145deg, #020617 0%, #0f172a 45%, #111827 100%);
 }
 
 body {
@@ -28,7 +29,7 @@ body {
   color: hsl(var(--foreground));
   background: transparent;
   font-family:
-    "Segoe UI Variable", "Aptos", "Trebuchet MS", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Inter, "Segoe UI Variable", "Aptos", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
 }
 
@@ -42,23 +43,22 @@ body {
   inset: 0;
   z-index: -2;
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.25)),
-    radial-gradient(circle at 12% 18%, rgba(250, 204, 21, 0.2), transparent 22%),
-    radial-gradient(circle at 88% 10%, rgba(14, 165, 233, 0.16), transparent 24%),
-    radial-gradient(circle at 70% 75%, rgba(249, 115, 22, 0.12), transparent 20%);
+    radial-gradient(circle at 15% 25%, rgba(34, 211, 238, 0.18), transparent 26%),
+    radial-gradient(circle at 78% 20%, rgba(168, 85, 247, 0.16), transparent 24%),
+    radial-gradient(circle at 70% 82%, rgba(56, 189, 248, 0.14), transparent 20%);
   pointer-events: none;
 }
 
 .app-shell::after {
   content: "";
   position: fixed;
-  inset: auto -8rem -10rem auto;
-  width: 26rem;
-  height: 26rem;
+  inset: 0;
   z-index: -1;
-  border-radius: 9999px;
-  background: radial-gradient(circle, rgba(14, 116, 144, 0.12), transparent 68%);
-  filter: blur(10px);
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 42px 42px;
+  mask-image: linear-gradient(180deg, rgba(255, 255, 255, 0.65), transparent 92%);
   pointer-events: none;
 }
 
@@ -69,6 +69,16 @@ textarea {
   font: inherit;
 }
 
+input::placeholder,
+textarea::placeholder {
+  color: #64748b;
+}
+
+select option {
+  background: #0f172a;
+  color: #f8fafc;
+}
+
 .focus-ring {
-  @apply outline-none ring-offset-2 focus-visible:ring-2 focus-visible:ring-primary;
+  @apply outline-none ring-offset-2 focus-visible:ring-2 focus-visible:ring-cyan-300;
 }
