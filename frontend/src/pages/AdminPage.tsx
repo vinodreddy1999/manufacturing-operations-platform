@@ -9,6 +9,8 @@ import { PageHeader } from '../components/PageHeader';
 import { Panel } from '../components/Panel';
 import { StatCard } from '../components/StatCard';
 import { StatusBadge } from '../components/StatusBadge';
+import { AccessDeniedState } from '../components/AccessDeniedState';
+import { canManagePlatform } from '../lib/rbac';
 import { backend } from '../services/api';
 import type { RuntimeUser } from '../types';
 
@@ -26,7 +28,7 @@ const roleOptions: Array<{ value: RuntimeUser['role']; label: string }> = [
   { value: 'super_admin', label: 'Super Admin' },
 ];
 
-export function AdminPage() {
+export function AdminPage({ user }: { user: RuntimeUser }) {
   const queryClient = useQueryClient();
   const [selectedCompanyId, setSelectedCompanyId] = useState('company-c');
   const [newCompany, setNewCompany] = useState({ name: '', code: '' });
@@ -84,15 +86,6 @@ export function AdminPage() {
     },
   });
 
-  if ([navigation, dashboard, access, users, auditLogs, companies, featureFlags].some((query) => query.isLoading)) {
-    return <LoadingState label="Loading admin contracts from backend APIs" />;
-  }
-
-  const firstError = [navigation, dashboard, access, users, auditLogs, companies, featureFlags].find((query) => query.isError)?.error;
-  if (firstError) {
-    return <ErrorState error={firstError} title="Admin API integration failed" />;
-  }
-
   const companyNameById = useMemo(() => new Map((companies.data ?? []).map((company) => [company.id, company.name])), [companies.data]);
   const companyRows = companies.data ?? [];
   const selectedCompany = companyRows.find((company) => company.id === selectedCompanyId) ?? companyRows[0];
@@ -109,6 +102,24 @@ export function AdminPage() {
     items: section.items.join(', '),
     scope: section.super_admin_only ? 'Super Admin' : 'Company / role scoped',
   }));
+
+  if (!canManagePlatform(user)) {
+    return (
+      <AccessDeniedState
+        title="Admin controls are restricted"
+        description="This section is reserved for platform administration roles with user and company management access."
+      />
+    );
+  }
+
+  if ([navigation, dashboard, access, users, auditLogs, companies, featureFlags].some((query) => query.isLoading)) {
+    return <LoadingState label="Loading admin contracts from backend APIs" />;
+  }
+
+  const firstError = [navigation, dashboard, access, users, auditLogs, companies, featureFlags].find((query) => query.isError)?.error;
+  if (firstError) {
+    return <ErrorState error={firstError} title="Admin API integration failed" />;
+  }
 
   function submitUser(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

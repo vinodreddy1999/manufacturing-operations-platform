@@ -9,7 +9,7 @@ type ErrorStateProps = {
 
 export function ErrorState({ error, title = 'Unable to load data' }: ErrorStateProps) {
   return (
-    <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+    <div className="rounded-[24px] border border-red-200 bg-red-50/95 p-5 text-sm text-red-800 shadow-panel">
       <div className="flex gap-3">
         <AlertTriangle className="mt-0.5 h-5 w-5 flex-none" />
         <div>

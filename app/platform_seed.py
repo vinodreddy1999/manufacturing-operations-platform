@@ -47,14 +47,20 @@ def seed_platform(db: Session) -> None:
     seed_users = [
         ("user-super-001", "super@mop.local", "MOP Super Admin", "super_admin", "SuperAdmin123!"),
         ("user-owner-001", "owner@mop.local", "MOP Account Owner", "account_owner", "Owner12345!"),
+        ("user-orgadmin-001", "orgadmin@mop.local", "MOP Organization Admin", "organization_admin", "OrgAdmin123!"),
         ("user-admin-001", "admin@mop.local", "MOP Admin", "admin", "ChangeMe123!"),
         ("user-manager-001", "manager@mop.local", "MOP Team Manager", "team_manager", "Manager123!"),
+        ("user-supervisor-001", "supervisor@mop.local", "MOP Supervisor", "supervisor", "Supervisor123!"),
+        ("user-operator-001", "operator@mop.local", "MOP Operator", "operator", "Operator123!"),
         ("user-auditor-001", "auditor@mop.local", "MOP Auditor", "auditor", "Auditor123!"),
         ("user-qa-001", "qa@mop.local", "MOP QA Tester", "qa_tester", "QaTester123!"),
+        ("user-custom-001", "custom@mop.local", "MOP Custom User", "custom", "Custom123!"),
         ("user-viewer-001", "user@mop.local", "MOP User", "user", "User12345!"),
+        ("user-disabled-001", "disabled.operator@mop.local", "MOP Disabled Operator", "operator", "Disabled123!"),
     ]
     for user_id, email, name, role, password in seed_users:
         user = db.query(User).filter(User.id == user_id).first()
+        is_active = email != "disabled.operator@mop.local"
         if not user:
             db.add(
                 User(
@@ -66,12 +72,12 @@ def seed_platform(db: Session) -> None:
                     name=name,
                     password_hash=hash_password(password),
                     role=role,
-                    is_active=True,
+                    is_active=is_active,
                 )
             )
         else:
             user.role = role
-            user.is_active = True
+            user.is_active = is_active
 
     roles = [
         ("role-super-admin", "Super Admin", ["platform.super_admin", "platform.admin", "account.override", "organization.override", "team.override", "users.manage", "roles.manage", "data.write", "data.read", "audit.read"]),

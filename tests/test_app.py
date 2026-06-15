@@ -6,6 +6,12 @@ from app.main import app
 client = TestClient(app)
 
 
+def runtime_headers(email: str = "super@mop.local", password: str = "SuperAdmin123!") -> dict[str, str]:
+    response = client.post("/runtime/auth/login", json={"email": email, "password": password})
+    assert response.status_code == 200
+    return {"Authorization": f"Bearer {response.json()['data']['access_token']}"}
+
+
 def test_health():
     response = client.get("/health")
     assert response.status_code == 200
@@ -109,30 +115,32 @@ def test_inventory_mobile_scan():
 
 
 def test_core_company_seed_available():
-    response = client.get("/companies")
+    response = client.get("/companies", headers=runtime_headers())
     assert response.status_code == 200
     companies = response.json()
     assert any(company["id"] == "company-c" for company in companies)
 
 
 def test_feature_flag_toggle():
-    response = client.post("/feature-flags/warehouse/disable")
+    headers = runtime_headers("admin@mop.local", "ChangeMe123!")
+    response = client.post("/feature-flags/warehouse/disable", headers=headers)
     assert response.status_code == 200
     assert response.json()["enabled"] is False
 
-    response = client.post("/feature-flags/warehouse/enable")
+    response = client.post("/feature-flags/warehouse/enable", headers=headers)
     assert response.status_code == 200
     assert response.json()["enabled"] is True
 
 
 def test_feature_flag_toggle_for_selected_company():
-    response = client.post("/feature-flags/inventory/disable?company_id=company-apex")
+    headers = runtime_headers("admin@mop.local", "ChangeMe123!")
+    response = client.post("/feature-flags/inventory/disable?company_id=company-apex", headers=headers)
     assert response.status_code == 200
     assert response.json()["company_id"] == "company-apex"
     assert response.json()["module_key"] == "inventory"
     assert response.json()["enabled"] is False
 
-    flags = client.get("/feature-flags")
+    flags = client.get("/feature-flags", headers=headers)
     assert flags.status_code == 200
     apex_inventory = [
         flag for flag in flags.json()
@@ -140,7 +148,7 @@ def test_feature_flag_toggle_for_selected_company():
     ][0]
     assert apex_inventory["enabled"] is False
 
-    response = client.post("/feature-flags/inventory/enable?company_id=company-apex")
+    response = client.post("/feature-flags/inventory/enable?company_id=company-apex", headers=headers)
     assert response.status_code == 200
     assert response.json()["enabled"] is True
 
@@ -149,20 +157,21 @@ def test_registered_modules_have_company_allocations():
     module_keys = {item["key"].lower() for item in client.get("/modules").json()}
     company_c_flags = {
         item["module_key"]
-        for item in client.get("/feature-flags").json()
+        for item in client.get("/feature-flags", headers=runtime_headers()).json()
         if item["company_id"] == "company-c"
     }
     assert module_keys.issubset(company_c_flags)
 
 
 def test_create_company_initializes_module_allocations():
-    company = client.post("/companies", json={"name": "Pytest Company", "code": "PYTCO"})
+    headers = runtime_headers("admin@mop.local", "ChangeMe123!")
+    company = client.post("/companies", headers=headers, json={"tenant_id": "tenant-demo-001", "name": "Pytest Company", "code": "PYTCO"})
     assert company.status_code in {200, 409}
 
     module_keys = {item["key"].lower() for item in client.get("/modules").json()}
     company_flags = {
         item["module_key"]: item["enabled"]
-        for item in client.get("/feature-flags").json()
+        for item in client.get("/feature-flags", headers=headers).json()
         if item["company_id"] == "company-pytco"
     }
     assert module_keys.issubset(set(company_flags))
@@ -994,6 +1003,77 @@ def test_runtime_login_users_records_analytics_and_audit():
     audit = client.get("/runtime/audit-logs", headers=headers)
     assert audit.status_code == 200
     assert any(log["entity_type"] == "module_record" for log in audit.json()["data"])
+
+
+def test_all_seeded_runtime_roles_can_login():
+    credentials = [
+        ("super@mop.local", "SuperAdmin123!", "super_admin"),
+        ("owner@mop.local", "Owner12345!", "account_owner"),
+        ("orgadmin@mop.local", "OrgAdmin123!", "organization_admin"),
+        ("admin@mop.local", "ChangeMe123!", "admin"),
+        ("manager@mop.local", "Manager123!", "team_manager"),
+        ("supervisor@mop.local", "Supervisor123!", "supervisor"),
+        ("operator@mop.local", "Operator123!", "operator"),
+        ("auditor@mop.local", "Auditor123!", "auditor"),
+        ("qa@mop.local", "QaTester123!", "qa_tester"),
+        ("custom@mop.local", "Custom123!", "custom"),
+        ("user@mop.local", "User12345!", "user"),
+    ]
+    for email, password, role in credentials:
+        response = client.post("/runtime/auth/login", json={"email": email, "password": password})
+        assert response.status_code == 200
+        assert response.json()["data"]["user"]["role"] == role
+
+
+def test_disabled_runtime_user_cannot_login():
+    response = client.post("/runtime/auth/login", json={"email": "disabled.operator@mop.local", "password": "Disabled123!"})
+    assert response.status_code == 403
+
+
+def test_core_platform_endpoints_require_auth_and_admin():
+    assert client.get("/companies").status_code == 401
+    assert client.get("/feature-flags").status_code == 401
+
+    operator_login = client.post("/runtime/auth/login", json={"email": "operator@mop.local", "password": "Operator123!"})
+    assert operator_login.status_code == 200
+    operator_headers = {"Authorization": f"Bearer {operator_login.json()['data']['access_token']}"}
+
+    companies = client.get("/companies", headers=operator_headers)
+    assert companies.status_code == 200
+
+    create_company = client.post(
+        "/companies",
+        headers=operator_headers,
+        json={"tenant_id": "tenant-demo-001", "name": "Blocked Company", "code": "BLK"},
+    )
+    assert create_company.status_code == 403
+
+    update_flag = client.post(
+        "/feature-flags",
+        headers=operator_headers,
+        json={"tenant_id": "tenant-demo-001", "company_id": "company-c", "module_key": "inventory", "enabled": False},
+    )
+    assert update_flag.status_code == 403
+
+    admin_login = client.post("/runtime/auth/login", json={"email": "admin@mop.local", "password": "ChangeMe123!"})
+    assert admin_login.status_code == 200
+    admin_headers = {"Authorization": f"Bearer {admin_login.json()['data']['access_token']}"}
+
+    admin_update = client.post(
+        "/feature-flags",
+        headers=admin_headers,
+        json={"tenant_id": "tenant-demo-001", "company_id": "company-c", "module_key": "inventory", "enabled": False},
+    )
+    assert admin_update.status_code == 200
+    assert admin_update.json()["enabled"] is False
+
+    restore = client.post(
+        "/feature-flags",
+        headers=admin_headers,
+        json={"tenant_id": "tenant-demo-001", "company_id": "company-c", "module_key": "inventory", "enabled": True},
+    )
+    assert restore.status_code == 200
+    assert restore.json()["enabled"] is True
 
 
 def test_runtime_user_role_is_read_only():

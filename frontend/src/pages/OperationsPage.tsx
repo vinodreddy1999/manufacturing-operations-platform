@@ -11,10 +11,11 @@ import { Panel } from '../components/Panel';
 import { StatCard } from '../components/StatCard';
 import { StatusBadge } from '../components/StatusBadge';
 import { formatCurrency, formatNumber } from '../lib/format';
+import { canWriteOperationalData } from '../lib/rbac';
 import { backend } from '../services/api';
-import type { ModuleRecord } from '../types';
+import type { ModuleRecord, RuntimeUser } from '../types';
 
-export function OperationsPage() {
+export function OperationsPage({ user }: { user: RuntimeUser }) {
   const queryClient = useQueryClient();
   const [newRecord, setNewRecord] = useState({
     module_key: 'inventory',
@@ -85,6 +86,7 @@ export function OperationsPage() {
     });
   }, [companies.data, featureFlags.data, selectedModule]);
   const allocatedCompanies = moduleAllocationRows.filter((row) => row.allocation === 'Enabled');
+  const canWrite = canWriteOperationalData(user);
 
   if ([inventory, modules, records, analytics, companies, featureFlags].some((query) => query.isLoading)) {
     return <LoadingState label="Loading operations data from backend APIs" />;
@@ -108,6 +110,12 @@ export function OperationsPage() {
         description="A live frontend shell over the backend source of truth. Each card uses available backend module or dashboard responses."
       />
 
+      {!canWrite ? (
+        <div className="mb-6 rounded-[24px] border border-sky-200/70 bg-sky-50/90 px-4 py-3 text-sm text-sky-900 shadow-panel">
+          Your role is active in read-only mode. You can inspect live operational data, but write actions are intentionally disabled.
+        </div>
+      ) : null}
+
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Inventory Value" value={formatCurrency(inventory.data?.total_inventory_value)} helper="Inventory dashboard" icon={<Boxes className="h-5 w-5" />} />
         <StatCard label="Backend Modules" value={formatNumber(modules.data?.length)} helper="Registered module list" icon={<Factory className="h-5 w-5" />} />
@@ -118,26 +126,26 @@ export function OperationsPage() {
       <div className="mt-6 grid gap-4 xl:grid-cols-[1fr_0.9fr]">
         <Panel title="Create Operational Record" description="Writes to the shared backend database and immediately updates analytics.">
           <form className="grid gap-3 md:grid-cols-2" onSubmit={submitRecord}>
-            <select className="rounded-md border border-border px-3 py-2 text-sm" value={newRecord.module_key} onChange={(event) => setNewRecord({ ...newRecord, module_key: event.target.value })}>
+            <select className="rounded-md border border-border px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60" value={newRecord.module_key} onChange={(event) => setNewRecord({ ...newRecord, module_key: event.target.value })} disabled={!canWrite}>
               <option value="inventory">Inventory</option>
               <option value="production">Production</option>
               <option value="maintenance">Maintenance</option>
               <option value="quality">Quality</option>
               <option value="procurement">Procurement</option>
             </select>
-            <input className="rounded-md border border-border px-3 py-2 text-sm" placeholder="Record type" value={newRecord.record_type} onChange={(event) => setNewRecord({ ...newRecord, record_type: event.target.value })} required />
-            <input className="rounded-md border border-border px-3 py-2 text-sm" placeholder="Code" value={newRecord.record_code} onChange={(event) => setNewRecord({ ...newRecord, record_code: event.target.value })} required />
-            <input className="rounded-md border border-border px-3 py-2 text-sm" placeholder="Name" value={newRecord.name} onChange={(event) => setNewRecord({ ...newRecord, name: event.target.value })} required />
-            <select className="rounded-md border border-border px-3 py-2 text-sm" value={newRecord.status} onChange={(event) => setNewRecord({ ...newRecord, status: event.target.value })}>
+            <input className="rounded-md border border-border px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60" placeholder="Record type" value={newRecord.record_type} onChange={(event) => setNewRecord({ ...newRecord, record_type: event.target.value })} required disabled={!canWrite} />
+            <input className="rounded-md border border-border px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60" placeholder="Code" value={newRecord.record_code} onChange={(event) => setNewRecord({ ...newRecord, record_code: event.target.value })} required disabled={!canWrite} />
+            <input className="rounded-md border border-border px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60" placeholder="Name" value={newRecord.name} onChange={(event) => setNewRecord({ ...newRecord, name: event.target.value })} required disabled={!canWrite} />
+            <select className="rounded-md border border-border px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60" value={newRecord.status} onChange={(event) => setNewRecord({ ...newRecord, status: event.target.value })} disabled={!canWrite}>
               <option value="AVAILABLE">Available</option>
               <option value="LOW_STOCK">Low Stock</option>
               <option value="QUARANTINE">Quarantine</option>
               <option value="OPEN">Open</option>
               <option value="SCHEDULED">Scheduled</option>
             </select>
-            <input className="rounded-md border border-border px-3 py-2 text-sm" type="number" value={newRecord.quantity} onChange={(event) => setNewRecord({ ...newRecord, quantity: Number(event.target.value) })} />
-            <button className="rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60 md:col-span-2" disabled={createRecord.isPending}>
-              {createRecord.isPending ? 'Creating...' : 'Create Record'}
+            <input className="rounded-md border border-border px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60" type="number" value={newRecord.quantity} onChange={(event) => setNewRecord({ ...newRecord, quantity: Number(event.target.value) })} disabled={!canWrite} />
+            <button className="rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60 md:col-span-2" disabled={createRecord.isPending || !canWrite}>
+              {canWrite ? (createRecord.isPending ? 'Creating...' : 'Create Record') : 'Read-only role'}
             </button>
           </form>
         </Panel>
@@ -167,10 +175,10 @@ export function OperationsPage() {
               { key: 'record_code', label: 'Code' },
               { key: 'name', label: 'Name' },
               { key: 'quantity', label: 'Quantity', render: (value, row) => (
-                <input className="w-24 rounded-md border border-border px-2 py-1 text-xs" type="number" value={Number(value ?? 0)} onChange={(event) => updateRecord.mutate({ id: String(row.id), payload: { quantity: Number(event.target.value) } })} />
+                <input className="w-24 rounded-md border border-border px-2 py-1 text-xs disabled:cursor-not-allowed disabled:opacity-60" type="number" value={Number(value ?? 0)} onChange={(event) => updateRecord.mutate({ id: String(row.id), payload: { quantity: Number(event.target.value) } })} disabled={!canWrite} />
               ) },
               { key: 'status', label: 'Status', render: (value, row) => (
-                <select className="rounded-md border border-border px-2 py-1 text-xs" value={String(value)} onChange={(event) => updateRecord.mutate({ id: String(row.id), payload: { status: event.target.value } })}>
+                <select className="rounded-md border border-border px-2 py-1 text-xs disabled:cursor-not-allowed disabled:opacity-60" value={String(value)} onChange={(event) => updateRecord.mutate({ id: String(row.id), payload: { status: event.target.value } })} disabled={!canWrite}>
                   <option value="AVAILABLE">Available</option>
                   <option value="LOW_STOCK">Low Stock</option>
                   <option value="QUARANTINE">Quarantine</option>
@@ -181,9 +189,9 @@ export function OperationsPage() {
               ) },
               { key: 'record_type', label: 'Type', render: (value) => <StatusBadge status={String(value)} /> },
               { key: 'id', label: 'Action', render: (value) => (
-                <button className="rounded-md border border-red-200 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50" onClick={() => deleteRecord.mutate(String(value))}>
+                <button className="rounded-md border border-red-200 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60" onClick={() => deleteRecord.mutate(String(value))} disabled={!canWrite}>
                   <Trash2 className="mr-1 inline h-3 w-3" />
-                  Delete
+                  {canWrite ? 'Delete' : 'Locked'}
                 </button>
               ) },
             ]}

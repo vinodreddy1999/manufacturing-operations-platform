@@ -1,8 +1,9 @@
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, Suspense, lazy, useMemo, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { NavLink, Route, Routes } from 'react-router-dom';
 import {
   Activity,
+  BadgeCheck,
   Boxes,
   BrainCircuit,
   DatabaseZap,
@@ -12,19 +13,24 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 
+import { AccessDeniedState } from '../components/AccessDeniedState';
+import { LoadingState } from '../components/LoadingState';
+import { canAccessSection } from '../lib/rbac';
 import { apiConfig, backend } from '../services/api';
-import { AdminPage } from '../pages/AdminPage';
-import { DataHubPage } from '../pages/DataHubPage';
-import { DashboardPage } from '../pages/DashboardPage';
-import { IntelligencePage } from '../pages/IntelligencePage';
-import { OperationsPage } from '../pages/OperationsPage';
+import type { RuntimeUser } from '../types';
+
+const AdminPage = lazy(() => import('../pages/AdminPage').then((module) => ({ default: module.AdminPage })));
+const DataHubPage = lazy(() => import('../pages/DataHubPage').then((module) => ({ default: module.DataHubPage })));
+const DashboardPage = lazy(() => import('../pages/DashboardPage').then((module) => ({ default: module.DashboardPage })));
+const IntelligencePage = lazy(() => import('../pages/IntelligencePage').then((module) => ({ default: module.IntelligencePage })));
+const OperationsPage = lazy(() => import('../pages/OperationsPage').then((module) => ({ default: module.OperationsPage })));
 
 const navItems = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/admin', label: 'Admin', icon: ShieldCheck },
-  { to: '/data-hub', label: 'Data Hub', icon: DatabaseZap },
-  { to: '/operations', label: 'Operations', icon: Factory },
-  { to: '/intelligence', label: 'AI Command', icon: BrainCircuit },
+  { to: '/', label: 'Dashboard', icon: LayoutDashboard, section: 'dashboard' as const },
+  { to: '/admin', label: 'Admin', icon: ShieldCheck, section: 'admin' as const },
+  { to: '/data-hub', label: 'Data Hub', icon: DatabaseZap, section: 'data-hub' as const },
+  { to: '/operations', label: 'Operations', icon: Factory, section: 'operations' as const },
+  { to: '/intelligence', label: 'AI Command', icon: BrainCircuit, section: 'intelligence' as const },
 ];
 
 export function App() {
@@ -49,28 +55,42 @@ export function App() {
   }
 
   const user = session.data;
+  const allowedNavItems = navItems.filter((item) => canAccessSection(user, item.section));
 
   return (
-    <div className="min-h-screen bg-background">
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-border bg-white lg:block">
-        <div className="flex h-16 items-center gap-3 border-b border-border px-5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+    <div className="app-shell min-h-screen bg-background">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 border-r border-white/60 bg-white/78 backdrop-blur xl:block">
+        <div className="flex h-20 items-center gap-3 border-b border-white/60 px-6">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
             <Boxes className="h-5 w-5" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-foreground">MOP</p>
-            <p className="text-xs text-muted-foreground">Operations Platform</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-primary">MOP</p>
+            <p className="text-sm text-slate-600">Enterprise operations cockpit</p>
           </div>
         </div>
-        <nav className="space-y-1 p-3">
-          {navItems.map((item) => (
+        <div className="px-6 pt-6">
+          <div className="rounded-[24px] border border-white/70 bg-white/70 p-4 shadow-panel">
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Signed in as</p>
+            <p className="mt-2 text-lg font-semibold text-slate-950">{user.name}</p>
+            <p className="mt-1 text-sm text-slate-600">{user.email}</p>
+            <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-slate-950 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-white">
+              <BadgeCheck className="h-3.5 w-3.5" />
+              {user.role.replace('_', ' ')}
+            </div>
+          </div>
+        </div>
+        <nav className="space-y-2 p-4">
+          {allowedNavItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
               end={item.to === '/'}
               className={({ isActive }) =>
-                `flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium ${
-                  isActive ? 'bg-blue-50 text-primary' : 'text-slate-700 hover:bg-slate-50'
+                `group flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition ${
+                  isActive
+                    ? 'bg-slate-950 text-white shadow-lg shadow-slate-950/10'
+                    : 'text-slate-700 hover:bg-white/80 hover:text-slate-950'
                 }`
               }
             >
@@ -81,25 +101,26 @@ export function App() {
         </nav>
       </aside>
 
-      <div className="lg:pl-64">
-        <header className="sticky top-0 z-20 border-b border-border bg-white/90 backdrop-blur">
-          <div className="flex h-16 items-center justify-between gap-4 px-4 sm:px-6">
+      <div className="xl:pl-72">
+        <header className="sticky top-0 z-20 border-b border-white/60 bg-white/72 backdrop-blur">
+          <div className="flex h-20 items-center justify-between gap-4 px-4 sm:px-6">
             <div className="flex items-center gap-3">
-              <button className="focus-ring rounded-md border border-border p-2 lg:hidden" aria-label="Open navigation">
+              <button className="focus-ring rounded-2xl border border-white/70 bg-white/80 p-2.5 xl:hidden" aria-label="Open navigation">
                 <Menu className="h-4 w-4" />
               </button>
-            <div>
-              <p className="text-sm font-semibold text-foreground">Manufacturing Operations Platform</p>
-              <p className="text-xs text-muted-foreground">Backend source of truth: {baseUrl}</p>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Release control</p>
+                <p className="text-xl font-semibold tracking-tight text-slate-950">Manufacturing Operations Platform</p>
+                <p className="text-sm text-slate-600">Live backend source: {baseUrl}</p>
+              </div>
             </div>
-          </div>
             <div className="flex items-center gap-3">
-              <div className="hidden items-center gap-2 rounded-full border border-border bg-slate-50 px-3 py-1.5 text-xs text-slate-600 sm:flex">
+              <div className="hidden items-center gap-2 rounded-full border border-white/70 bg-white/80 px-3 py-1.5 text-xs text-slate-600 sm:flex">
                 <Activity className="h-3.5 w-3.5 text-primary" />
-                {user.name} / {user.role.replace('_', ' ')}
+                {allowedNavItems.length} sections available
               </div>
               <button
-                className="focus-ring rounded-md border border-border px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                className="focus-ring rounded-2xl border border-white/70 bg-white/80 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-700 hover:bg-white"
                 onClick={() => {
                   backend.logout();
                   setSessionVersion((value) => value + 1);
@@ -109,15 +130,15 @@ export function App() {
               </button>
             </div>
           </div>
-          <nav className="flex gap-1 overflow-x-auto border-t border-border px-3 py-2 lg:hidden">
-            {navItems.map((item) => (
+          <nav className="flex gap-1 overflow-x-auto border-t border-white/60 px-3 py-2 xl:hidden">
+            {allowedNavItems.map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
                 end={item.to === '/'}
                 className={({ isActive }) =>
-                  `flex min-w-max items-center gap-2 rounded-md px-3 py-2 text-sm ${
-                    isActive ? 'bg-blue-50 text-primary' : 'text-slate-700'
+                  `flex min-w-max items-center gap-2 rounded-2xl px-3 py-2 text-sm ${
+                    isActive ? 'bg-slate-950 text-white' : 'text-slate-700'
                   }`
                 }
               >
@@ -128,18 +149,41 @@ export function App() {
           </nav>
         </header>
 
-        <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
-          <Routes>
-            <Route path="/" element={<DashboardPage />} />
-            <Route path="/admin" element={<AdminPage />} />
-            <Route path="/data-hub" element={<DataHubPage />} />
-            <Route path="/operations" element={<OperationsPage />} />
-            <Route path="/intelligence" element={<IntelligencePage />} />
-          </Routes>
+        <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+          <Suspense fallback={<LoadingState label="Loading workspace view" />}>
+            <Routes>
+              <Route path="/" element={<DashboardPage />} />
+              <Route path="/admin" element={<ProtectedRoute user={user} section="admin"><AdminPage user={user} /></ProtectedRoute>} />
+              <Route path="/data-hub" element={<ProtectedRoute user={user} section="data-hub"><DataHubPage /></ProtectedRoute>} />
+              <Route path="/operations" element={<ProtectedRoute user={user} section="operations"><OperationsPage user={user} /></ProtectedRoute>} />
+              <Route path="/intelligence" element={<ProtectedRoute user={user} section="intelligence"><IntelligencePage /></ProtectedRoute>} />
+            </Routes>
+          </Suspense>
         </main>
       </div>
     </div>
   );
+}
+
+function ProtectedRoute({
+  user,
+  section,
+  children,
+}: {
+  user: RuntimeUser;
+  section: 'admin' | 'data-hub' | 'operations' | 'intelligence';
+  children: ReactNode;
+}) {
+  if (!canAccessSection(user, section)) {
+    return (
+      <AccessDeniedState
+        title="This workspace is not enabled for your role"
+        description={`Your ${user.role.replace('_', ' ')} account is active, but it does not include the ${section.replace('-', ' ')} workspace.`}
+      />
+    );
+  }
+
+  return children;
 }
 
 function LoginScreen({ onLogin, baseUrl }: { onLogin: () => void; baseUrl: string }) {
@@ -164,34 +208,34 @@ function LoginScreen({ onLogin, baseUrl }: { onLogin: () => void; baseUrl: strin
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="w-full max-w-md rounded-lg border border-border bg-white p-6 shadow-sm">
+      <div className="w-full max-w-md rounded-[32px] border border-white/70 bg-white/85 p-7 shadow-panel backdrop-blur">
         <div className="mb-6 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
             <Boxes className="h-5 w-5" />
           </div>
           <div>
-            <h1 className="text-lg font-semibold text-foreground">Manufacturing Operations Platform</h1>
-            <p className="text-xs text-muted-foreground">Full-stack runtime: {baseUrl}</p>
+            <h1 className="text-xl font-semibold tracking-tight text-foreground">Manufacturing Operations Platform</h1>
+            <p className="text-sm text-muted-foreground">Full-stack runtime: {baseUrl}</p>
           </div>
         </div>
 
         <form className="space-y-4" onSubmit={submit}>
           <label className="block text-sm font-medium text-slate-700">
             Email
-            <input className="mt-1 w-full rounded-md border border-border px-3 py-2 text-sm" value={email} onChange={(event) => setEmail(event.target.value)} />
+            <input className="mt-1 w-full rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-sm shadow-sm" value={email} onChange={(event) => setEmail(event.target.value)} />
           </label>
           <label className="block text-sm font-medium text-slate-700">
             Password
-            <input className="mt-1 w-full rounded-md border border-border px-3 py-2 text-sm" type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
+            <input className="mt-1 w-full rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-sm shadow-sm" type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
           </label>
-          {error ? <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div> : null}
-          <button className="focus-ring w-full rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60" disabled={submitting}>
+          {error ? <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
+          <button className="focus-ring w-full rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60" disabled={submitting}>
             {submitting ? 'Signing in...' : 'Sign in'}
           </button>
         </form>
 
-        <div className="mt-5 rounded-md bg-slate-50 p-3 text-xs text-slate-600">
-          <p className="font-semibold text-slate-700">Seeded access</p>
+        <div className="mt-5 rounded-2xl bg-slate-50/90 p-4 text-xs text-slate-600">
+          <p className="font-semibold uppercase tracking-[0.18em] text-slate-700">Seeded access</p>
           <p>Super admin: super@mop.local / SuperAdmin123!</p>
           <p>Admin: admin@mop.local / ChangeMe123!</p>
           <p>User: user@mop.local / User12345!</p>

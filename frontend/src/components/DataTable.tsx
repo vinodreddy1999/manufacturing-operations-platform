@@ -18,21 +18,21 @@ export function DataTable<T extends Record<string, unknown>>({ rows, columns, em
   }
 
   return (
-    <div className="overflow-hidden rounded-lg border border-border">
+    <div className="overflow-hidden rounded-[24px] border border-white/70 bg-white/80 shadow-panel">
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-border text-sm">
-          <thead className="bg-slate-50">
+          <thead className="bg-slate-950/[0.04]">
             <tr>
               {columns.map((column) => (
-                <th key={String(column.key)} className="px-4 py-3 text-left font-semibold text-slate-700">
+                <th key={String(column.key)} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">
                   {column.label}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-border bg-white">
+          <tbody className="divide-y divide-border bg-white/90">
             {rows.map((row, rowIndex) => (
-              <tr key={rowIndex}>
+              <tr key={rowIndex} className="transition hover:bg-slate-50/80">
                 {columns.map((column) => (
                   <td key={String(column.key)} className="px-4 py-3 text-slate-700">
                     {column.render ? column.render(row[column.key], row) : String(row[column.key] ?? '')}

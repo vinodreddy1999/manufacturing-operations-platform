@@ -3,30 +3,63 @@
 @tailwind utilities;
 
 :root {
-  --background: 210 40% 98%;
+  --background: 36 100% 98%;
   --foreground: 222 47% 11%;
-  --muted: 210 40% 94%;
-  --muted-foreground: 215 16% 47%;
+  --muted: 36 44% 94%;
+  --muted-foreground: 215 16% 40%;
   --card: 0 0% 100%;
   --card-foreground: 222 47% 11%;
-  --border: 214 32% 91%;
-  --primary: 221 83% 53%;
+  --border: 28 39% 88%;
+  --primary: 204 90% 40%;
   --primary-foreground: 210 40% 98%;
   --destructive: 0 84% 60%;
 }
 
 html {
-  background: hsl(var(--background));
+  background:
+    radial-gradient(circle at top left, rgba(251, 191, 36, 0.18), transparent 24%),
+    radial-gradient(circle at top right, rgba(14, 116, 144, 0.16), transparent 28%),
+    linear-gradient(180deg, #fffdfa 0%, #f7f3eb 100%);
 }
 
 body {
   min-width: 320px;
   margin: 0;
   color: hsl(var(--foreground));
-  background: hsl(var(--background));
+  background: transparent;
   font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "Segoe UI Variable", "Aptos", "Trebuchet MS", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.app-shell::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.25)),
+    radial-gradient(circle at 12% 18%, rgba(250, 204, 21, 0.2), transparent 22%),
+    radial-gradient(circle at 88% 10%, rgba(14, 165, 233, 0.16), transparent 24%),
+    radial-gradient(circle at 70% 75%, rgba(249, 115, 22, 0.12), transparent 20%);
+  pointer-events: none;
+}
+
+.app-shell::after {
+  content: "";
+  position: fixed;
+  inset: auto -8rem -10rem auto;
+  width: 26rem;
+  height: 26rem;
+  z-index: -1;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(14, 116, 144, 0.12), transparent 68%);
+  filter: blur(10px);
+  pointer-events: none;
 }
 
 button,

@@ -53,7 +53,7 @@ JWT_ALGORITHM = "HS256"
 
 app = FastAPI(
     title="Manufacturing Operations Platform - Python Backend",
-    version="0.2.5",
+    version="0.2.6",
     description="Python/FastAPI implementation of the MOP backend modules.",
 )
 configure_enterprise(app)

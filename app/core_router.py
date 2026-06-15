@@ -21,6 +21,7 @@ from .platform_schemas import (
     TaskRequest,
 )
 from .platform_seed import MODULE_KEYS
+from .runtime_router import current_user, require_any
 from .security import hash_password
 
 router = APIRouter(tags=["Core Platform"])
@@ -35,7 +36,7 @@ def as_dict(row):
 
 
 @router.post("/companies")
-def create_company(request: CreateCompanyRequest, db: Session = Depends(get_db)):
+def create_company(request: CreateCompanyRequest, db: Session = Depends(get_db), _: User = Depends(require_any("admin"))):
     normalized_code = request.code.strip().lower()
     company_id = f"company-{normalized_code}"
     if db.query(Company).filter(Company.id == company_id).first():
@@ -51,12 +52,12 @@ def create_company(request: CreateCompanyRequest, db: Session = Depends(get_db))
 
 
 @router.get("/companies")
-def list_companies(db: Session = Depends(get_db)):
+def list_companies(db: Session = Depends(get_db), _: User = Depends(current_user)):
     return [as_dict(row) for row in db.query(Company).all()]
 
 
 @router.post("/plants")
-def create_plant(request: CreatePlantRequest, db: Session = Depends(get_db)):
+def create_plant(request: CreatePlantRequest, db: Session = Depends(get_db), _: User = Depends(require_any("admin"))):
     row = Plant(id=f"plant-{request.code.lower()}", tenant_id=request.tenant_id, company_id=request.company_id, name=request.name, code=request.code, timezone=request.timezone)
     db.add(row)
     db.commit()
@@ -66,12 +67,12 @@ def create_plant(request: CreatePlantRequest, db: Session = Depends(get_db)):
 
 
 @router.get("/plants")
-def list_plants(db: Session = Depends(get_db)):
+def list_plants(db: Session = Depends(get_db), _: User = Depends(current_user)):
     return [as_dict(row) for row in db.query(Plant).all()]
 
 
 @router.post("/departments")
-def create_department(request: CreateDepartmentRequest, db: Session = Depends(get_db)):
+def create_department(request: CreateDepartmentRequest, db: Session = Depends(get_db), _: User = Depends(require_any("admin"))):
     row = Department(id=f"dept-{request.code.lower()}", tenant_id=request.tenant_id, company_id=request.company_id, plant_id=request.plant_id, name=request.name, code=request.code)
     db.add(row)
     db.commit()
@@ -80,12 +81,12 @@ def create_department(request: CreateDepartmentRequest, db: Session = Depends(ge
 
 
 @router.get("/departments")
-def list_departments(db: Session = Depends(get_db)):
+def list_departments(db: Session = Depends(get_db), _: User = Depends(current_user)):
     return [as_dict(row) for row in db.query(Department).all()]
 
 
 @router.post("/users")
-def create_user(request: CreateUserRequest, db: Session = Depends(get_db)):
+def create_user(request: CreateUserRequest, db: Session = Depends(get_db), _: User = Depends(require_any("admin"))):
     row = User(id=str(uuid4()), tenant_id=request.tenant_id, company_id=request.company_id, plant_id=request.plant_id, email=request.email, name=request.name, password_hash=hash_password(request.password))
     db.add(row)
     db.commit()
@@ -94,12 +95,12 @@ def create_user(request: CreateUserRequest, db: Session = Depends(get_db)):
 
 
 @router.get("/users")
-def list_users(db: Session = Depends(get_db)):
+def list_users(db: Session = Depends(get_db), _: User = Depends(require_any("admin"))):
     return [as_dict(row) for row in db.query(User).all()]
 
 
 @router.post("/roles")
-def create_role(request: CreateRoleRequest, db: Session = Depends(get_db)):
+def create_role(request: CreateRoleRequest, db: Session = Depends(get_db), _: User = Depends(require_any("admin"))):
     row = Role(id=str(uuid4()), tenant_id=request.tenant_id, company_id=request.company_id, name=request.name, permissions=request.permissions)
     db.add(row)
     db.commit()
@@ -108,12 +109,12 @@ def create_role(request: CreateRoleRequest, db: Session = Depends(get_db)):
 
 
 @router.get("/roles")
-def list_roles(db: Session = Depends(get_db)):
+def list_roles(db: Session = Depends(get_db), _: User = Depends(require_any("admin"))):
     return [as_dict(row) for row in db.query(Role).all()]
 
 
 @router.post("/permissions")
-def create_permission(request: CreatePermissionRequest, db: Session = Depends(get_db)):
+def create_permission(request: CreatePermissionRequest, db: Session = Depends(get_db), _: User = Depends(require_any("admin"))):
     row = Permission(id=str(uuid4()), key=request.key, description=request.description)
     db.add(row)
     db.commit()
@@ -122,12 +123,12 @@ def create_permission(request: CreatePermissionRequest, db: Session = Depends(ge
 
 
 @router.get("/permissions")
-def list_permissions(db: Session = Depends(get_db)):
+def list_permissions(db: Session = Depends(get_db), _: User = Depends(require_any("admin"))):
     return [as_dict(row) for row in db.query(Permission).all()]
 
 
 @router.post("/feature-flags")
-def set_feature_flag(request: FeatureFlagRequest, db: Session = Depends(get_db)):
+def set_feature_flag(request: FeatureFlagRequest, db: Session = Depends(get_db), _: User = Depends(require_any("admin"))):
     row = (
         db.query(FeatureFlag)
         .filter(
@@ -149,22 +150,34 @@ def set_feature_flag(request: FeatureFlagRequest, db: Session = Depends(get_db))
 
 
 @router.get("/feature-flags")
-def list_feature_flags(db: Session = Depends(get_db)):
+def list_feature_flags(db: Session = Depends(get_db), _: User = Depends(current_user)):
     return [as_dict(row) for row in db.query(FeatureFlag).all()]
 
 
 @router.post("/feature-flags/{module_key}/enable")
-def enable_module(module_key: str, company_id: str = "company-c", tenant_id: str = "tenant-demo-001", db: Session = Depends(get_db)):
-    return set_feature_flag(FeatureFlagRequest(tenant_id=tenant_id, company_id=company_id, module_key=module_key, enabled=True), db)
+def enable_module(
+    module_key: str,
+    company_id: str = "company-c",
+    tenant_id: str = "tenant-demo-001",
+    db: Session = Depends(get_db),
+    actor: User = Depends(require_any("admin")),
+):
+    return set_feature_flag(FeatureFlagRequest(tenant_id=tenant_id, company_id=company_id, module_key=module_key, enabled=True), db, actor)
 
 
 @router.post("/feature-flags/{module_key}/disable")
-def disable_module(module_key: str, company_id: str = "company-c", tenant_id: str = "tenant-demo-001", db: Session = Depends(get_db)):
-    return set_feature_flag(FeatureFlagRequest(tenant_id=tenant_id, company_id=company_id, module_key=module_key, enabled=False), db)
+def disable_module(
+    module_key: str,
+    company_id: str = "company-c",
+    tenant_id: str = "tenant-demo-001",
+    db: Session = Depends(get_db),
+    actor: User = Depends(require_any("admin")),
+):
+    return set_feature_flag(FeatureFlagRequest(tenant_id=tenant_id, company_id=company_id, module_key=module_key, enabled=False), db, actor)
 
 
 @router.post("/tasks")
-def create_task(request: TaskRequest, db: Session = Depends(get_db)):
+def create_task(request: TaskRequest, db: Session = Depends(get_db), _: User = Depends(require_any("admin"))):
     row = Task(id=str(uuid4()), **request.model_dump(), status="OPEN")
     db.add(row)
     db.commit()
@@ -173,12 +186,12 @@ def create_task(request: TaskRequest, db: Session = Depends(get_db)):
 
 
 @router.get("/tasks")
-def list_tasks(db: Session = Depends(get_db)):
+def list_tasks(db: Session = Depends(get_db), _: User = Depends(current_user)):
     return [as_dict(row) for row in db.query(Task).all()]
 
 
 @router.post("/approvals/{approval_id}/decision")
-def decide_approval(approval_id: str, request: ApprovalDecisionRequest, db: Session = Depends(get_db)):
+def decide_approval(approval_id: str, request: ApprovalDecisionRequest, db: Session = Depends(get_db), _: User = Depends(require_any("admin"))):
     row = db.query(Approval).filter(Approval.id == approval_id).first()
     if not row:
         row = Approval(id=approval_id, tenant_id="tenant-demo-001", company_id="company-c", plant_id="plant-north", entity_type="draft", entity_id=approval_id)
@@ -192,12 +205,12 @@ def decide_approval(approval_id: str, request: ApprovalDecisionRequest, db: Sess
 
 
 @router.get("/approvals")
-def list_approvals(db: Session = Depends(get_db)):
+def list_approvals(db: Session = Depends(get_db), _: User = Depends(current_user)):
     return [as_dict(row) for row in db.query(Approval).all()]
 
 
 @router.post("/documents")
-def upload_document(request: DocumentRequest, db: Session = Depends(get_db)):
+def upload_document(request: DocumentRequest, db: Session = Depends(get_db), _: User = Depends(require_any("admin"))):
     row = Document(id=str(uuid4()), **request.model_dump())
     db.add(row)
     db.commit()
@@ -206,12 +219,12 @@ def upload_document(request: DocumentRequest, db: Session = Depends(get_db)):
 
 
 @router.get("/documents")
-def list_documents(db: Session = Depends(get_db)):
+def list_documents(db: Session = Depends(get_db), _: User = Depends(current_user)):
     return [as_dict(row) for row in db.query(Document).all()]
 
 
 @router.get("/audit-logs")
-def view_audit_logs(db: Session = Depends(get_db)):
+def view_audit_logs(db: Session = Depends(get_db), _: User = Depends(require_any("admin"))):
     return [as_dict(row) for row in db.query(__import__("app.platform_models", fromlist=["AuditLog"]).AuditLog).all()]
 
 
