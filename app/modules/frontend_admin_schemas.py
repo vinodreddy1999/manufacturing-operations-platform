@@ -36,15 +36,20 @@ class PendingUpdateDecisionRequest(BaseModel):
 
 
 class DataHubConnectionRequest(BaseModel):
+    company_id: str | None = None
     system_name: str
     system_type: str
     connection_status: str
     last_sync: str | None = None
     health_score: float = Field(ge=0, le=100)
     record_count: int = Field(ge=0, default=0)
+    source_category: str | None = None
+    auth_method: str | None = None
+    connection_details: dict[str, Any] = Field(default_factory=dict)
 
 
 class DataCatalogEntryRequest(BaseModel):
+    company_id: str | None = None
     data_type: str
     source_system: str
     owner: str
@@ -54,6 +59,7 @@ class DataCatalogEntryRequest(BaseModel):
 
 
 class DataMappingRuleRequest(BaseModel):
+    company_id: str | None = None
     source_system: str
     source_field: str
     target_entity: str
@@ -80,8 +86,11 @@ class OperationalFootprintRequest(BaseModel):
 
 
 class CloudSourceUploadRequest(BaseModel):
+    company_id: str | None = None
     provider: str
     resource_name: str
     resource_url: str
     file_format: str
     sync_mode: str = Field(default="manual")
+    auth_method: str | None = None
+    connection_details: dict[str, Any] = Field(default_factory=dict)

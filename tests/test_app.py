@@ -1211,6 +1211,83 @@ def test_datahub_requires_admin_and_is_company_scoped():
     assert created.json()["data"]["company_id"] == "company-c"
 
 
+def test_datahub_super_admin_targets_company_and_admin_cannot_spoof_scope():
+    super_headers = runtime_headers("super@mop.local", "SuperAdmin123!")
+    catalog = client.post(
+        "/manufacturing-data-hub/catalog",
+        headers=super_headers,
+        json={
+            "company_id": "company-apex",
+            "data_type": "Inventory",
+            "source_system": "Apex SAP",
+            "owner": "Apex Data Steward",
+            "ai_ready": True,
+            "quality_score": 92,
+            "lineage": {
+                "source_category": "ERP / SAP / Oracle",
+                "source_format": "xlsx",
+                "auth_method": "OAuth2",
+                "routing_target": "Inventory module",
+            },
+        },
+    )
+    assert catalog.status_code == 200
+    assert catalog.json()["data"]["company_id"] == "company-apex"
+    assert catalog.json()["data"]["company_name"] == "Apex Components Ltd"
+    assert catalog.json()["data"]["lineage"]["routing_target"] == "Inventory module"
+
+    admin_headers = runtime_headers("admin@mop.local", "ChangeMe123!")
+    spoofed = client.post(
+        "/manufacturing-data-hub/catalog",
+        headers=admin_headers,
+        json={
+            "company_id": "company-apex",
+            "data_type": "Procurement",
+            "source_system": "Company C SAP",
+            "owner": "Company C Admin",
+            "ai_ready": True,
+            "quality_score": 88,
+            "lineage": {"routing_target": "Procurement module"},
+        },
+    )
+    assert spoofed.status_code == 200
+    assert spoofed.json()["data"]["company_id"] == "company-c"
+    assert spoofed.json()["data"]["company_name"] == "Company C"
+
+
+def test_datahub_company_scoped_upload_and_cloud_source_manifests():
+    super_headers = runtime_headers("super@mop.local", "SuperAdmin123!")
+    upload = client.post(
+        "/manufacturing-data-hub/uploads",
+        headers=super_headers,
+        data={"company_id": "company-apex"},
+        files={"file": ("apex-inventory.csv", b"material,qty\nRM-APX-001,50\n", "text/csv")},
+    )
+    assert upload.status_code == 200
+    assert upload.json()["data"]["company_id"] == "company-apex"
+
+    cloud = client.post(
+        "/manufacturing-data-hub/cloud-sources",
+        headers=super_headers,
+        json={
+            "company_id": "company-apex",
+            "provider": "Google Drive",
+            "resource_name": "Apex Inventory Sheet",
+            "resource_url": "https://drive.google.com/apex-inventory",
+            "file_format": "gsheets",
+            "sync_mode": "scheduled",
+            "auth_method": "OAuth2",
+            "connection_details": {"client_id": "apex-client", "folder_path": "/inventory"},
+        },
+    )
+    assert cloud.status_code == 200
+    assert cloud.json()["data"]["metadata"]["auth_method"] == "OAuth2"
+
+    uploads = client.get("/manufacturing-data-hub/uploads", headers=super_headers)
+    assert uploads.status_code == 200
+    assert any(item["company_id"] == "company-apex" and item["company_name"] == "Apex Components Ltd" for item in uploads.json()["data"])
+
+
 def test_versioned_runtime_api_alias():
     login = client.post("/api/v1/runtime/auth/login", json={"email": "super@mop.local", "password": "SuperAdmin123!"})
     assert login.status_code == 200

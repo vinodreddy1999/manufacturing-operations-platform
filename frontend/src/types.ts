@@ -58,17 +58,22 @@ export type AiReadiness = {
 export type ConnectedSystem = {
   id: string;
   company_id?: string;
+  company_name?: string;
   system_name: string;
   system_type: string;
   connection_status: string;
   last_sync: string;
   health_score: number;
   record_count: number;
+  source_category?: string | null;
+  auth_method?: string | null;
+  connection_details?: Record<string, unknown>;
 };
 
 export type DataCatalogEntry = {
   id: string;
   company_id?: string;
+  company_name?: string;
   data_type: string;
   source_system: string;
   owner: string;
@@ -80,6 +85,7 @@ export type DataCatalogEntry = {
 export type DataMappingRule = {
   id: string;
   company_id?: string;
+  company_name?: string;
   source_system: string;
   source_field: string;
   target_entity: string;
@@ -208,6 +214,7 @@ export type OperationalFootprint = {
 export type DataHubUpload = {
   id: string;
   company_id?: string | null;
+  company_name?: string | null;
   source: 'local_upload' | 'cloud_link' | string;
   provider: string;
   resource_name: string;
@@ -219,6 +226,8 @@ export type DataHubUpload = {
     content_type?: string;
     size_bytes?: number;
     sync_mode?: string;
+    auth_method?: string | null;
+    connection_details?: Record<string, unknown>;
     preview?: {
       detected_format?: string;
       columns?: string[];

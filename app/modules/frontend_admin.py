@@ -5,13 +5,13 @@ from io import BytesIO
 from pathlib import Path
 
 import pandas as pd
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from . import frontend_admin_models  # noqa: F401
 from ..database import get_db
 from ..metadata_store import first_metadata, list_metadata, upsert_metadata
-from ..platform_models import AppMetadata, User
+from ..platform_models import AppMetadata, Company, User
 from ..platform_models import Plant
 from ..runtime_router import current_user, require_any
 from .frontend_admin_repository import frontend_admin_repo
@@ -50,6 +50,21 @@ def has_override_scope(user: User) -> bool:
 
 def scoped_company_id(user: User) -> str | None:
     return None if has_override_scope(user) else user.company_id
+
+
+def resolve_datahub_company_id(requested_company_id: str | None, actor: User, db: Session) -> str:
+    company_id = requested_company_id if has_override_scope(actor) and requested_company_id else actor.company_id
+    if not company_id:
+        company_id = "company-c"
+    if not has_override_scope(actor) and company_id != actor.company_id:
+        raise HTTPException(status_code=403, detail="Cannot manage another company's DataHub metadata")
+    if not db.get(Company, company_id):
+        raise HTTPException(status_code=404, detail="Selected company not found")
+    return company_id
+
+
+def company_name_map(db: Session) -> dict[str, str]:
+    return {company.id: company.name for company in db.query(Company).all()}
 
 
 def can_edit_executive_metrics(user: User) -> bool:
@@ -186,10 +201,11 @@ def extract_upload_preview(filename: str, content: bytes) -> dict[str, Any]:
     return preview
 
 
-def serialize_connection(row: frontend_admin_models.ManufacturingDataConnection) -> dict[str, Any]:
+def serialize_connection(row: frontend_admin_models.ManufacturingDataConnection, companies: dict[str, str] | None = None) -> dict[str, Any]:
     return {
         "id": row.id,
         "company_id": row.company_id,
+        "company_name": (companies or {}).get(row.company_id, row.company_id),
         "system_name": row.system_name,
         "system_type": row.system_type,
         "connection_status": row.connection_status,
@@ -199,10 +215,11 @@ def serialize_connection(row: frontend_admin_models.ManufacturingDataConnection)
     }
 
 
-def serialize_catalog(row: frontend_admin_models.DataCatalogEntry) -> dict[str, Any]:
+def serialize_catalog(row: frontend_admin_models.DataCatalogEntry, companies: dict[str, str] | None = None) -> dict[str, Any]:
     return {
         "id": row.id,
         "company_id": row.company_id,
+        "company_name": (companies or {}).get(row.company_id, row.company_id),
         "data_type": row.data_type,
         "source_system": row.source_system,
         "owner": row.owner,
@@ -212,10 +229,11 @@ def serialize_catalog(row: frontend_admin_models.DataCatalogEntry) -> dict[str, 
     }
 
 
-def serialize_mapping(row: frontend_admin_models.DataMappingRule) -> dict[str, Any]:
+def serialize_mapping(row: frontend_admin_models.DataMappingRule, companies: dict[str, str] | None = None) -> dict[str, Any]:
     return {
         "id": row.id,
         "company_id": row.company_id,
+        "company_name": (companies or {}).get(row.company_id, row.company_id),
         "source_system": row.source_system,
         "source_field": row.source_field,
         "target_entity": row.target_entity,
@@ -386,7 +404,8 @@ def connected_systems(
     if company_id:
         query = query.filter(frontend_admin_models.ManufacturingDataConnection.company_id == company_id)
     rows = query.order_by(frontend_admin_models.ManufacturingDataConnection.system_name).all()
-    return result("connected_systems", "Connected systems with status, sync, health and record count.", [serialize_connection(row) for row in rows])
+    companies = company_name_map(db)
+    return result("connected_systems", "Connected systems with status, sync, health and record count.", [serialize_connection(row, companies) for row in rows])
 
 
 @data_hub_router.post("/connected-systems", response_model=FrontendAdminApiResult)
@@ -395,15 +414,40 @@ def create_connected_system(
     actor: User = Depends(require_any("admin")),
     db: Session = Depends(get_db),
 ) -> FrontendAdminApiResult:
+    payload = request.model_dump()
+    company_id = resolve_datahub_company_id(payload.pop("company_id", None), actor, db)
+    connection_details = payload.pop("connection_details", {})
+    source_category = payload.pop("source_category", None)
+    auth_method = payload.pop("auth_method", None)
+    system_type = payload.pop("system_type")
+    if source_category or auth_method or connection_details:
+        system_type = f"{system_type} | {source_category or 'General'} | {auth_method or 'No Auth'}"
     row = frontend_admin_models.ManufacturingDataConnection(
         id=f"conn-{uuid4()}",
-        company_id=actor.company_id or "company-c",
-        **request.model_dump(),
+        company_id=company_id,
+        system_type=system_type,
+        **payload,
     )
     db.add(row)
     db.commit()
     db.refresh(row)
-    return result("create_connected_system", "Connected system created for this company.", serialize_connection(row))
+    if connection_details:
+        upsert_metadata(
+            db,
+            category="datahub_connection_details",
+            record_key=row.id,
+            row_id=f"details-{row.id}",
+            company_id=company_id,
+            payload={
+                "connection_id": row.id,
+                "source_category": source_category,
+                "auth_method": auth_method,
+                "connection_details": connection_details,
+            },
+            name=row.system_name,
+        )
+        db.commit()
+    return result("create_connected_system", "Connected system created for the selected company.", serialize_connection(row, company_name_map(db)))
 
 
 @data_hub_router.put("/connected-systems/{connection_id}", response_model=FrontendAdminApiResult)
@@ -418,11 +462,35 @@ def update_connected_system(
         raise HTTPException(status_code=404, detail="Connected system not found")
     if not has_override_scope(actor) and row.company_id != actor.company_id:
         raise HTTPException(status_code=403, detail="Cannot modify another company's DataHub connection")
-    for key, value in request.model_dump().items():
+    payload = request.model_dump()
+    requested_company_id = payload.pop("company_id", None)
+    if has_override_scope(actor) and requested_company_id:
+        row.company_id = resolve_datahub_company_id(requested_company_id, actor, db)
+    connection_details = payload.pop("connection_details", {})
+    source_category = payload.pop("source_category", None)
+    auth_method = payload.pop("auth_method", None)
+    if source_category or auth_method or connection_details:
+        payload["system_type"] = f"{payload['system_type']} | {source_category or 'General'} | {auth_method or 'No Auth'}"
+    for key, value in payload.items():
         setattr(row, key, value)
+    if connection_details:
+        upsert_metadata(
+            db,
+            category="datahub_connection_details",
+            record_key=row.id,
+            row_id=f"details-{row.id}",
+            company_id=row.company_id,
+            payload={
+                "connection_id": row.id,
+                "source_category": source_category,
+                "auth_method": auth_method,
+                "connection_details": connection_details,
+            },
+            name=row.system_name,
+        )
     db.commit()
     db.refresh(row)
-    return result("update_connected_system", "Connected system updated.", serialize_connection(row))
+    return result("update_connected_system", "Connected system updated.", serialize_connection(row, company_name_map(db)))
 
 
 @data_hub_router.delete("/connected-systems/{connection_id}", response_model=FrontendAdminApiResult)
@@ -451,7 +519,8 @@ def data_catalog(
     if company_id:
         query = query.filter(frontend_admin_models.DataCatalogEntry.company_id == company_id)
     rows = query.order_by(frontend_admin_models.DataCatalogEntry.data_type).all()
-    return result("data_catalog", "Manufacturing data catalog.", [serialize_catalog(row) for row in rows])
+    companies = company_name_map(db)
+    return result("data_catalog", "Manufacturing data catalog.", [serialize_catalog(row, companies) for row in rows])
 
 
 @data_hub_router.post("/catalog", response_model=FrontendAdminApiResult)
@@ -460,15 +529,17 @@ def create_data_catalog_entry(
     actor: User = Depends(require_any("admin")),
     db: Session = Depends(get_db),
 ) -> FrontendAdminApiResult:
+    payload = request.model_dump()
+    company_id = resolve_datahub_company_id(payload.pop("company_id", None), actor, db)
     row = frontend_admin_models.DataCatalogEntry(
         id=f"catalog-{uuid4()}",
-        company_id=actor.company_id or "company-c",
-        **request.model_dump(),
+        company_id=company_id,
+        **payload,
     )
     db.add(row)
     db.commit()
     db.refresh(row)
-    return result("create_data_catalog_entry", "Data catalog entry created.", serialize_catalog(row))
+    return result("create_data_catalog_entry", "Data catalog entry created for the selected company.", serialize_catalog(row, company_name_map(db)))
 
 
 @data_hub_router.put("/catalog/{entry_id}", response_model=FrontendAdminApiResult)
@@ -483,11 +554,15 @@ def update_data_catalog_entry(
         raise HTTPException(status_code=404, detail="Catalog entry not found")
     if not has_override_scope(actor) and row.company_id != actor.company_id:
         raise HTTPException(status_code=403, detail="Cannot modify another company's DataHub catalog")
-    for key, value in request.model_dump().items():
+    payload = request.model_dump()
+    requested_company_id = payload.pop("company_id", None)
+    if has_override_scope(actor) and requested_company_id:
+        row.company_id = resolve_datahub_company_id(requested_company_id, actor, db)
+    for key, value in payload.items():
         setattr(row, key, value)
     db.commit()
     db.refresh(row)
-    return result("update_data_catalog_entry", "Data catalog entry updated.", serialize_catalog(row))
+    return result("update_data_catalog_entry", "Data catalog entry updated.", serialize_catalog(row, company_name_map(db)))
 
 
 @data_hub_router.delete("/catalog/{entry_id}", response_model=FrontendAdminApiResult)
@@ -516,7 +591,8 @@ def mappings(
     if company_id:
         query = query.filter(frontend_admin_models.DataMappingRule.company_id == company_id)
     rows = query.order_by(frontend_admin_models.DataMappingRule.source_system, frontend_admin_models.DataMappingRule.source_field).all()
-    return result("mappings", "Data mapping studio rules.", [serialize_mapping(row) for row in rows])
+    companies = company_name_map(db)
+    return result("mappings", "Data mapping studio rules.", [serialize_mapping(row, companies) for row in rows])
 
 
 @data_hub_router.post("/mappings", response_model=FrontendAdminApiResult)
@@ -525,15 +601,17 @@ def create_mapping(
     actor: User = Depends(require_any("admin")),
     db: Session = Depends(get_db),
 ) -> FrontendAdminApiResult:
+    payload = request.model_dump()
+    company_id = resolve_datahub_company_id(payload.pop("company_id", None), actor, db)
     row = frontend_admin_models.DataMappingRule(
         id=f"map-{uuid4()}",
-        company_id=actor.company_id or "company-c",
-        **request.model_dump(),
+        company_id=company_id,
+        **payload,
     )
     db.add(row)
     db.commit()
     db.refresh(row)
-    return result("create_mapping", "Data mapping rule created.", serialize_mapping(row))
+    return result("create_mapping", "Data mapping rule created for the selected company.", serialize_mapping(row, company_name_map(db)))
 
 
 @data_hub_router.put("/mappings/{mapping_id}", response_model=FrontendAdminApiResult)
@@ -548,11 +626,15 @@ def update_mapping(
         raise HTTPException(status_code=404, detail="Mapping rule not found")
     if not has_override_scope(actor) and row.company_id != actor.company_id:
         raise HTTPException(status_code=403, detail="Cannot modify another company's DataHub mapping")
-    for key, value in request.model_dump().items():
+    payload = request.model_dump()
+    requested_company_id = payload.pop("company_id", None)
+    if has_override_scope(actor) and requested_company_id:
+        row.company_id = resolve_datahub_company_id(requested_company_id, actor, db)
+    for key, value in payload.items():
         setattr(row, key, value)
     db.commit()
     db.refresh(row)
-    return result("update_mapping", "Data mapping rule updated.", serialize_mapping(row))
+    return result("update_mapping", "Data mapping rule updated.", serialize_mapping(row, company_name_map(db)))
 
 
 @data_hub_router.delete("/mappings/{mapping_id}", response_model=FrontendAdminApiResult)
@@ -641,20 +723,35 @@ def uploads(
     actor: User = Depends(require_any("admin")),
     db: Session = Depends(get_db),
 ) -> FrontendAdminApiResult:
-    rows = list_metadata(db, "datahub_upload", company_id=actor.company_id)
+    company_id = scoped_company_id(actor)
+    if company_id:
+        rows = list_metadata(db, "datahub_upload", company_id=company_id)
+    else:
+        rows = [
+            row.payload
+            for row in db.query(AppMetadata)
+            .filter(AppMetadata.tenant_id == "tenant-demo-001", AppMetadata.category == "datahub_upload")
+            .order_by(AppMetadata.record_key.asc())
+            .all()
+        ]
+    companies = company_name_map(db)
+    for row in rows:
+        row["company_name"] = companies.get(row.get("company_id"), row.get("company_id"))
     return result("uploads", "Stored DataHub upload manifests.", rows)
 
 
 @data_hub_router.post("/uploads", response_model=FrontendAdminApiResult)
 async def create_upload(
     file: UploadFile = File(...),
+    company_id: str | None = Form(default=None),
     actor: User = Depends(require_executive_editor),
     db: Session = Depends(get_db),
 ) -> FrontendAdminApiResult:
     content = await file.read()
     preview = extract_upload_preview(file.filename or "upload", content)
+    target_company_id = resolve_datahub_company_id(company_id, actor, db)
     payload = upload_manifest_payload(
-        company_id=actor.company_id,
+        company_id=target_company_id,
         source="local_upload",
         provider="Local Computer",
         resource_name=file.filename or "upload",
@@ -672,7 +769,7 @@ async def create_upload(
         category="datahub_upload",
         record_key=payload["id"],
         row_id=payload["id"],
-        company_id=actor.company_id,
+        company_id=target_company_id,
         payload=payload,
         name=payload["resource_name"],
     )
@@ -686,22 +783,28 @@ def create_cloud_source(
     actor: User = Depends(require_executive_editor),
     db: Session = Depends(get_db),
 ) -> FrontendAdminApiResult:
+    payload_request = request.model_dump()
+    target_company_id = resolve_datahub_company_id(payload_request.pop("company_id", None), actor, db)
     payload = upload_manifest_payload(
-        company_id=actor.company_id,
+        company_id=target_company_id,
         source="cloud_link",
-        provider=request.provider,
-        resource_name=request.resource_name,
-        file_format=request.file_format,
-        resource_url=request.resource_url,
+        provider=payload_request["provider"],
+        resource_name=payload_request["resource_name"],
+        file_format=payload_request["file_format"],
+        resource_url=payload_request["resource_url"],
         uploaded_by=actor.email,
-        metadata={"sync_mode": request.sync_mode},
+        metadata={
+            "sync_mode": payload_request["sync_mode"],
+            "auth_method": payload_request.get("auth_method"),
+            "connection_details": payload_request.get("connection_details", {}),
+        },
     )
     upsert_metadata(
         db,
         category="datahub_upload",
         record_key=payload["id"],
         row_id=payload["id"],
-        company_id=actor.company_id,
+        company_id=target_company_id,
         payload=payload,
         name=payload["resource_name"],
     )

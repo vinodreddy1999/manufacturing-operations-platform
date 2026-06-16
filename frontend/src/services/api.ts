@@ -142,15 +142,27 @@ export const backend = {
     return response.data.data;
   },
   uploads: () => getEnvelope<DataHubUpload[]>('/manufacturing-data-hub/uploads'),
-  uploadFile: async (file: File) => {
+  uploadFile: async (file: File, companyId?: string) => {
     const form = new FormData();
     form.append('file', file);
+    if (companyId) {
+      form.append('company_id', companyId);
+    }
     const response = await api.post<ApiEnvelope<DataHubUpload>>('/manufacturing-data-hub/uploads', form, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data.data;
   },
-  createCloudSource: async (payload: { provider: string; resource_name: string; resource_url: string; file_format: string; sync_mode: string }) => {
+  createCloudSource: async (payload: {
+    company_id?: string;
+    provider: string;
+    resource_name: string;
+    resource_url: string;
+    file_format: string;
+    sync_mode: string;
+    auth_method?: string;
+    connection_details?: Record<string, unknown>;
+  }) => {
     const response = await api.post<ApiEnvelope<DataHubUpload>>('/manufacturing-data-hub/cloud-sources', payload);
     return response.data.data;
   },
