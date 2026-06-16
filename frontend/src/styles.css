@@ -74,6 +74,48 @@ textarea::placeholder {
   color: #64748b;
 }
 
+.admin-surface input,
+.admin-surface select,
+.admin-surface textarea {
+  color: #ffffff !important;
+  background: rgba(10, 14, 26, 0.6) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 8px !important;
+  box-shadow: none;
+  outline: none;
+  backdrop-filter: blur(12px);
+  transition: all 0.2s ease-in-out;
+}
+
+.admin-surface input::placeholder,
+.admin-surface textarea::placeholder {
+  color: rgba(255, 255, 255, 0.5) !important;
+}
+
+.admin-surface input:focus,
+.admin-surface select:focus,
+.admin-surface textarea:focus {
+  border-color: #4facfe !important;
+  box-shadow: 0 0 12px rgba(79, 172, 254, 0.25);
+}
+
+.admin-surface label,
+.admin-surface .text-slate-700,
+.admin-surface .text-foreground {
+  color: rgba(255, 255, 255, 0.82) !important;
+}
+
+.admin-surface .bg-slate-50 {
+  background: rgba(10, 14, 26, 0.46) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  color: rgba(255, 255, 255, 0.82) !important;
+  backdrop-filter: blur(12px);
+}
+
+.admin-surface .text-muted-foreground {
+  color: rgba(255, 255, 255, 0.5) !important;
+}
+
 select option {
   background: #0f172a;
   color: #f8fafc;

@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query';
 import { BarChart3, Boxes, Factory, ShieldCheck, Users } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
 import { ErrorState } from '../components/ErrorState';
 import { LoadingState } from '../components/LoadingState';
@@ -25,6 +24,31 @@ const readinessDescriptions: Record<string, string> = {
 
 function getReadinessDescription(area: string) {
   return readinessDescriptions[area] ?? 'Editable executive-facing AI adoption signal';
+}
+
+function getReadinessState(score: number) {
+  if (score >= 80) {
+    return {
+      label: 'Ready',
+      gradient: 'linear-gradient(90deg, #00f2fe 0%, #4facfe 100%)',
+      glow: '0 0 12px rgba(79, 172, 254, 0.38)',
+      badge: 'border-cyan-300/25 bg-cyan-400/10 text-cyan-100',
+    };
+  }
+  if (score >= 50) {
+    return {
+      label: 'In Progress',
+      gradient: 'linear-gradient(90deg, #f9d423 0%, #ff4e50 100%)',
+      glow: '0 0 12px rgba(255, 115, 80, 0.34)',
+      badge: 'border-amber-300/25 bg-amber-300/10 text-amber-100',
+    };
+  }
+  return {
+    label: 'Review',
+    gradient: 'linear-gradient(90deg, #f857a6 0%, #ff5858 100%)',
+    glow: '0 0 12px rgba(248, 87, 166, 0.34)',
+    badge: 'border-rose-300/25 bg-rose-400/10 text-rose-100',
+  };
 }
 
 function sectionClasses(active: boolean) {
@@ -97,6 +121,8 @@ export function DashboardPage({ user }: { user: RuntimeUser }) {
       quantity: Number(risk.available_quantity ?? 0),
     }));
   }, [inventory.data]);
+  const overallReadiness = readiness.data?.overall_ai_readiness ?? 0;
+  const gaugeOffset = 100 - Math.min(Math.max(overallReadiness, 0), 100);
 
   if ([health, admin, inventory, quality, readiness, footprint, analytics].some((query) => query.isLoading)) {
     return <LoadingState label="Loading futuristic command dashboard from live backend APIs" />;
@@ -181,42 +207,72 @@ export function DashboardPage({ user }: { user: RuntimeUser }) {
             </button>
           ) : null}
         >
-          <div className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
-            <div className={`rounded-[24px] border border-white/10 bg-slate-950/20 p-3 ${sectionClasses(focus === 'ai-readiness')}`}>
-              <div
-                className="h-80 lg:h-[26rem]"
-                style={{ minHeight: `${Math.max(readinessDraft.length * 68, 320)}px` }}
-              >
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={readinessDraft}
-                    layout="vertical"
-                    margin={{ top: 12, right: 20, bottom: 12, left: 12 }}
-                    barCategoryGap={18}
-                  >
-                    <CartesianGrid stroke="rgba(255,255,255,0.09)" strokeDasharray="3 3" />
-                    <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11, fill: '#cbd5e1' }} />
-                    <YAxis type="category" dataKey="area" hide width={0} />
-                    <Tooltip contentStyle={{ background: '#0f172a', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 16 }} />
-                    <Bar dataKey="score" fill="#22d3ee" radius={[0, 10, 10, 0]} barSize={28} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="mt-4 space-y-3 px-2 pb-2">
-                {readinessDraft.map((row) => (
-                  <div key={`chart-label-${row.area}`} className="flex flex-wrap items-start justify-between gap-2 rounded-2xl border border-white/8 bg-white/5 px-4 py-3">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-white">{row.area}</p>
-                      <p className="text-xs text-slate-400">{getReadinessDescription(row.area)}</p>
-                    </div>
-                    <span className="rounded-full border border-cyan-300/20 bg-cyan-400/10 px-3 py-1 text-xs font-semibold text-cyan-100">
-                      {row.score}%
-                    </span>
-                  </div>
-                ))}
+          <div className={`grid gap-5 rounded-[24px] border border-white/10 bg-slate-950/20 p-5 lg:grid-cols-[35fr_65fr] ${sectionClasses(focus === 'ai-readiness')}`}>
+            <div className="flex min-h-[260px] flex-col items-center justify-center rounded-[22px] border border-white/10 bg-white/[0.045] p-5">
+              <div className="relative h-48 w-48">
+                <svg className="h-full w-full overflow-visible" viewBox="0 0 120 120" role="img" aria-label={`${overallReadiness}% overall AI readiness`}>
+                  <path
+                    d="M 20 78 A 40 40 0 0 1 100 78"
+                    stroke="rgba(255,255,255,0.07)"
+                    strokeWidth="11"
+                    strokeLinecap="round"
+                    fill="none"
+                    pathLength={100}
+                  />
+                  <path
+                    d="M 20 78 A 40 40 0 0 1 100 78"
+                    stroke="url(#readinessGaugeGradient)"
+                    strokeWidth="11"
+                    strokeLinecap="round"
+                    fill="none"
+                    pathLength={100}
+                    strokeDasharray="100"
+                    strokeDashoffset={gaugeOffset}
+                    className="drop-shadow-[0_0_10px_rgba(79,172,254,0.55)] transition-all duration-500"
+                  />
+                  <defs>
+                    <linearGradient id="readinessGaugeGradient" x1="12" y1="60" x2="108" y2="60" gradientUnits="userSpaceOnUse">
+                      <stop offset="0%" stopColor="#00f2fe" />
+                      <stop offset="100%" stopColor="#4facfe" />
+                    </linearGradient>
+                  </defs>
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                  <p className="text-4xl font-semibold tracking-[-0.02em] text-white">{overallReadiness}%</p>
+                  <p className="mt-1 max-w-28 text-xs font-medium leading-4 text-slate-300">Overall Readiness</p>
+                </div>
               </div>
             </div>
-            <div className="space-y-3">
+
+            <div className="flex flex-col justify-center gap-4">
+              {readinessDraft.map((row) => {
+                const state = getReadinessState(row.score);
+                return (
+                  <div key={`domain-readiness-${row.area}`} className="rounded-[20px] border border-white/10 bg-white/[0.045] p-4 backdrop-blur-xl">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold tracking-[-0.02em] text-white">{row.area}</p>
+                        <p className="mt-1 text-xs text-slate-400">{getReadinessDescription(row.area)}</p>
+                      </div>
+                      <div className="flex items-center gap-2 text-right">
+                        <span className="text-sm font-semibold tracking-[-0.02em] text-white">{row.score}%</span>
+                        <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${state.badge}`}>
+                          {state.label}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/[0.03]">
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{ width: `${Math.min(Math.max(row.score, 0), 100)}%`, background: state.gradient, boxShadow: state.glow }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="space-y-3 lg:col-span-2">
               {readinessDraft.map((row, index) => (
                 <div key={row.area} className="rounded-[22px] border border-white/10 bg-white/6 p-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">

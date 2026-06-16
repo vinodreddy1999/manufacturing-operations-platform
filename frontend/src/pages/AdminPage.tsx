@@ -133,7 +133,7 @@ export function AdminPage({ user }: { user: RuntimeUser }) {
   }
 
   return (
-    <>
+    <div className="admin-surface">
       <PageHeader
         eyebrow="Admin"
         title="Admin Control Center"
@@ -300,6 +300,6 @@ export function AdminPage({ user }: { user: RuntimeUser }) {
           />
         </Panel>
       </div>
-    </>
+    </div>
   );
 }

@@ -22,7 +22,7 @@ export function StatCard({ label, value, helper, icon, onClick, accent = 'blue' 
     <button
       type="button"
       onClick={onClick}
-      className={`group relative overflow-hidden rounded-[28px] border border-white/15 bg-white/8 p-5 text-left shadow-[0_20px_60px_rgba(15,23,42,0.18)] backdrop-blur-xl transition duration-300 ${onClick ? 'hover:-translate-y-1 hover:border-cyan-300/40 hover:bg-white/12' : ''} w-full`}
+      className={`group relative flex min-h-[164px] w-full flex-col justify-between overflow-hidden rounded-[28px] border border-white/15 bg-white/8 p-5 text-left shadow-[0_20px_60px_rgba(15,23,42,0.18)] backdrop-blur-xl transition duration-300 ${onClick ? 'hover:-translate-y-1 hover:border-cyan-300/40 hover:bg-white/12' : ''}`}
     >
       <div className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${accentClasses}`} />
       <div className="pointer-events-none absolute inset-px rounded-[27px] border border-white/10" />
