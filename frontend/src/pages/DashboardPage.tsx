@@ -17,6 +17,16 @@ import type { RuntimeUser } from '../types';
 
 type DetailKey = 'active-users' | 'inventory-value' | 'data-quality' | 'ai-readiness' | 'plants';
 
+const readinessDescriptions: Record<string, string> = {
+  'Inventory AI Readiness': 'AWS S3 Global View',
+  'Production AI Readiness': 'MES / Factory Systems',
+  'Machine Data AI Readiness': 'OPC-UA / Edge Devices',
+};
+
+function getReadinessDescription(area: string) {
+  return readinessDescriptions[area] ?? 'Editable executive-facing AI adoption signal';
+}
+
 function sectionClasses(active: boolean) {
   return active
     ? 'ring-2 ring-cyan-300/60 shadow-[0_0_0_1px_rgba(103,232,249,0.25),0_30px_80px_rgba(34,211,238,0.18)]'
@@ -173,16 +183,37 @@ export function DashboardPage({ user }: { user: RuntimeUser }) {
         >
           <div className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
             <div className={`rounded-[24px] border border-white/10 bg-slate-950/20 p-3 ${sectionClasses(focus === 'ai-readiness')}`}>
-              <div className="h-72">
+              <div
+                className="h-80 lg:h-[26rem]"
+                style={{ minHeight: `${Math.max(readinessDraft.length * 68, 320)}px` }}
+              >
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={readinessDraft}>
+                  <BarChart
+                    data={readinessDraft}
+                    layout="vertical"
+                    margin={{ top: 12, right: 20, bottom: 12, left: 12 }}
+                    barCategoryGap={18}
+                  >
                     <CartesianGrid stroke="rgba(255,255,255,0.09)" strokeDasharray="3 3" />
-                    <XAxis dataKey="area" tick={{ fontSize: 11, fill: '#cbd5e1' }} interval={0} angle={-18} textAnchor="end" height={72} />
-                    <YAxis domain={[0, 100]} tick={{ fill: '#cbd5e1' }} />
+                    <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11, fill: '#cbd5e1' }} />
+                    <YAxis type="category" dataKey="area" hide width={0} />
                     <Tooltip contentStyle={{ background: '#0f172a', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 16 }} />
-                    <Bar dataKey="score" fill="#22d3ee" radius={[8, 8, 0, 0]} />
+                    <Bar dataKey="score" fill="#22d3ee" radius={[0, 10, 10, 0]} barSize={28} />
                   </BarChart>
                 </ResponsiveContainer>
+              </div>
+              <div className="mt-4 space-y-3 px-2 pb-2">
+                {readinessDraft.map((row) => (
+                  <div key={`chart-label-${row.area}`} className="flex flex-wrap items-start justify-between gap-2 rounded-2xl border border-white/8 bg-white/5 px-4 py-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-white">{row.area}</p>
+                      <p className="text-xs text-slate-400">{getReadinessDescription(row.area)}</p>
+                    </div>
+                    <span className="rounded-full border border-cyan-300/20 bg-cyan-400/10 px-3 py-1 text-xs font-semibold text-cyan-100">
+                      {row.score}%
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
             <div className="space-y-3">
@@ -191,7 +222,7 @@ export function DashboardPage({ user }: { user: RuntimeUser }) {
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <p className="text-sm font-semibold text-white">{row.area}</p>
-                      <p className="text-xs text-slate-400">Editable executive-facing AI adoption signal</p>
+                      <p className="text-xs text-slate-400">{getReadinessDescription(row.area)}</p>
                     </div>
                     <StatusBadge status={row.ready ? 'Ready' : 'In Progress'} />
                   </div>
