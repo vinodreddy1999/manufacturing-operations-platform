@@ -1,6 +1,7 @@
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Activity, Bell, Boxes, CheckCircle2, Link2, PackageCheck, ShoppingCart } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 
 import { DataTable } from '../components/DataTable';
 import { ErrorState } from '../components/ErrorState';
@@ -21,7 +22,36 @@ function statusScore(records: ModuleRecord[] | undefined, moduleKey: string, fal
   return Math.max(35, Math.round((healthy / moduleRecords.length) * 100));
 }
 
+function moduleRoute(moduleKey: string) {
+  const directRoutes = new Set([
+    'planning',
+    'inventory',
+    'production',
+    'maintenance',
+    'quality',
+    'procurement',
+    'sales',
+    'costing',
+    'compliance',
+    'customer-portal',
+    'supplier-portal',
+    'reports',
+    'documents',
+  ]);
+  const routeMap: Record<string, string> = {
+    reporting: '/reports',
+    reports: '/reports',
+    integrations: '/data-hub',
+    mobile: '/operations',
+    ai_copilot: '/intelligence',
+    ai: '/intelligence',
+  };
+  if (directRoutes.has(moduleKey)) return `/${moduleKey}`;
+  return routeMap[moduleKey] ?? '/operations';
+}
+
 export function DashboardPage({ user }: { user: RuntimeUser }) {
+  const navigate = useNavigate();
   const admin = useQuery({ queryKey: ['admin-dashboard'], queryFn: backend.adminDashboard });
   const inventory = useQuery({ queryKey: ['inventory-dashboard'], queryFn: backend.inventoryDashboard });
   const analytics = useQuery({ queryKey: ['runtime-analytics'], queryFn: backend.analytics });
@@ -57,39 +87,44 @@ export function DashboardPage({ user }: { user: RuntimeUser }) {
       value: formatNumber(admin.data?.active_users ?? analytics.data?.active_users),
       helper: `${formatNumber(admin.data?.user_count)} total users`,
       accent: 'emerald' as const,
+      route: '/admin',
     },
     {
       label: 'Backend Records',
       value: formatNumber(allRecords.length),
       helper: 'All module records',
       accent: 'blue' as const,
+      route: '/operations',
     },
     {
       label: 'Inventory Value',
       value: formatCurrency(inventory.data?.total_inventory_value),
       helper: `${formatNumber(analytics.data?.inventory_total_quantity)} units tracked`,
       accent: 'amber' as const,
+      route: '/inventory',
     },
     {
       label: 'Open Approvals',
       value: formatNumber(admin.data?.open_approvals ?? admin.data?.pending_actions),
       helper: 'Waiting for action',
       accent: 'violet' as const,
+      route: '/admin',
     },
     {
       label: 'Active Integrations',
       value: formatNumber(connectedSystems.length || admin.data?.integrations),
       helper: 'ERP, files, APIs, SFTP',
       accent: 'blue' as const,
+      route: '/data-hub',
     },
   ];
 
   const operationalStatus = [
-    { area: 'Production', status: 'Backend', value: productionScore },
-    { area: 'Maintenance', status: 'Backend', value: maintenanceScore },
-    { area: 'Quality', status: 'Backend', value: qualityScore },
-    { area: 'Procurement', status: 'Backend', value: procurementScore },
-    { area: 'Inventory', status: 'Backend', value: inventoryScore },
+    { area: 'Production', status: 'Backend', value: productionScore, route: '/production' },
+    { area: 'Maintenance', status: 'Backend', value: maintenanceScore, route: '/maintenance' },
+    { area: 'Quality', status: 'Backend', value: qualityScore, route: '/quality' },
+    { area: 'Procurement', status: 'Backend', value: procurementScore, route: '/procurement' },
+    { area: 'Inventory', status: 'Backend', value: inventoryScore, route: '/inventory' },
   ];
 
   const notifications = [
@@ -97,16 +132,19 @@ export function DashboardPage({ user }: { user: RuntimeUser }) {
       title: `${item.name} is low stock`,
       owner: item.record_code,
       status: 'Review',
+      route: '/inventory',
     })),
     {
       title: `${formatNumber(admin.data?.pending_actions)} pending admin actions`,
       owner: 'Admin workflow',
       status: (admin.data?.pending_actions ?? 0) > 0 ? 'Pending' : 'Closed',
+      route: '/admin',
     },
     {
       title: `${formatNumber(fileUploads.length)} DataHub uploads available`,
       owner: 'DataHub',
       status: fileUploads.length ? 'Ready' : 'Open',
+      route: '/data-hub',
     },
   ];
 
@@ -115,6 +153,7 @@ export function DashboardPage({ user }: { user: RuntimeUser }) {
     owner: user.role.replace('_', ' '),
     records: count,
     status: count > 0 ? 'Enabled' : 'Empty',
+    route: moduleRoute(module),
   }));
 
   return (
@@ -134,7 +173,7 @@ export function DashboardPage({ user }: { user: RuntimeUser }) {
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         {dashboardMetrics.map((metric) => (
-          <StatCard key={metric.label} label={metric.label} value={metric.value} helper={metric.helper} accent={metric.accent} />
+          <StatCard key={metric.label} label={metric.label} value={metric.value} helper={metric.helper} accent={metric.accent} onClick={() => navigate(metric.route)} />
         ))}
       </div>
 
@@ -155,7 +194,7 @@ export function DashboardPage({ user }: { user: RuntimeUser }) {
         <Panel title="Open Notifications" description="Operational items that require review or action.">
           <div className="space-y-3">
             {notifications.map((item) => (
-              <div key={item.title} className="rounded-xl border border-white/10 bg-slate-950/25 p-3">
+              <button key={item.title} className="w-full rounded-xl border border-white/10 bg-slate-950/25 p-3 text-left transition hover:border-cyan-300/30 hover:bg-slate-900/50" onClick={() => navigate(item.route)}>
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold text-white">{item.title}</p>
@@ -163,17 +202,17 @@ export function DashboardPage({ user }: { user: RuntimeUser }) {
                   </div>
                   <StatusBadge status={item.status} />
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </Panel>
       </div>
 
       <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Production Status" value="82%" helper="Orders on track" icon={<PackageCheck className="h-5 w-5" />} accent="blue" />
-        <StatCard label="Quality Status" value="91%" helper="Inspection performance" icon={<CheckCircle2 className="h-5 w-5" />} accent="emerald" />
-        <StatCard label="Procurement Status" value="73%" helper="Purchase coverage" icon={<ShoppingCart className="h-5 w-5" />} accent="amber" />
-        <StatCard label="Inventory Status" value="88%" helper="Stock readiness" icon={<Boxes className="h-5 w-5" />} accent="violet" />
+        <StatCard label="Production Status" value={`${productionScore}%`} helper="Open production workspace" icon={<PackageCheck className="h-5 w-5" />} accent="blue" onClick={() => navigate('/production')} />
+        <StatCard label="Quality Status" value={`${qualityScore}%`} helper="Open quality workspace" icon={<CheckCircle2 className="h-5 w-5" />} accent="emerald" onClick={() => navigate('/quality')} />
+        <StatCard label="Procurement Status" value={`${procurementScore}%`} helper="Open procurement workspace" icon={<ShoppingCart className="h-5 w-5" />} accent="amber" onClick={() => navigate('/procurement')} />
+        <StatCard label="Inventory Status" value={`${inventoryScore}%`} helper="Open inventory workspace" icon={<Boxes className="h-5 w-5" />} accent="violet" onClick={() => navigate('/inventory')} />
       </div>
 
       <div className="mt-6 grid gap-4 xl:grid-cols-2">
@@ -186,16 +225,25 @@ export function DashboardPage({ user }: { user: RuntimeUser }) {
               { key: 'owner', label: 'Owner' },
               { key: 'records', label: 'Records' },
               { key: 'status', label: 'Status', render: (value) => <StatusBadge status={String(value)} /> },
+              {
+                key: 'route',
+                label: 'Open',
+                render: (value) => (
+                  <button className="rounded-xl border border-cyan-300/20 bg-cyan-400/10 px-3 py-1 text-xs font-semibold text-cyan-100 hover:bg-cyan-400/20" onClick={() => navigate(String(value))}>
+                    View
+                  </button>
+                ),
+              },
             ]}
           />
         </Panel>
 
         <Panel title="Integration Snapshot" description="ERP, database, upload, REST API, and SFTP connection overview.">
           <div className="grid gap-3 sm:grid-cols-2">
-            <StatCard label="ERP Systems" value={formatNumber(connectedSystems.filter((system) => system.system_type.toLowerCase().includes('erp')).length)} helper="Connected" icon={<Link2 className="h-5 w-5" />} />
-            <StatCard label="File Uploads" value={formatNumber(fileUploads.length)} helper="CSV, Excel, cloud links" icon={<Activity className="h-5 w-5" />} accent="emerald" />
-            <StatCard label="Open Alerts" value={formatNumber((admin.data?.pending_actions ?? 0) + (analytics.data?.inventory_low_stock_count ?? 0))} helper="Sync and stock review queue" icon={<Bell className="h-5 w-5" />} accent="amber" />
-            <StatCard label="REST APIs" value={formatNumber(connectedSystems.filter((system) => system.system_type.toLowerCase().includes('api')).length)} helper="Active endpoints" icon={<Link2 className="h-5 w-5" />} accent="violet" />
+            <StatCard label="ERP Systems" value={formatNumber(connectedSystems.filter((system) => system.system_type.toLowerCase().includes('erp')).length)} helper="Open Data Hub connections" icon={<Link2 className="h-5 w-5" />} onClick={() => navigate('/data-hub')} />
+            <StatCard label="File Uploads" value={formatNumber(fileUploads.length)} helper="Open upload center" icon={<Activity className="h-5 w-5" />} accent="emerald" onClick={() => navigate('/data-hub')} />
+            <StatCard label="Open Alerts" value={formatNumber((admin.data?.pending_actions ?? 0) + (analytics.data?.inventory_low_stock_count ?? 0))} helper="Open admin and inventory queues" icon={<Bell className="h-5 w-5" />} accent="amber" onClick={() => navigate('/admin')} />
+            <StatCard label="REST APIs" value={formatNumber(connectedSystems.filter((system) => system.system_type.toLowerCase().includes('api')).length)} helper="Open Data Hub integrations" icon={<Link2 className="h-5 w-5" />} accent="violet" onClick={() => navigate('/data-hub')} />
           </div>
         </Panel>
       </div>

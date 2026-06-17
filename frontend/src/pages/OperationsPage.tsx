@@ -1,5 +1,6 @@
 import { FormEvent, useMemo, useState } from 'react';
 import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Boxes, Factory, ShieldCheck, Trash2, Wrench } from 'lucide-react';
 
@@ -15,8 +16,35 @@ import { canWriteOperationalData } from '../lib/rbac';
 import { backend } from '../services/api';
 import type { ModuleRecord, RuntimeUser } from '../types';
 
+function moduleRoute(moduleKey: string) {
+  const directRoutes = new Set([
+    'planning',
+    'inventory',
+    'production',
+    'maintenance',
+    'quality',
+    'procurement',
+    'sales',
+    'costing',
+    'compliance',
+    'customer-portal',
+    'supplier-portal',
+    'reports',
+    'documents',
+  ]);
+  const routeMap: Record<string, string> = {
+    reporting: '/reports',
+    integrations: '/data-hub',
+    ai: '/intelligence',
+    ai_copilot: '/intelligence',
+  };
+  if (directRoutes.has(moduleKey)) return `/${moduleKey}`;
+  return routeMap[moduleKey] ?? '/operations';
+}
+
 export function OperationsPage({ user }: { user: RuntimeUser }) {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [newRecord, setNewRecord] = useState({
     module_key: 'inventory',
     record_type: 'raw_material',
@@ -82,6 +110,7 @@ export function OperationsPage({ user }: { user: RuntimeUser }) {
         company_code: company.code,
         module_key: selectedModule,
         allocation: flag?.enabled ? 'Enabled' : 'Disabled',
+        route: moduleRoute(selectedModule),
       };
     });
   }, [companies.data, featureFlags.data, selectedModule]);
@@ -117,10 +146,10 @@ export function OperationsPage({ user }: { user: RuntimeUser }) {
       ) : null}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Inventory Value" value={formatCurrency(inventory.data?.total_inventory_value)} helper="Inventory dashboard" icon={<Boxes className="h-5 w-5" />} />
-        <StatCard label="Backend Modules" value={formatNumber(modules.data?.length)} helper="Registered module list" icon={<Factory className="h-5 w-5" />} />
-        <StatCard label="Low Stock Risks" value={formatNumber(analytics.data?.inventory_low_stock_count ?? inventory.data?.low_stock_risks?.length)} helper="Database analytics" icon={<ShieldCheck className="h-5 w-5" />} />
-        <StatCard label="Maintenance Ready" value="Active" helper="Maintenance APIs mounted" icon={<Wrench className="h-5 w-5" />} />
+        <StatCard label="Inventory Value" value={formatCurrency(inventory.data?.total_inventory_value)} helper="Open inventory module" icon={<Boxes className="h-5 w-5" />} onClick={() => navigate('/inventory')} />
+        <StatCard label="Backend Modules" value={formatNumber(modules.data?.length)} helper="Jump to module allocations" icon={<Factory className="h-5 w-5" />} onClick={() => document.getElementById('module-allocations')?.scrollIntoView({ behavior: 'smooth' })} />
+        <StatCard label="Low Stock Risks" value={formatNumber(analytics.data?.inventory_low_stock_count ?? inventory.data?.low_stock_risks?.length)} helper="Open inventory risks" icon={<ShieldCheck className="h-5 w-5" />} onClick={() => navigate('/inventory')} />
+        <StatCard label="Maintenance Ready" value="Active" helper="Open maintenance module" icon={<Wrench className="h-5 w-5" />} onClick={() => navigate('/maintenance')} />
       </div>
 
       <div className="mt-6 grid gap-4 xl:grid-cols-[1fr_0.9fr]">
@@ -201,6 +230,7 @@ export function OperationsPage({ user }: { user: RuntimeUser }) {
 
       <div className="mt-6">
         <Panel title="Registered Backend Modules" description="Select a module to see which companies have it allocated from live /feature-flags data.">
+          <div id="module-allocations" />
           <div className="mb-4 grid gap-3 md:grid-cols-[minmax(240px,360px)_1fr]">
             <label className="block text-sm font-medium text-slate-700">
               Module
@@ -229,6 +259,15 @@ export function OperationsPage({ user }: { user: RuntimeUser }) {
               { key: 'company_code', label: 'Code' },
               { key: 'module_key', label: 'Selected Module' },
               { key: 'allocation', label: 'Allocation', render: (value) => <StatusBadge status={String(value)} /> },
+              {
+                key: 'route',
+                label: 'Open',
+                render: (value) => (
+                  <button className="rounded-md border border-cyan-300/30 px-3 py-1 text-xs font-semibold text-cyan-100 hover:bg-cyan-400/10" onClick={() => navigate(String(value))}>
+                    View module
+                  </button>
+                ),
+              },
             ]}
           />
         </Panel>
