@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import struct
 import textwrap
 import urllib.error
 import urllib.request
@@ -13,6 +14,7 @@ from PIL import Image, ImageDraw, ImageFont
 ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs"
 OUTPUT_GIF = DOCS / "mop-complete-working-walkthrough.gif"
+OUTPUT_AVI = DOCS / "mop-complete-working-walkthrough.avi"
 OUTPUT_HTML = DOCS / "mop-complete-working-walkthrough.html"
 API_BASE = "http://127.0.0.1:8000"
 APP_BASE = "http://127.0.0.1:8080"
@@ -384,7 +386,12 @@ def save_html(frames: list[str]) -> None:
   <main>
     <h1>Manufacturing Operations Platform - Complete Working Walkthrough</h1>
     <p>This animated walkthrough covers user levels, module flows, backend data, click redirects, RBAC, and deployment.</p>
-    <img src=\"mop-complete-working-walkthrough.gif\" alt=\"MOP complete working walkthrough animation\" />
+    <video controls width=\"100%\" poster=\"mop-complete-working-walkthrough.gif\">
+      <source src=\"mop-complete-working-walkthrough.avi\" type=\"video/x-msvideo\" />
+      Your browser can still view the animated fallback below.
+    </video>
+    <p><a href=\"mop-complete-working-walkthrough.avi\">Download full AVI video</a></p>
+    <img src=\"mop-complete-working-walkthrough.gif\" alt=\"MOP complete working walkthrough animation fallback\" />
     <section class=\"card\">
       <h2>Covered Sections</h2>
       <ul>{items}</ul>
@@ -399,6 +406,109 @@ def save_html(frames: list[str]) -> None:
 """,
         encoding="utf-8",
     )
+
+
+def riff_chunk(chunk_id: bytes, data: bytes) -> bytes:
+    padding = b"\0" if len(data) % 2 else b""
+    return chunk_id + struct.pack("<I", len(data)) + data + padding
+
+
+def riff_list(list_type: bytes, data: bytes) -> bytes:
+    payload = list_type + data
+    padding = b"\0" if len(payload) % 2 else b""
+    return b"LIST" + struct.pack("<I", len(payload)) + payload + padding
+
+
+def save_avi(frames: list[Image.Image], output: Path, fps: int = 1) -> None:
+    """Write a simple MJPEG AVI without relying on ffmpeg or external codecs."""
+    width, height = frames[0].size
+    jpeg_frames: list[bytes] = []
+    for frame in frames:
+        from io import BytesIO
+
+        buffer = BytesIO()
+        frame.convert("RGB").save(buffer, format="JPEG", quality=88)
+        jpeg_frames.append(buffer.getvalue())
+
+    max_frame_size = max(len(frame) for frame in jpeg_frames)
+    total_frames = len(jpeg_frames)
+    microseconds_per_frame = int(1_000_000 / fps)
+
+    avih = struct.pack(
+        "<IIIIIIIIII4I",
+        microseconds_per_frame,
+        max_frame_size * fps,
+        0,
+        0x10,
+        total_frames,
+        0,
+        1,
+        max_frame_size,
+        width,
+        height,
+        0,
+        0,
+        0,
+        0,
+    )
+
+    strh = (
+        b"vids"
+        + b"MJPG"
+        + struct.pack(
+            "<IHHIIIIIIIIhhhh",
+            0,
+            0,
+            0,
+            0,
+            1,
+            fps,
+            0,
+            total_frames,
+            max_frame_size,
+            0xFFFFFFFF,
+            0,
+            0,
+            0,
+            width,
+            height,
+        )
+    )
+
+    strf = struct.pack(
+        "<IiiHHIIiiII",
+        40,
+        width,
+        height,
+        1,
+        24,
+        int.from_bytes(b"MJPG", "little"),
+        max_frame_size,
+        0,
+        0,
+        0,
+        0,
+    )
+
+    hdrl = riff_list(
+        b"hdrl",
+        riff_chunk(b"avih", avih)
+        + riff_list(b"strl", riff_chunk(b"strh", strh) + riff_chunk(b"strf", strf)),
+    )
+
+    movi_payload = bytearray()
+    index_entries = []
+    offset = 4
+    for frame in jpeg_frames:
+        chunk = riff_chunk(b"00dc", frame)
+        index_entries.append((b"00dc", 0x10, offset, len(frame)))
+        movi_payload.extend(chunk)
+        offset += len(chunk)
+
+    movi = riff_list(b"movi", bytes(movi_payload))
+    idx1 = b"".join(struct.pack("<4sIII", *entry) for entry in index_entries)
+    avi_payload = b"AVI " + hdrl + movi + riff_chunk(b"idx1", idx1)
+    output.write_bytes(b"RIFF" + struct.pack("<I", len(avi_payload)) + avi_payload)
 
 
 def main() -> None:
@@ -442,8 +552,9 @@ def main() -> None:
         loop=0,
         optimize=True,
     )
+    save_avi(frames, OUTPUT_AVI, fps=1)
     save_html(frame_names)
-    print(json.dumps({"gif": str(OUTPUT_GIF), "html": str(OUTPUT_HTML), "frames": len(frames)}, indent=2))
+    print(json.dumps({"gif": str(OUTPUT_GIF), "avi": str(OUTPUT_AVI), "html": str(OUTPUT_HTML), "frames": len(frames)}, indent=2))
 
 
 if __name__ == "__main__":
