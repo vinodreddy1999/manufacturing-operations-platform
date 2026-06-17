@@ -5,12 +5,16 @@ import {
   Activity,
   BadgeCheck,
   Boxes,
-  BrainCircuit,
   DatabaseZap,
+  FileText,
   Factory,
+  Gauge,
   LayoutDashboard,
   Menu,
   ShieldCheck,
+  ShoppingCart,
+  Truck,
+  Wrench,
 } from 'lucide-react';
 
 import { AccessDeniedState } from '../components/AccessDeniedState';
@@ -22,15 +26,26 @@ import type { RuntimeUser } from '../types';
 const AdminPage = lazy(() => import('../pages/AdminPage').then((module) => ({ default: module.AdminPage })));
 const DataHubPage = lazy(() => import('../pages/DataHubPage').then((module) => ({ default: module.DataHubPage })));
 const DashboardPage = lazy(() => import('../pages/DashboardPage').then((module) => ({ default: module.DashboardPage })));
-const IntelligencePage = lazy(() => import('../pages/IntelligencePage').then((module) => ({ default: module.IntelligencePage })));
+const ModuleWorkspacePage = lazy(() => import('../pages/ModuleWorkspacePage').then((module) => ({ default: module.ModuleWorkspacePage })));
 const OperationsPage = lazy(() => import('../pages/OperationsPage').then((module) => ({ default: module.OperationsPage })));
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, section: 'dashboard' as const },
   { to: '/admin', label: 'Admin', icon: ShieldCheck, section: 'admin' as const },
   { to: '/data-hub', label: 'Data Hub', icon: DatabaseZap, section: 'data-hub' as const },
-  { to: '/operations', label: 'Operations', icon: Factory, section: 'operations' as const },
-  { to: '/intelligence', label: 'AI Command', icon: BrainCircuit, section: 'intelligence' as const },
+  { to: '/planning', label: 'Planning', icon: Gauge, section: 'operations' as const },
+  { to: '/inventory', label: 'Inventory', icon: Boxes, section: 'operations' as const },
+  { to: '/production', label: 'Production', icon: Factory, section: 'operations' as const },
+  { to: '/maintenance', label: 'Maintenance', icon: Wrench, section: 'operations' as const },
+  { to: '/quality', label: 'Quality', icon: ShieldCheck, section: 'operations' as const },
+  { to: '/procurement', label: 'Procurement', icon: ShoppingCart, section: 'operations' as const },
+  { to: '/sales', label: 'Sales', icon: Truck, section: 'operations' as const },
+  { to: '/costing', label: 'Costing', icon: Activity, section: 'operations' as const },
+  { to: '/compliance', label: 'Compliance', icon: ShieldCheck, section: 'operations' as const },
+  { to: '/customer-portal', label: 'Customer Portal', icon: BadgeCheck, section: 'operations' as const },
+  { to: '/supplier-portal', label: 'Supplier Portal', icon: Truck, section: 'operations' as const },
+  { to: '/reports', label: 'Reports', icon: FileText, section: 'operations' as const },
+  { to: '/documents', label: 'Documents', icon: FileText, section: 'operations' as const },
 ];
 
 export function App() {
@@ -158,7 +173,19 @@ export function App() {
               <Route path="/admin" element={<ProtectedRoute user={user} section="admin"><AdminPage user={user} /></ProtectedRoute>} />
               <Route path="/data-hub" element={<ProtectedRoute user={user} section="data-hub"><DataHubPage user={user} /></ProtectedRoute>} />
               <Route path="/operations" element={<ProtectedRoute user={user} section="operations"><OperationsPage user={user} /></ProtectedRoute>} />
-              <Route path="/intelligence" element={<ProtectedRoute user={user} section="intelligence"><IntelligencePage /></ProtectedRoute>} />
+              <Route path="/planning" element={<ProtectedRoute user={user} section="operations"><ModuleWorkspacePage moduleKey="planning" user={user} /></ProtectedRoute>} />
+              <Route path="/inventory" element={<ProtectedRoute user={user} section="operations"><ModuleWorkspacePage moduleKey="inventory" user={user} /></ProtectedRoute>} />
+              <Route path="/production" element={<ProtectedRoute user={user} section="operations"><ModuleWorkspacePage moduleKey="production" user={user} /></ProtectedRoute>} />
+              <Route path="/maintenance" element={<ProtectedRoute user={user} section="operations"><ModuleWorkspacePage moduleKey="maintenance" user={user} /></ProtectedRoute>} />
+              <Route path="/quality" element={<ProtectedRoute user={user} section="operations"><ModuleWorkspacePage moduleKey="quality" user={user} /></ProtectedRoute>} />
+              <Route path="/procurement" element={<ProtectedRoute user={user} section="operations"><ModuleWorkspacePage moduleKey="procurement" user={user} /></ProtectedRoute>} />
+              <Route path="/sales" element={<ProtectedRoute user={user} section="operations"><ModuleWorkspacePage moduleKey="sales" user={user} /></ProtectedRoute>} />
+              <Route path="/costing" element={<ProtectedRoute user={user} section="operations"><ModuleWorkspacePage moduleKey="costing" user={user} /></ProtectedRoute>} />
+              <Route path="/compliance" element={<ProtectedRoute user={user} section="operations"><ModuleWorkspacePage moduleKey="compliance" user={user} /></ProtectedRoute>} />
+              <Route path="/customer-portal" element={<ProtectedRoute user={user} section="operations"><ModuleWorkspacePage moduleKey="customer-portal" user={user} /></ProtectedRoute>} />
+              <Route path="/supplier-portal" element={<ProtectedRoute user={user} section="operations"><ModuleWorkspacePage moduleKey="supplier-portal" user={user} /></ProtectedRoute>} />
+              <Route path="/reports" element={<ProtectedRoute user={user} section="operations"><ModuleWorkspacePage moduleKey="reports" user={user} /></ProtectedRoute>} />
+              <Route path="/documents" element={<ProtectedRoute user={user} section="operations"><ModuleWorkspacePage moduleKey="documents" user={user} /></ProtectedRoute>} />
             </Routes>
           </Suspense>
         </main>
