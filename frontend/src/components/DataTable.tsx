@@ -18,23 +18,23 @@ export function DataTable<T extends Record<string, unknown>>({ rows, columns, em
   }
 
   return (
-    <div className="overflow-hidden rounded-[24px] border border-white/10 bg-slate-950/20 shadow-[0_12px_40px_rgba(15,23,42,0.12)] backdrop-blur">
+    <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-950/25 backdrop-blur">
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-border text-sm">
-          <thead className="bg-white/8">
+          <thead className="bg-slate-950/45">
             <tr>
               {columns.map((column) => (
-                <th key={String(column.key)} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
+                <th key={String(column.key)} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
                   {column.label}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-white/10 bg-white/6">
+          <tbody className="divide-y divide-white/10">
             {rows.map((row, rowIndex) => (
-              <tr key={rowIndex} className="transition hover:bg-white/8">
+              <tr key={rowIndex} className="transition hover:bg-white/[0.04]">
                 {columns.map((column) => (
-                  <td key={String(column.key)} className="px-4 py-3 text-slate-100">
+                  <td key={String(column.key)} className="px-4 py-3 text-slate-200">
                     {column.render ? column.render(row[column.key], row) : String(row[column.key] ?? '')}
                   </td>
                 ))}

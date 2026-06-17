@@ -9,17 +9,15 @@ type PanelProps = {
 
 export function Panel({ title, description, children, action }: PanelProps) {
   return (
-    <section className="relative flex h-full flex-col justify-between overflow-hidden rounded-[30px] border border-white/15 bg-white/8 p-5 shadow-[0_20px_70px_rgba(15,23,42,0.18)] backdrop-blur-xl">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.15),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(168,85,247,0.14),transparent_28%)]" />
-      <div className="pointer-events-none absolute inset-px rounded-[29px] border border-white/10" />
+    <section className="flex h-full flex-col rounded-2xl border border-white/10 bg-slate-900/55 p-4 shadow-[0_12px_36px_rgba(2,6,23,0.22)] backdrop-blur-xl sm:p-5">
       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-        <div className="relative z-10">
-          <h2 className="text-base font-semibold tracking-tight text-white sm:text-lg">{title}</h2>
-          {description ? <p className="mt-1 text-sm leading-6 text-slate-300">{description}</p> : null}
+        <div>
+          <h2 className="text-base font-semibold tracking-tight text-white">{title}</h2>
+          {description ? <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-400">{description}</p> : null}
         </div>
-        <div className="relative z-10">{action}</div>
+        <div>{action}</div>
       </div>
-      <div className="relative z-10 flex flex-1 flex-col">{children}</div>
+      <div className="flex flex-1 flex-col">{children}</div>
     </section>
   );
 }

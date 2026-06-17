@@ -169,6 +169,7 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const canUpload = canUseDataHubUploads(user);
   const [isDragging, setIsDragging] = useState(false);
+  const [activeView, setActiveView] = useState<'sources' | 'catalog' | 'mapping'>('sources');
   const [selectedCompanyId, setSelectedCompanyId] = useState(user.company_id ?? '');
   const [sourceCategory, setSourceCategory] = useState('erp');
   const [catalogSourceCategory, setCatalogSourceCategory] = useState('erp');
@@ -400,8 +401,8 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
     <>
       <PageHeader
         eyebrow="Manufacturing Data Hub"
-        title="Data catalog, source intake, routing, and AI readiness"
-        description={`Target company: ${targetCompany?.name ?? targetCompanyId}. Super Admin can select any company before adding data; Admin users stay locked to their assigned company.`}
+        title="Connect data, catalog it, and map it"
+        description={`Target company: ${targetCompany?.name ?? targetCompanyId}. Pick a company, choose a source type, then move through sources, catalog, and mapping one step at a time.`}
       />
 
       <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
@@ -413,7 +414,27 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
         </div>
       </div>
 
-      <div className="mt-6 grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
+      <div className="mt-6 flex flex-wrap gap-2 rounded-2xl border border-white/10 bg-slate-900/45 p-2">
+        {[
+          { key: 'sources', label: '1. Sources' },
+          { key: 'catalog', label: '2. Catalog & Uploads' },
+          { key: 'mapping', label: '3. Mapping' },
+        ].map((item) => (
+          <button
+            key={item.key}
+            type="button"
+            className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+              activeView === item.key ? 'bg-cyan-400/15 text-cyan-50' : 'text-slate-400 hover:bg-white/8 hover:text-white'
+            }`}
+            onClick={() => setActiveView(item.key as typeof activeView)}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+
+      {activeView === 'sources' ? (
+      <div className="mt-4 grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
         <Panel title="Connected Systems" description="Choose the company, source type, auth pattern, and required connection fields before adding the integration.">
           <form className="mb-4 grid gap-3 md:grid-cols-2" onSubmit={submitConnection}>
             <select
@@ -534,8 +555,10 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
           )}
         </Panel>
       </div>
+      ) : null}
 
-      <div className="mt-6 grid gap-4 xl:grid-cols-2">
+      {activeView === 'catalog' ? (
+      <div className="mt-4 grid gap-4 xl:grid-cols-2">
         <Panel title="Data Catalog" description="Select data domain, source type, format, auth, and routing target before cataloging the dataset.">
           <form className="mb-4 grid gap-3 md:grid-cols-2" onSubmit={submitCatalog}>
             <select className={selectClass} value={newCatalogEntry.data_type} onChange={(event) => setNewCatalogEntry({ ...newCatalogEntry, data_type: event.target.value })}>
@@ -637,8 +660,10 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
           ) : null}
         </Panel>
       </div>
+      ) : null}
 
-      <div className="mt-6">
+      {activeView === 'mapping' ? (
+      <div className="mt-4">
         <Panel title="Mapping Studio" description="Mapping rules stay isolated per company and document how source fields transform into target module fields.">
           <form className="mb-4 grid gap-3 md:grid-cols-3" onSubmit={submitMapping}>
             <select className={selectClass} value={newMapping.source_system} onChange={(event) => setNewMapping({ ...newMapping, source_system: event.target.value })} required>
@@ -678,8 +703,9 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
           />
         </Panel>
       </div>
+      ) : null}
 
-      <div className="mt-6 rounded-[24px] border border-white/15 bg-white/8 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.14)]">
+      <div className="mt-4 rounded-2xl border border-white/10 bg-slate-900/45 p-4">
         <div className="flex items-start gap-3">
           <div className="rounded-2xl bg-cyan-400/15 p-2.5 text-cyan-100">
             <Cable className="h-5 w-5" />

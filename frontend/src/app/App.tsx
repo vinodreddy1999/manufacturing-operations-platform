@@ -61,38 +61,38 @@ export function App() {
 
   return (
     <div className="app-shell min-h-screen bg-background text-white">
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 border-r border-white/10 bg-slate-950/45 backdrop-blur-2xl xl:block">
-        <div className="flex h-20 items-center gap-3 border-b border-white/10 px-6">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-cyan-300/20 bg-cyan-400/15 text-cyan-100 shadow-[0_0_30px_rgba(34,211,238,0.25)]">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-white/10 bg-slate-950/70 backdrop-blur-xl xl:block">
+        <div className="flex h-16 items-center gap-3 border-b border-white/10 px-5">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-cyan-300/20 bg-cyan-400/10 text-cyan-100">
             <Boxes className="h-5 w-5" />
           </div>
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-cyan-200">MOP</p>
-            <p className="text-sm text-slate-300">Enterprise operations cockpit</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-200">MOP</p>
+            <p className="text-xs text-slate-400">Operations Platform</p>
           </div>
         </div>
-        <div className="px-6 pt-6">
-          <div className="rounded-[28px] border border-white/10 bg-white/8 p-4 shadow-[0_24px_70px_rgba(15,23,42,0.18)] backdrop-blur-xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Signed in as</p>
-            <p className="mt-2 text-lg font-semibold text-white">{user.name}</p>
+        <div className="px-4 pt-4">
+          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Signed in</p>
+            <p className="mt-2 truncate text-sm font-semibold text-white">{user.name}</p>
             <p className="mt-1 text-sm text-slate-300">{user.email}</p>
-            <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-cyan-100">
+            <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/8 px-3 py-1 text-xs font-semibold uppercase tracking-[0.1em] text-cyan-100">
               <BadgeCheck className="h-3.5 w-3.5" />
               {user.role.replace('_', ' ')}
             </div>
           </div>
         </div>
-        <nav className="space-y-2 p-4">
+        <nav className="space-y-1 p-3">
           {allowedNavItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
               end={item.to === '/'}
               className={({ isActive }) =>
-                `group flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition ${
+                `group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
                   isActive
-                    ? 'border border-white/10 bg-white/12 text-white shadow-[0_0_28px_rgba(34,211,238,0.15)]'
-                    : 'text-slate-300 hover:bg-white/8 hover:text-white'
+                    ? 'border border-cyan-300/20 bg-cyan-400/10 text-white'
+                    : 'text-slate-400 hover:bg-white/[0.06] hover:text-white'
                 }`
               }
             >
@@ -103,26 +103,25 @@ export function App() {
         </nav>
       </aside>
 
-      <div className="xl:pl-72">
-        <header className="sticky top-0 z-20 border-b border-white/10 bg-slate-950/35 backdrop-blur-2xl">
-          <div className="flex h-20 items-center justify-between gap-4 px-4 sm:px-6">
+      <div className="xl:pl-64">
+        <header className="sticky top-0 z-20 border-b border-white/10 bg-slate-950/70 backdrop-blur-xl">
+          <div className="flex h-16 items-center justify-between gap-4 px-4 sm:px-6">
             <div className="flex items-center gap-3">
-              <button className="focus-ring rounded-2xl border border-white/10 bg-white/8 p-2.5 text-slate-100 xl:hidden" aria-label="Open navigation">
+              <button className="focus-ring rounded-xl border border-white/10 bg-white/8 p-2 text-slate-100 xl:hidden" aria-label="Open navigation">
                 <Menu className="h-4 w-4" />
               </button>
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Release control</p>
-                <p className="text-xl font-semibold tracking-tight text-white">Manufacturing Operations Platform</p>
-                <p className="text-sm text-slate-300">Live backend source: {baseUrl}</p>
+                <p className="text-lg font-semibold tracking-tight text-white">Manufacturing Operations Platform</p>
+                <p className="hidden text-xs text-slate-400 sm:block">Backend: {baseUrl}</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <div className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/8 px-3 py-1.5 text-xs text-slate-200 sm:flex">
+              <div className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/8 px-3 py-1.5 text-xs text-slate-300 sm:flex">
                 <Activity className="h-3.5 w-3.5 text-cyan-200" />
-                {allowedNavItems.length} sections available
+                {allowedNavItems.length} sections
               </div>
               <button
-                className="focus-ring rounded-2xl border border-white/10 bg-white/8 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-100 hover:bg-white/12"
+                className="focus-ring rounded-xl border border-white/10 bg-white/8 px-3 py-2 text-xs font-semibold text-slate-100 hover:bg-white/12"
                 onClick={() => {
                   backend.logout();
                   setSessionVersion((value) => value + 1);
@@ -139,8 +138,8 @@ export function App() {
                 to={item.to}
                 end={item.to === '/'}
                 className={({ isActive }) =>
-                  `flex min-w-max items-center gap-2 rounded-2xl px-3 py-2 text-sm ${
-                    isActive ? 'border border-white/10 bg-white/12 text-white' : 'text-slate-300'
+                  `flex min-w-max items-center gap-2 rounded-xl px-3 py-2 text-sm ${
+                    isActive ? 'border border-cyan-300/20 bg-cyan-400/10 text-white' : 'text-slate-400'
                   }`
                 }
               >
@@ -151,7 +150,7 @@ export function App() {
           </nav>
         </header>
 
-        <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+        <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
           <Suspense fallback={<LoadingState label="Loading workspace view" />}>
             <Routes>
               <Route path="/" element={<DashboardPage user={user} />} />

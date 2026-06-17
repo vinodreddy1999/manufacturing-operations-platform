@@ -17,10 +17,7 @@
 
 html {
   background:
-    radial-gradient(circle at 10% 15%, rgba(34, 211, 238, 0.18), transparent 20%),
-    radial-gradient(circle at 85% 18%, rgba(168, 85, 247, 0.2), transparent 24%),
-    radial-gradient(circle at 60% 80%, rgba(59, 130, 246, 0.14), transparent 18%),
-    linear-gradient(145deg, #020617 0%, #0f172a 45%, #111827 100%);
+    linear-gradient(180deg, #08111f 0%, #0f172a 48%, #111827 100%);
 }
 
 body {
@@ -43,23 +40,13 @@ body {
   inset: 0;
   z-index: -2;
   background:
-    radial-gradient(circle at 15% 25%, rgba(34, 211, 238, 0.18), transparent 26%),
-    radial-gradient(circle at 78% 20%, rgba(168, 85, 247, 0.16), transparent 24%),
-    radial-gradient(circle at 70% 82%, rgba(56, 189, 248, 0.14), transparent 20%);
+    radial-gradient(circle at 12% 0%, rgba(34, 211, 238, 0.08), transparent 24%),
+    radial-gradient(circle at 92% 5%, rgba(99, 102, 241, 0.08), transparent 22%);
   pointer-events: none;
 }
 
 .app-shell::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
-  background-size: 42px 42px;
-  mask-image: linear-gradient(180deg, rgba(255, 255, 255, 0.65), transparent 92%);
-  pointer-events: none;
+  content: none;
 }
 
 button,
@@ -123,4 +110,16 @@ select option {
 
 .focus-ring {
   @apply outline-none ring-offset-2 focus-visible:ring-2 focus-visible:ring-cyan-300;
+}
+
+.form-input {
+  @apply rounded-xl border border-white/10 bg-slate-950/35 px-3 py-2 text-sm text-white outline-none placeholder:text-slate-500 transition focus:border-cyan-300/60 focus:bg-slate-950/55 focus:shadow-[0_0_0_3px_rgba(34,211,238,0.12)];
+}
+
+.form-button-primary {
+  @apply rounded-xl border border-cyan-300/20 bg-cyan-400/15 px-4 py-2 text-sm font-semibold text-cyan-50 transition hover:bg-cyan-400/25 disabled:cursor-not-allowed disabled:opacity-60;
+}
+
+.form-button-subtle {
+  @apply rounded-xl border border-white/10 bg-white/[0.08] px-4 py-2 text-sm font-semibold text-slate-100 transition hover:bg-white/[0.12] disabled:cursor-not-allowed disabled:opacity-60;
 }
