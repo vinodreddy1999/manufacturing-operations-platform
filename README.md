@@ -219,6 +219,11 @@ Replace apex with coc, nova, fresh, or med to test each seeded company.
 
 The backend also seeds full module records for Planning, Inventory, Production, Maintenance, Quality, Procurement, Sales, Costing, Compliance, Customer Portal, Supplier Portal, Reports, and Documents across every seeded company.
 
+Walkthrough artifacts:
+
+- `docs/mop-complete-working-walkthrough.html`
+- `docs/mop-complete-working-walkthrough.gif`
+
 Access model:
 
 - Super admin has full access and can create or update other super admins.
