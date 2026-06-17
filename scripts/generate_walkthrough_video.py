@@ -111,6 +111,38 @@ def get_live_summary() -> dict[str, Any]:
         return FALLBACK_SUMMARY
 
 
+def get_workflow_evidence() -> dict[str, Any]:
+    evidence = {
+        "work_order_id": "wo-a3a2076d",
+        "work_order_number": "MWO-WALKTHROUGH-001",
+        "assigned_to": "operator.apex@mop.local",
+        "final_status": "Pending Review",
+        "task_count": 1,
+        "notification_count": 2,
+        "notification_messages": [
+            "Breakdown reported: Maintenance work order is ready.",
+            "Maintenance completed: Maintenance completion captured.",
+        ],
+    }
+    try:
+        orders = api_json("/maintenance/work-orders")["data"]
+        tasks = api_json("/maintenance/tasks")["data"]
+        notifications = api_json("/maintenance/notifications")["data"]
+        walkthrough = next((item for item in orders if item.get("work_order_number") == "MWO-WALKTHROUGH-001"), None)
+        if walkthrough:
+            evidence["work_order_id"] = walkthrough.get("id", evidence["work_order_id"])
+            evidence["assigned_to"] = walkthrough.get("assigned_to", evidence["assigned_to"])
+            evidence["final_status"] = walkthrough.get("status", evidence["final_status"])
+        evidence["task_count"] = len(tasks)
+        evidence["notification_count"] = len(notifications)
+        evidence["notification_messages"] = [
+            f"{item.get('notification_type')}: {item.get('message')}" for item in notifications[-3:]
+        ] or evidence["notification_messages"]
+    except Exception:
+        pass
+    return evidence
+
+
 def font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     candidates = [
         "C:/Windows/Fonts/segoeuib.ttf" if bold else "C:/Windows/Fonts/segoeui.ttf",
@@ -238,6 +270,87 @@ def frame_flow() -> Image.Image:
     return image
 
 
+def frame_company_selection() -> Image.Image:
+    image, draw = base_frame("Admin Flow: Select Company and Allocate Modules", "How Super Admin/Admin controls module access before users work.")
+    panel(draw, (80, 300, 760, 760), "Click Path", [
+        "1. Login as super@mop.local.",
+        "2. Open Admin.",
+        "3. Create/select company.",
+        "4. Select module in Company Module Controls.",
+        "5. Enable or disable the module for that company.",
+    ], accent="#22d3ee")
+    panel(draw, (820, 300, 1520, 760), "What Changes", [
+        "Feature flags update backend module allocation.",
+        "Company users see only allowed sections.",
+        "Operations allocation table redirects to the selected module.",
+    ], accent="#8b5cf6")
+    return image
+
+
+def frame_add_data() -> Image.Image:
+    image, draw = base_frame("User Flow: Add and Check Module Data", "How backend records are created, displayed, charted, and audited.")
+    panel(draw, (80, 300, 760, 760), "Click Path", [
+        "1. Open a module: Inventory, Production, Maintenance, Quality, etc.",
+        "2. Use Create Backend Record.",
+        "3. Enter code, name, status, owner, and quantity.",
+        "4. Click Add Backend Record.",
+    ], accent="#10b981")
+    panel(draw, (820, 300, 1520, 760), "Result", [
+        "Record is written to /runtime/records.",
+        "Table refreshes from PostgreSQL-backed runtime data.",
+        "Chart updates from the same loaded backend records.",
+        "Read-only users can view but cannot write.",
+    ], accent="#f59e0b")
+    return image
+
+
+def frame_assignment(evidence: dict[str, Any]) -> Image.Image:
+    image, draw = base_frame("Work Assignment: Manager Creates and Assigns Work", "Actual live API walkthrough example generated in Docker.")
+    panel(draw, (80, 300, 760, 760), "Created Work", [
+        f"Work order: {evidence['work_order_number']}",
+        f"Backend id: {evidence['work_order_id']}",
+        "Machine: M-CUT-01",
+        "Priority: CRITICAL",
+        "Production impact: HIGH",
+    ], accent="#ef4444")
+    panel(draw, (820, 300, 1520, 760), "Assignment", [
+        f"Assigned to: {evidence['assigned_to']}",
+        "Skill: CNC spindle diagnostics",
+        "Status moved through Assigned -> In Progress -> Pending Review.",
+        "Manager review is required after completion.",
+    ], accent="#22d3ee")
+    return image
+
+
+def frame_notifications(evidence: dict[str, Any]) -> Image.Image:
+    image, draw = base_frame("Notification Flow: Operator and Manager Are Informed", "How assignment and completion events become tasks and notifications.")
+    panel(draw, (80, 300, 760, 760), "Generated Queues", [
+        f"Maintenance task count: {evidence['task_count']}",
+        f"Maintenance notification count: {evidence['notification_count']}",
+        "Operator sees assigned work through Maintenance module context.",
+        "Manager sees Pending Review status and notification queue.",
+    ], accent="#8b5cf6")
+    panel(draw, (820, 300, 1520, 760), "Latest Messages", evidence["notification_messages"], accent="#10b981")
+    return image
+
+
+def frame_manager_review(evidence: dict[str, Any]) -> Image.Image:
+    image, draw = base_frame("Manager Review: Check, Approve, and Close Loop", "End-to-end status check after operator completes work.")
+    panel(draw, (80, 300, 760, 760), "Manager Checks", [
+        "1. Login as manager.apex@mop.local.",
+        "2. Open Dashboard for open notifications.",
+        "3. Open Maintenance or Operations.",
+        f"4. Search/check {evidence['work_order_number']}.",
+        f"5. Current final status: {evidence['final_status']}.",
+    ], accent="#22d3ee")
+    panel(draw, (820, 300, 1520, 760), "Outcome", [
+        "Manager can verify root cause, closure notes, spare usage, uploaded docs.",
+        "If approved, the process can move to close/audit trail.",
+        "If rejected, manager sends it back to the assigned operator/team.",
+    ], accent="#f59e0b")
+    return image
+
+
 def frame_end() -> Image.Image:
     image, draw = base_frame("Deployment and Testing", "The walkthrough aligns to the current Docker/GitHub build.")
     panel(draw, (100, 300, 1500, 720), "Current Delivery", [
@@ -291,9 +404,26 @@ def save_html(frames: list[str]) -> None:
 def main() -> None:
     DOCS.mkdir(exist_ok=True)
     summary = get_live_summary()
+    workflow_evidence = get_workflow_evidence()
     counts = summary["module_record_counts"]
-    frames: list[Image.Image] = [frame_cover(summary), frame_flow()]
-    frame_names = ["Cover", "Data flow"]
+    frames: list[Image.Image] = [
+        frame_cover(summary),
+        frame_flow(),
+        frame_company_selection(),
+        frame_add_data(),
+        frame_assignment(workflow_evidence),
+        frame_notifications(workflow_evidence),
+        frame_manager_review(workflow_evidence),
+    ]
+    frame_names = [
+        "Cover",
+        "Data flow",
+        "Select company and allocate modules",
+        "Add and check backend data",
+        "Assign work",
+        "Notify operator and manager",
+        "Manager review",
+    ]
     for role in ROLES:
         frames.append(frame_role(*role))
         frame_names.append(f"Role - {role[0]}")
