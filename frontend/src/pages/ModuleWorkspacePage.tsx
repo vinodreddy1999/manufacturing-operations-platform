@@ -1,18 +1,47 @@
 import { FormEvent, useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Trash2 } from 'lucide-react';
 
 import { DataTable } from '../components/DataTable';
+import { ErrorState } from '../components/ErrorState';
+import { LoadingState } from '../components/LoadingState';
 import { PageHeader } from '../components/PageHeader';
 import { Panel } from '../components/Panel';
 import { StatCard } from '../components/StatCard';
 import { StatusBadge } from '../components/StatusBadge';
 import { getModuleDefinition } from '../data/phase1';
-import type { RuntimeUser } from '../types';
+import { canWriteOperationalData } from '../lib/rbac';
+import { backend } from '../services/api';
+import type { ModuleRecord, RuntimeUser } from '../types';
+
+function statusIsOpen(status: string) {
+  return !['closed', 'approved', 'published', 'released', 'completed', 'signed'].includes(status.toLowerCase());
+}
+
+function normalizeRecord(moduleKey: string, row: { code: string; name: string; status: string; owner: string; quantity: number }): Omit<ModuleRecord, 'id' | 'created_at'> {
+  return {
+    tenant_id: 'tenant-demo-001',
+    company_id: undefined,
+    plant_id: undefined,
+    module_key: moduleKey,
+    record_type: 'phase1_record',
+    record_code: row.code,
+    name: row.name,
+    status: row.status,
+    quantity: Number(row.quantity),
+    payload: {
+      owner: row.owner,
+      source: 'phase1_frontend',
+    },
+  };
+}
 
 export function ModuleWorkspacePage({ moduleKey, user }: { moduleKey: string; user: RuntimeUser }) {
+  const queryClient = useQueryClient();
   const definition = getModuleDefinition(moduleKey);
   const Icon = definition.icon;
-  const [rows, setRows] = useState(definition.sampleRows);
+  const canWrite = canWriteOperationalData(user);
   const [draft, setDraft] = useState({
     code: '',
     name: '',
@@ -21,33 +50,91 @@ export function ModuleWorkspacePage({ moduleKey, user }: { moduleKey: string; us
     quantity: 0,
   });
 
+  const records = useQuery({
+    queryKey: ['runtime-records', moduleKey],
+    queryFn: () => backend.records(moduleKey),
+  });
+
+  const createRecord = useMutation({
+    mutationFn: backend.createRecord,
+    onSuccess: () => {
+      setDraft({ code: '', name: '', status: 'Open', owner: user.role.replace('_', ' '), quantity: 0 });
+      queryClient.invalidateQueries({ queryKey: ['runtime-records', moduleKey] });
+      queryClient.invalidateQueries({ queryKey: ['runtime-analytics'] });
+    },
+  });
+
+  const updateRecord = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: Partial<Omit<ModuleRecord, 'id' | 'created_at'>> }) => backend.updateRecord(id, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['runtime-records', moduleKey] });
+      queryClient.invalidateQueries({ queryKey: ['runtime-analytics'] });
+    },
+  });
+
+  const deleteRecord = useMutation({
+    mutationFn: backend.deleteRecord,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['runtime-records', moduleKey] });
+      queryClient.invalidateQueries({ queryKey: ['runtime-analytics'] });
+    },
+  });
+
+  const backendRows = records.data ?? [];
+  const fallbackRows = definition.sampleRows.map((row, index) => ({
+    id: `sample-${moduleKey}-${index}`,
+    module_key: moduleKey,
+    record_type: 'sample_record',
+    record_code: row.code,
+    name: row.name,
+    status: row.status,
+    quantity: row.quantity,
+    payload: { owner: row.owner, source: 'fallback_sample' },
+  })) satisfies ModuleRecord[];
+  const rows = backendRows.length ? backendRows : fallbackRows;
+  const usingBackendRows = backendRows.length > 0;
+
   const chartRows = useMemo(
-    () => rows.map((row) => ({ name: row.code, quantity: row.quantity })),
+    () => rows.map((row) => ({ name: row.record_code, quantity: Number(row.quantity ?? 0) })),
     [rows],
   );
 
+  if (records.isLoading) {
+    return <LoadingState label={`Loading ${definition.title} backend records`} />;
+  }
+
+  if (records.isError) {
+    return <ErrorState title={`${definition.title} backend data failed`} error={records.error} />;
+  }
+
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setRows((current) => [{ ...draft, quantity: Number(draft.quantity) }, ...current]);
-    setDraft({ code: '', name: '', status: 'Open', owner: user.role.replace('_', ' '), quantity: 0 });
+    if (!canWrite) return;
+    createRecord.mutate(normalizeRecord(moduleKey, draft));
   }
 
   return (
     <>
-      <PageHeader eyebrow="Module Workspace" title={definition.title} description={definition.description} />
+      <PageHeader eyebrow="Backend Module Workspace" title={definition.title} description={`${definition.description} Records are loaded from /runtime/records?module_key=${moduleKey}.`} />
+
+      {!usingBackendRows ? (
+        <div className="mb-4 rounded-2xl border border-amber-300/20 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+          No backend records were returned for this module yet, so sample rows are shown only as a visual fallback. Add a record to start testing backend write/read flow.
+        </div>
+      ) : null}
 
       <div className="grid gap-4 md:grid-cols-3">
-        <StatCard label="Records" value={rows.length} helper="Visible in this workspace" icon={<Icon className="h-5 w-5" />} accent="blue" />
-        <StatCard label="Open Items" value={rows.filter((row) => !['Closed', 'Approved', 'Published', 'Released'].includes(row.status)).length} helper="Need follow-up" accent="amber" />
+        <StatCard label="Backend Records" value={backendRows.length} helper="From runtime database" icon={<Icon className="h-5 w-5" />} accent="blue" />
+        <StatCard label="Open Items" value={rows.filter((row) => statusIsOpen(row.status)).length} helper="Need follow-up" accent="amber" />
         <StatCard label="Features" value={definition.features.length} helper="Phase 1 coverage" accent="emerald" />
       </div>
 
       <div className="mt-6 grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
-        <Panel title="Create Record" description="Simple Phase 1 operational form. This frontend uses local module data until backend-specific endpoints are connected.">
+        <Panel title="Create Backend Record" description="Writes to the shared backend database through the runtime records API.">
           <form className="grid gap-3 md:grid-cols-2" onSubmit={submit}>
-            <input className="form-input" placeholder="Code" value={draft.code} onChange={(event) => setDraft({ ...draft, code: event.target.value })} required />
-            <input className="form-input" placeholder="Name" value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} required />
-            <select className="form-input" value={draft.status} onChange={(event) => setDraft({ ...draft, status: event.target.value })}>
+            <input className="form-input" placeholder="Code" value={draft.code} onChange={(event) => setDraft({ ...draft, code: event.target.value })} required disabled={!canWrite} />
+            <input className="form-input" placeholder="Name" value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} required disabled={!canWrite} />
+            <select className="form-input" value={draft.status} onChange={(event) => setDraft({ ...draft, status: event.target.value })} disabled={!canWrite}>
               <option value="Open">Open</option>
               <option value="Draft">Draft</option>
               <option value="Scheduled">Scheduled</option>
@@ -56,9 +143,11 @@ export function ModuleWorkspacePage({ moduleKey, user }: { moduleKey: string; us
               <option value="Approved">Approved</option>
               <option value="Closed">Closed</option>
             </select>
-            <input className="form-input" placeholder="Owner" value={draft.owner} onChange={(event) => setDraft({ ...draft, owner: event.target.value })} required />
-            <input className="form-input" type="number" placeholder="Quantity / Score" value={draft.quantity} onChange={(event) => setDraft({ ...draft, quantity: Number(event.target.value) })} />
-            <button className="form-button-primary md:col-span-2">Add Record</button>
+            <input className="form-input" placeholder="Owner" value={draft.owner} onChange={(event) => setDraft({ ...draft, owner: event.target.value })} required disabled={!canWrite} />
+            <input className="form-input" type="number" placeholder="Quantity / Score" value={draft.quantity} onChange={(event) => setDraft({ ...draft, quantity: Number(event.target.value) })} disabled={!canWrite} />
+            <button className="form-button-primary md:col-span-2" disabled={!canWrite || createRecord.isPending}>
+              {canWrite ? (createRecord.isPending ? 'Saving...' : 'Add Backend Record') : 'Read-only role'}
+            </button>
           </form>
         </Panel>
 
@@ -74,21 +163,51 @@ export function ModuleWorkspacePage({ moduleKey, user }: { moduleKey: string; us
       </div>
 
       <div className="mt-6 grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-        <Panel title={`${definition.title} Records`} description="User-friendly table with the key operational fields.">
+        <Panel title={`${definition.title} Backend Records`} description="Read, edit status/quantity, and delete records from the backend runtime database.">
           <DataTable
-            rows={rows}
-            emptyTitle="No records"
+            rows={rows as Array<ModuleRecord & Record<string, unknown>>}
+            emptyTitle="No backend records"
             columns={[
-              { key: 'code', label: 'Code' },
+              { key: 'record_code', label: 'Code' },
               { key: 'name', label: 'Name' },
-              { key: 'status', label: 'Status', render: (value) => <StatusBadge status={String(value)} /> },
-              { key: 'owner', label: 'Owner' },
-              { key: 'quantity', label: 'Qty / Score' },
+              {
+                key: 'status',
+                label: 'Status',
+                render: (value, row) => usingBackendRows && canWrite ? (
+                  <select className="form-input min-w-36 py-1 text-xs" value={String(value)} onChange={(event) => updateRecord.mutate({ id: String(row.id), payload: { status: event.target.value } })}>
+                    <option value="Open">Open</option>
+                    <option value="Draft">Draft</option>
+                    <option value="Scheduled">Scheduled</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Pending Approval">Pending Approval</option>
+                    <option value="Approved">Approved</option>
+                    <option value="Closed">Closed</option>
+                  </select>
+                ) : <StatusBadge status={String(value)} />,
+              },
+              { key: 'record_type', label: 'Type' },
+              {
+                key: 'quantity',
+                label: 'Qty / Score',
+                render: (value, row) => usingBackendRows && canWrite ? (
+                  <input className="form-input w-24 py-1 text-xs" type="number" value={Number(value ?? 0)} onChange={(event) => updateRecord.mutate({ id: String(row.id), payload: { quantity: Number(event.target.value) } })} />
+                ) : String(value ?? 0),
+              },
+              {
+                key: 'id',
+                label: 'Action',
+                render: (value) => usingBackendRows && canWrite ? (
+                  <button className="rounded-xl border border-red-300/20 bg-red-400/10 px-2 py-1 text-xs text-red-100 hover:bg-red-400/20" onClick={() => deleteRecord.mutate(String(value))}>
+                    <Trash2 className="mr-1 inline h-3 w-3" />
+                    Delete
+                  </button>
+                ) : <span className="text-xs text-slate-500">Sample</span>,
+              },
             ]}
           />
         </Panel>
 
-        <Panel title="Record Volume" description="Simple chart using the current module table.">
+        <Panel title="Backend Record Volume" description="Chart generated from the loaded module records.">
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartRows}>

@@ -206,6 +206,19 @@ Admin:       admin@mop.local / ChangeMe123!
 User:        user@mop.local / User12345!
 ```
 
+Expanded multi-company test accounts are also seeded for each company. Use the same role password by prefix:
+
+```text
+admin.apex@mop.local     / ChangeMe123!
+manager.apex@mop.local   / Manager123!
+operator.apex@mop.local  / Operator123!
+viewer.apex@mop.local    / User12345!
+
+Replace apex with coc, nova, fresh, or med to test each seeded company.
+```
+
+The backend also seeds full module records for Planning, Inventory, Production, Maintenance, Quality, Procurement, Sales, Costing, Compliance, Customer Portal, Supplier Portal, Reports, and Documents across every seeded company.
+
 Access model:
 
 - Super admin has full access and can create or update other super admins.

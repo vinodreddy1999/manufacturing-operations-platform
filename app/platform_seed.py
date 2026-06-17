@@ -12,6 +12,7 @@ from .store import MODULES, store
 MODULE_KEYS = [
     "auth",
     "platform",
+    "planning",
     "inventory",
     "warehouse",
     "supplier",
@@ -20,7 +21,12 @@ MODULE_KEYS = [
     "maintenance",
     "quality",
     "sales",
+    "compliance",
+    "customer-portal",
+    "supplier-portal",
+    "documents",
     "reporting",
+    "reports",
     "costing",
     "forecasting",
     "supply_chain",
@@ -286,6 +292,34 @@ def seed_platform(db: Session) -> None:
             user.role = role
             user.is_active = is_active
 
+    company_user_templates = [
+        ("admin", "admin", "Company Admin", "ChangeMe123!"),
+        ("manager", "team_manager", "Operations Manager", "Manager123!"),
+        ("supervisor", "supervisor", "Plant Supervisor", "Supervisor123!"),
+        ("operator", "operator", "Shopfloor Operator", "Operator123!"),
+        ("auditor", "auditor", "Compliance Auditor", "Auditor123!"),
+        ("viewer", "user", "Business Viewer", "User12345!"),
+    ]
+    for company_id, company_name, company_code, plant_id, *_ in COMPANY_SEEDS:
+        normalized_code = company_code.lower().replace("-", "")
+        for login_prefix, role, title, password in company_user_templates:
+            user_id = f"user-{login_prefix}-{normalized_code}"
+            email = f"{login_prefix}.{normalized_code}@mop.local"
+            if not db.query(User).filter(User.id == user_id).first():
+                db.add(
+                    User(
+                        id=user_id,
+                        tenant_id="tenant-demo-001",
+                        company_id=company_id,
+                        plant_id=plant_id,
+                        email=email,
+                        name=f"{company_name} {title}",
+                        password_hash=hash_password(password),
+                        role=role,
+                        is_active=True,
+                    )
+                )
+
     roles = [
         ("role-super-admin", "Super Admin", ["platform.super_admin", "platform.admin", "account.override", "organization.override", "team.override", "users.manage", "roles.manage", "data.write", "data.read", "audit.read"]),
         ("role-account-owner", "Account Owner", ["account.override", "organization.override", "team.override", "users.manage", "roles.manage", "data.write", "data.read", "audit.read"]),
@@ -463,4 +497,96 @@ def seed_platform(db: Session) -> None:
                     payload=payload,
                 )
             )
+
+    phase1_record_templates = {
+        "planning": [
+            ("demand_plan", "Demand Plan", "APPROVED", 1280.0),
+            ("capacity_plan", "Capacity Window", "DRAFT", 420.0),
+            ("workforce_plan", "Shift Coverage", "OPEN", 76.0),
+        ],
+        "inventory": [
+            ("raw_material", "Steel Coil", "AVAILABLE", 680.0),
+            ("finished_good", "Pump Assembly", "RESERVED", 94.0),
+            ("spare_part", "Bearing Kit", "LOW_STOCK", 12.0),
+        ],
+        "production": [
+            ("work_order", "Pump Assembly Run", "IN_PROGRESS", 240.0),
+            ("routing", "Valve Machining", "SCHEDULED", 180.0),
+            ("bom", "Pump Assembly BOM", "RELEASED", 32.0),
+        ],
+        "maintenance": [
+            ("work_order", "Compressor PM", "OPEN", 1.0),
+            ("asset", "CNC Machine", "RUNNING", 1.0),
+            ("inspection", "Line Motor Inspection", "SCHEDULED", 1.0),
+        ],
+        "quality": [
+            ("inspection_lot", "Incoming Steel Inspection", "PASSED", 60.0),
+            ("ncr", "Surface Finish Variance", "OPEN", 8.0),
+            ("capa", "Supplier Packaging Issue", "IN_PROGRESS", 1.0),
+        ],
+        "procurement": [
+            ("purchase_request", "Bearing Replenishment", "PENDING_APPROVAL", 300.0),
+            ("purchase_order", "Steel Coils", "RELEASED", 22.0),
+            ("rfq", "Pump Castings", "OPEN", 4.0),
+        ],
+        "sales": [
+            ("sales_order", "Pump Order", "CONFIRMED", 90.0),
+            ("delivery", "Regional Dispatch", "IN_TRANSIT", 18.0),
+            ("customer", "Customer Account", "ACTIVE", 1.0),
+        ],
+        "costing": [
+            ("product_cost", "Pump Model Costing", "PUBLISHED", 1240.0),
+            ("machine_rate", "Machine Hourly Rate", "REVIEW", 18.0),
+            ("plant_profit", "Plant Margin", "ACTIVE", 14.0),
+        ],
+        "compliance": [
+            ("audit", "ISO Audit Checklist", "OPEN", 34.0),
+            ("signature", "Batch Release Signature", "SIGNED", 1.0),
+            ("record", "Safety Compliance Record", "ACTIVE", 12.0),
+        ],
+        "customer-portal": [
+            ("order_status", "Customer Order Status", "VISIBLE", 8.0),
+            ("invoice", "Invoice Download", "READY", 1.0),
+            ("ticket", "Delivery Query", "OPEN", 1.0),
+        ],
+        "supplier-portal": [
+            ("rfq_response", "Casting Quotation", "SUBMITTED", 1.0),
+            ("po_ack", "Steel PO Acknowledgement", "ACCEPTED", 1.0),
+            ("scorecard", "Supplier Scorecard", "PUBLISHED", 92.0),
+        ],
+        "reports": [
+            ("inventory_report", "Inventory Status Report", "READY", 1.0),
+            ("production_report", "Production Output Report", "READY", 1.0),
+            ("finance_report", "Finance Summary Report", "READY", 1.0),
+        ],
+        "documents": [
+            ("sop", "Goods Receipt SOP", "APPROVED", 3.0),
+            ("work_instruction", "CNC Setup Instruction", "PUBLISHED", 5.0),
+            ("certificate", "Supplier Certificate", "ACTIVE", 1.0),
+        ],
+    }
+    for company_id, company_name, company_code, plant_id, *_ in COMPANY_SEEDS:
+        for module_key, templates in phase1_record_templates.items():
+            for index, (record_type, name, status, quantity) in enumerate(templates, start=1):
+                record_id = f"phase1-{company_id}-{module_key}-{index}".replace("_", "-")
+                if not db.query(ModuleRecord).filter(ModuleRecord.id == record_id).first():
+                    db.add(
+                        ModuleRecord(
+                            id=record_id,
+                            tenant_id="tenant-demo-001",
+                            company_id=company_id,
+                            plant_id=plant_id,
+                            module_key=module_key,
+                            record_type=record_type,
+                            record_code=f"{company_code}-{module_key.upper().replace('-', '')}-{index:03d}",
+                            name=f"{company_name} {name}",
+                            status=status,
+                            quantity=quantity,
+                            payload={
+                                "company": company_name,
+                                "source": "full_backend_seed",
+                                "scenario": "phase1_frontend_validation",
+                            },
+                        )
+                    )
     db.commit()
