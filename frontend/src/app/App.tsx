@@ -26,6 +26,7 @@ import type { RuntimeUser } from '../types';
 const AdminPage = lazy(() => import('../pages/AdminPage').then((module) => ({ default: module.AdminPage })));
 const DataHubPage = lazy(() => import('../pages/DataHubPage').then((module) => ({ default: module.DataHubPage })));
 const DashboardPage = lazy(() => import('../pages/DashboardPage').then((module) => ({ default: module.DashboardPage })));
+const IntelligencePage = lazy(() => import('../pages/IntelligencePage').then((module) => ({ default: module.IntelligencePage })));
 const ModuleWorkspacePage = lazy(() => import('../pages/ModuleWorkspacePage').then((module) => ({ default: module.ModuleWorkspacePage })));
 const OperationsPage = lazy(() => import('../pages/OperationsPage').then((module) => ({ default: module.OperationsPage })));
 
@@ -173,6 +174,7 @@ export function App() {
               <Route path="/admin" element={<ProtectedRoute user={user} section="admin"><AdminPage user={user} /></ProtectedRoute>} />
               <Route path="/data-hub" element={<ProtectedRoute user={user} section="data-hub"><DataHubPage user={user} /></ProtectedRoute>} />
               <Route path="/operations" element={<ProtectedRoute user={user} section="operations"><OperationsPage user={user} /></ProtectedRoute>} />
+              <Route path="/intelligence" element={<ProtectedRoute user={user} section="intelligence"><IntelligencePage /></ProtectedRoute>} />
               <Route path="/planning" element={<ProtectedRoute user={user} section="operations"><ModuleWorkspacePage moduleKey="planning" user={user} /></ProtectedRoute>} />
               <Route path="/inventory" element={<ProtectedRoute user={user} section="operations"><ModuleWorkspacePage moduleKey="inventory" user={user} /></ProtectedRoute>} />
               <Route path="/production" element={<ProtectedRoute user={user} section="operations"><ModuleWorkspacePage moduleKey="production" user={user} /></ProtectedRoute>} />
