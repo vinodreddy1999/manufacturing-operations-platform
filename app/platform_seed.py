@@ -258,22 +258,22 @@ def seed_platform(db: Session) -> None:
         )
 
     seed_users = [
-        ("user-super-001", "super@mop.local", "Metam Services Super Admin", "super_admin", "SuperAdmin123!"),
-        ("user-owner-001", "owner@mop.local", "Metam Services Account Owner", "account_owner", "Owner12345!"),
-        ("user-orgadmin-001", "orgadmin@mop.local", "Metam Services Organization Admin", "organization_admin", "OrgAdmin123!"),
-        ("user-admin-001", "admin@mop.local", "Metam Services Admin", "admin", "ChangeMe123!"),
-        ("user-manager-001", "manager@mop.local", "Metam Services Team Manager", "team_manager", "Manager123!"),
-        ("user-supervisor-001", "supervisor@mop.local", "Metam Services Supervisor", "supervisor", "Supervisor123!"),
-        ("user-operator-001", "operator@mop.local", "Metam Services Operator", "operator", "Operator123!"),
-        ("user-auditor-001", "auditor@mop.local", "Metam Services Auditor", "auditor", "Auditor123!"),
-        ("user-qa-001", "qa@mop.local", "Metam Services QA Tester", "qa_tester", "QaTester123!"),
-        ("user-custom-001", "custom@mop.local", "Metam Services Custom User", "custom", "Custom123!"),
-        ("user-viewer-001", "user@mop.local", "Metam Services User", "user", "User12345!"),
-        ("user-disabled-001", "disabled.operator@mop.local", "Metam Services Disabled Operator", "operator", "Disabled123!"),
+        ("user-super-001", "super@metam.local", "Metam Services Super Admin", "super_admin", "SuperAdmin123!"),
+        ("user-owner-001", "owner@metam.local", "Metam Services Account Owner", "account_owner", "Owner12345!"),
+        ("user-orgadmin-001", "orgadmin@metam.local", "Metam Services Organization Admin", "organization_admin", "OrgAdmin123!"),
+        ("user-admin-001", "admin@metam.local", "Metam Services Admin", "admin", "ChangeMe123!"),
+        ("user-manager-001", "manager@metam.local", "Metam Services Team Manager", "team_manager", "Manager123!"),
+        ("user-supervisor-001", "supervisor@metam.local", "Metam Services Supervisor", "supervisor", "Supervisor123!"),
+        ("user-operator-001", "operator@metam.local", "Metam Services Operator", "operator", "Operator123!"),
+        ("user-auditor-001", "auditor@metam.local", "Metam Services Auditor", "auditor", "Auditor123!"),
+        ("user-qa-001", "qa@metam.local", "Metam Services QA Tester", "qa_tester", "QaTester123!"),
+        ("user-custom-001", "custom@metam.local", "Metam Services Custom User", "custom", "Custom123!"),
+        ("user-viewer-001", "user@metam.local", "Metam Services User", "user", "User12345!"),
+        ("user-disabled-001", "disabled.operator@metam.local", "Metam Services Disabled Operator", "operator", "Disabled123!"),
     ]
     for user_id, email, name, role, password in seed_users:
         user = db.query(User).filter(User.id == user_id).first()
-        is_active = email != "disabled.operator@mop.local"
+        is_active = email != "disabled.operator@metam.local"
         if not user:
             db.add(
                 User(
@@ -305,7 +305,7 @@ def seed_platform(db: Session) -> None:
         normalized_code = company_code.lower().replace("-", "")
         for login_prefix, role, title, password in company_user_templates:
             user_id = f"user-{login_prefix}-{normalized_code}"
-            email = f"{login_prefix}.{normalized_code}@mop.local"
+            email = f"{login_prefix}.{normalized_code}@metam.local"
             if not db.query(User).filter(User.id == user_id).first():
                 db.add(
                     User(

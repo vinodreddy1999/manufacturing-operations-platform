@@ -13,7 +13,7 @@ echo
 TOKEN="$(
   curl -fsS -X POST "$BASE_URL/runtime/auth/login" \
     -H "Content-Type: application/json" \
-    -d '{"email":"super@mop.local","password":"SuperAdmin123!"}' |
+    -d '{"email":"super@metam.local","password":"SuperAdmin123!"}' |
     python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["access_token"])'
 )"
 echo "login: ok"

@@ -8,7 +8,7 @@ The platform is designed as a modular monolith first, with a separate Inventory 
 
 ## 2. Repository Summary
 
-Repository: `vinodreddy1999/manufacturing-operations-platform`
+Repository: `vinodreddy1999/metam-services`
 
 Default branch: `main`
 
@@ -121,7 +121,7 @@ The current app exposes login through `POST /auth/login`. Demo login credentials
 ```json
 {
   "tenant_slug": "precision-components",
-  "email": "admin@mop.local",
+  "email": "admin@metam.local",
   "password": "ChangeMe123!"
 }
 ```

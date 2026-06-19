@@ -1,5 +1,5 @@
 apiVersion: v2
-name: manufacturing-operations-platform
+name: metam-services
 description: Enterprise industrial dashboard platform
 type: application
 version: 0.2.1

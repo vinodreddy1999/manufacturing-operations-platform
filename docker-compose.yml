@@ -1,19 +1,21 @@
+name: metam-services
+
 services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-mop}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mop}
-      POSTGRES_DB: ${POSTGRES_DB:-mop}
+      POSTGRES_USER: ${POSTGRES_USER:-metam}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-metam}
+      POSTGRES_DB: ${POSTGRES_DB:-metam}
     ports:
       - "5432:5432"
     volumes:
-      - mop_postgres_data:/var/lib/postgresql/data
+      - metam_postgres_data:/var/lib/postgresql/data
     networks:
-      - mop-network
+      - metam-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mop} -d ${POSTGRES_DB:-mop}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-metam} -d ${POSTGRES_DB:-metam}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -29,13 +31,13 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - mop-network
+      - metam-network
 
   pgadmin:
     image: dpage/pgadmin4:8
     restart: unless-stopped
     environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@mop.localhost.com}
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@metam.localhost.com}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-ChangeMe123!}
     ports:
       - "5050:80"
@@ -43,16 +45,17 @@ services:
       postgres:
         condition: service_healthy
     volumes:
-      - mop_pgadmin_data:/var/lib/pgadmin
+      - metam_pgadmin_data:/var/lib/pgadmin
     networks:
-      - mop-network
+      - metam-network
 
   platform-api:
+    image: vinodreddy1999/metam-services-fullstack:latest
     build: .
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-mop}:${POSTGRES_PASSWORD:-mop}@postgres:5432/${POSTGRES_DB:-mop}
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-metam}:${POSTGRES_PASSWORD:-metam}@postgres:5432/${POSTGRES_DB:-metam}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     ports:
       - "8000:8000"
@@ -67,13 +70,14 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - mop-network
+      - metam-network
 
   fullstack-app:
+    image: vinodreddy1999/metam-services-fullstack:latest
     build: .
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-mop}:${POSTGRES_PASSWORD:-mop}@postgres:5432/${POSTGRES_DB:-mop}
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-metam}:${POSTGRES_PASSWORD:-metam}@postgres:5432/${POSTGRES_DB:-metam}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     ports:
       - "8080:8080"
@@ -90,9 +94,10 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - mop-network
+      - metam-network
 
   frontend:
+    image: vinodreddy1999/metam-services-frontend:latest
     build:
       context: ./frontend
       args:
@@ -104,14 +109,15 @@ services:
       platform-api:
         condition: service_healthy
     networks:
-      - mop-network
+      - metam-network
 
   worker:
+    image: vinodreddy1999/metam-services-fullstack:latest
     build: .
     command: celery -A app.jobs.celery_app worker --loglevel=info
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-mop}:${POSTGRES_PASSWORD:-mop}@postgres:5432/${POSTGRES_DB:-mop}
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-metam}:${POSTGRES_PASSWORD:-metam}@postgres:5432/${POSTGRES_DB:-metam}
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/1
     depends_on:
@@ -120,20 +126,21 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - mop-network
+      - metam-network
 
   seed-enterprise-data:
+    image: vinodreddy1999/metam-services-fullstack:latest
     build: .
     command: python scripts/seed_enterprise_data.py
     restart: "no"
     environment:
       BASE_URL: http://fullstack-app:8080
-      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-mop}:${POSTGRES_PASSWORD:-mop}@postgres:5432/${POSTGRES_DB:-mop}
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-metam}:${POSTGRES_PASSWORD:-metam}@postgres:5432/${POSTGRES_DB:-metam}
     depends_on:
       fullstack-app:
         condition: service_healthy
     networks:
-      - mop-network
+      - metam-network
 
   nginx:
     image: nginx:1.27-alpine
@@ -151,12 +158,12 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - mop-network
+      - metam-network
 
 volumes:
-  mop_postgres_data:
-  mop_pgadmin_data:
+  metam_postgres_data:
+  metam_pgadmin_data:
 
 networks:
-  mop-network:
+  metam-network:
     driver: bridge

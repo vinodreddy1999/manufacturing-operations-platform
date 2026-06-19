@@ -34,7 +34,7 @@ class DemoStore:
             }
         }
         self.users = {
-            "admin@mop.local": {
+            "admin@metam.local": {
                 "id": "user-admin-001",
                 "tenant_slug": "precision-components",
                 "name": "Metam Services Admin",

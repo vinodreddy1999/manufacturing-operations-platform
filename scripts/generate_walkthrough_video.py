@@ -13,9 +13,9 @@ from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs"
-OUTPUT_GIF = DOCS / "mop-complete-working-walkthrough.gif"
-OUTPUT_AVI = DOCS / "mop-complete-working-walkthrough.avi"
-OUTPUT_HTML = DOCS / "mop-complete-working-walkthrough.html"
+OUTPUT_GIF = DOCS / "metam-services-complete-working-walkthrough.gif"
+OUTPUT_AVI = DOCS / "metam-services-complete-working-walkthrough.avi"
+OUTPUT_HTML = DOCS / "metam-services-complete-working-walkthrough.html"
 API_BASE = "http://127.0.0.1:8000"
 APP_BASE = "http://127.0.0.1:8080"
 
@@ -47,13 +47,13 @@ FALLBACK_SUMMARY = {
 
 
 ROLES = [
-    ("Super Admin", "super@mop.local", "Sees all companies, all users, all modules, DataHub, Admin, and operations."),
-    ("Company Admin", "admin.apex@mop.local", "Sees only own company users/data and can manage DataHub + records."),
-    ("Team Manager", "manager.apex@mop.local", "Can work operational data for assigned company scope."),
-    ("Supervisor", "supervisor.apex@mop.local", "Can update operational records for execution follow-up."),
-    ("Operator", "operator.apex@mop.local", "Focused shopfloor user with limited operational access."),
-    ("Auditor", "auditor.apex@mop.local", "Read/audit focused view, no destructive operations."),
-    ("Viewer", "viewer.apex@mop.local", "Read-only business visibility."),
+    ("Super Admin", "super@metam.local", "Sees all companies, all users, all modules, DataHub, Admin, and operations."),
+    ("Company Admin", "admin.apex@metam.local", "Sees only own company users/data and can manage DataHub + records."),
+    ("Team Manager", "manager.apex@metam.local", "Can work operational data for assigned company scope."),
+    ("Supervisor", "supervisor.apex@metam.local", "Can update operational records for execution follow-up."),
+    ("Operator", "operator.apex@metam.local", "Focused shopfloor user with limited operational access."),
+    ("Auditor", "auditor.apex@metam.local", "Read/audit focused view, no destructive operations."),
+    ("Viewer", "viewer.apex@metam.local", "Read-only business visibility."),
 ]
 
 MODULES = [
@@ -97,7 +97,7 @@ def get_token(email: str, password: str) -> str | None:
 
 
 def get_live_summary() -> dict[str, Any]:
-    token = get_token("super@mop.local", "SuperAdmin123!")
+    token = get_token("super@metam.local", "SuperAdmin123!")
     if not token:
         return FALLBACK_SUMMARY
     try:
@@ -117,7 +117,7 @@ def get_workflow_evidence() -> dict[str, Any]:
     evidence = {
         "work_order_id": "wo-a3a2076d",
         "work_order_number": "MWO-WALKTHROUGH-001",
-        "assigned_to": "operator.apex@mop.local",
+        "assigned_to": "operator.apex@metam.local",
         "final_status": "Pending Review",
         "task_count": 1,
         "notification_count": 2,
@@ -275,7 +275,7 @@ def frame_flow() -> Image.Image:
 def frame_company_selection() -> Image.Image:
     image, draw = base_frame("Admin Flow: Select Company and Allocate Modules", "How Super Admin/Admin controls module access before users work.")
     panel(draw, (80, 300, 760, 760), "Click Path", [
-        "1. Login as super@mop.local.",
+        "1. Login as super@metam.local.",
         "2. Open Admin.",
         "3. Create/select company.",
         "4. Select module in Company Module Controls.",
@@ -339,7 +339,7 @@ def frame_notifications(evidence: dict[str, Any]) -> Image.Image:
 def frame_manager_review(evidence: dict[str, Any]) -> Image.Image:
     image, draw = base_frame("Manager Review: Check, Approve, and Close Loop", "End-to-end status check after operator completes work.")
     panel(draw, (80, 300, 760, 760), "Manager Checks", [
-        "1. Login as manager.apex@mop.local.",
+        "1. Login as manager.apex@metam.local.",
         "2. Open Dashboard for open notifications.",
         "3. Open Maintenance or Operations.",
         f"4. Search/check {evidence['work_order_number']}.",
@@ -356,7 +356,7 @@ def frame_manager_review(evidence: dict[str, Any]) -> Image.Image:
 def frame_end() -> Image.Image:
     image, draw = base_frame("Deployment and Testing", "The walkthrough aligns to the current Docker/GitHub build.")
     panel(draw, (100, 300, 1500, 720), "Current Delivery", [
-        "Docker image: vinodreddy1999/manufacturing-operations-platform-fullstack:0.3.7",
+        "Docker image: vinodreddy1999/metam-services-fullstack:0.3.7",
         "Frontend app: http://127.0.0.1:8080",
         "Backend API: http://127.0.0.1:8000",
         "All role/module paths in this video are routed in the application.",
@@ -386,12 +386,12 @@ def save_html(frames: list[str]) -> None:
   <main>
     <h1>Metam Services - Complete Working Walkthrough</h1>
     <p>This animated walkthrough covers user levels, module flows, backend data, click redirects, RBAC, and deployment.</p>
-    <video controls width=\"100%\" poster=\"mop-complete-working-walkthrough.gif\">
-      <source src=\"mop-complete-working-walkthrough.avi\" type=\"video/x-msvideo\" />
+    <video controls width=\"100%\" poster=\"metam-services-complete-working-walkthrough.gif\">
+      <source src=\"metam-services-complete-working-walkthrough.avi\" type=\"video/x-msvideo\" />
       Your browser can still view the animated fallback below.
     </video>
-    <p><a href=\"mop-complete-working-walkthrough.avi\">Download full AVI video</a></p>
-    <img src=\"mop-complete-working-walkthrough.gif\" alt=\"Metam Services complete working walkthrough animation fallback\" />
+    <p><a href=\"metam-services-complete-working-walkthrough.avi\">Download full AVI video</a></p>
+    <img src=\"metam-services-complete-working-walkthrough.gif\" alt=\"Metam Services complete working walkthrough animation fallback\" />
     <section class=\"card\">
       <h2>Covered Sections</h2>
       <ul>{items}</ul>

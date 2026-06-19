@@ -33,9 +33,9 @@ def login(email: str, password: str) -> str:
 
 
 def run() -> int:
-    admin_token = login("admin@mop.local", "ChangeMe123!")
-    super_token = login("super@mop.local", "SuperAdmin123!")
-    user_token = login("user@mop.local", "User12345!")
+    admin_token = login("admin@metam.local", "ChangeMe123!")
+    super_token = login("super@metam.local", "SuperAdmin123!")
+    user_token = login("user@metam.local", "User12345!")
 
     admin_users_response = request_json("GET", "/runtime/users", token=admin_token)
     super_users_response = request_json("GET", "/runtime/users", token=super_token)

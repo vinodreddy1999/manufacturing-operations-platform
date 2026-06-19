@@ -8,7 +8,7 @@ from app.platform_models import AppMetadata
 client = TestClient(app)
 
 
-def runtime_headers(email: str = "super@mop.local", password: str = "SuperAdmin123!") -> dict[str, str]:
+def runtime_headers(email: str = "super@metam.local", password: str = "SuperAdmin123!") -> dict[str, str]:
     response = client.post("/runtime/auth/login", json={"email": email, "password": password})
     assert response.status_code == 200
     return {"Authorization": f"Bearer {response.json()['data']['access_token']}"}
@@ -30,7 +30,7 @@ def test_enterprise_observability_endpoints():
 
     metrics = client.get("/metrics")
     assert metrics.status_code == 200
-    assert "mop_requests_total" in metrics.text
+    assert "metam_requests_total" in metrics.text
 
     traffic = client.get("/traffic")
     assert traffic.status_code == 200
@@ -54,7 +54,7 @@ def test_demo_login():
         "/auth/login",
         json={
             "tenant_slug": "precision-components",
-            "email": "admin@mop.local",
+            "email": "admin@metam.local",
             "password": "ChangeMe123!",
         },
     )
@@ -131,7 +131,7 @@ def test_inventory_metadata_is_persisted_in_database():
 
 
 def test_admin_can_update_ai_readiness_overrides():
-    headers = runtime_headers("admin@mop.local", "ChangeMe123!")
+    headers = runtime_headers("admin@metam.local", "ChangeMe123!")
     response = client.put(
         "/manufacturing-data-hub/ai-readiness",
         headers=headers,
@@ -147,7 +147,7 @@ def test_admin_can_update_ai_readiness_overrides():
 
 
 def test_admin_can_update_operational_footprint():
-    headers = runtime_headers("admin@mop.local", "ChangeMe123!")
+    headers = runtime_headers("admin@metam.local", "ChangeMe123!")
     response = client.put(
         "/admin/operational-footprint",
         headers=headers,
@@ -160,7 +160,7 @@ def test_admin_can_update_operational_footprint():
 
 
 def test_admin_can_upload_datahub_file_manifest():
-    headers = runtime_headers("admin@mop.local", "ChangeMe123!")
+    headers = runtime_headers("admin@metam.local", "ChangeMe123!")
     response = client.post(
         "/manufacturing-data-hub/uploads",
         headers=headers,
@@ -173,7 +173,7 @@ def test_admin_can_upload_datahub_file_manifest():
 
 
 def test_non_admin_cannot_upload_datahub_file():
-    headers = runtime_headers("user@mop.local", "User12345!")
+    headers = runtime_headers("user@metam.local", "User12345!")
     response = client.post(
         "/manufacturing-data-hub/uploads",
         headers=headers,
@@ -190,7 +190,7 @@ def test_core_company_seed_available():
 
 
 def test_feature_flag_toggle():
-    headers = runtime_headers("admin@mop.local", "ChangeMe123!")
+    headers = runtime_headers("admin@metam.local", "ChangeMe123!")
     response = client.post("/feature-flags/warehouse/disable", headers=headers)
     assert response.status_code == 200
     assert response.json()["enabled"] is False
@@ -201,7 +201,7 @@ def test_feature_flag_toggle():
 
 
 def test_feature_flag_toggle_for_selected_company():
-    headers = runtime_headers("super@mop.local", "SuperAdmin123!")
+    headers = runtime_headers("super@metam.local", "SuperAdmin123!")
     response = client.post("/feature-flags/inventory/disable?company_id=company-apex", headers=headers)
     assert response.status_code == 200
     assert response.json()["company_id"] == "company-apex"
@@ -232,7 +232,7 @@ def test_registered_modules_have_company_allocations():
 
 
 def test_create_company_initializes_module_allocations():
-    headers = runtime_headers("super@mop.local", "SuperAdmin123!")
+    headers = runtime_headers("super@metam.local", "SuperAdmin123!")
     company = client.post("/companies", headers=headers, json={"tenant_id": "tenant-demo-001", "name": "Pytest Company", "code": "PYTCO"})
     assert company.status_code in {200, 409}
 
@@ -958,7 +958,7 @@ def test_frontend_navigation_admin_dashboard_and_access_control():
     assert "Platform Management" in sections
     assert "Intelligence" in sections
 
-    dashboard = client.get("/admin/dashboard", headers=runtime_headers("admin@mop.local", "ChangeMe123!"))
+    dashboard = client.get("/admin/dashboard", headers=runtime_headers("admin@metam.local", "ChangeMe123!"))
     assert dashboard.status_code == 200
     data = dashboard.json()["data"]
     assert data["user_count"] >= data["active_users"]
@@ -992,7 +992,7 @@ def test_admin_workflow_kpis_and_compliance_contracts():
 
 
 def test_manufacturing_data_hub_mapping_quality_and_pending_update():
-    headers = runtime_headers("admin@mop.local", "ChangeMe123!")
+    headers = runtime_headers("admin@metam.local", "ChangeMe123!")
     systems = client.get("/manufacturing-data-hub/connected-systems", headers=headers)
     assert systems.status_code == 200
     assert all(system["company_id"] == "company-c" for system in systems.json()["data"])
@@ -1036,7 +1036,7 @@ def test_planning_ai_command_digital_twin_and_operations_center():
 
 
 def test_runtime_login_users_records_analytics_and_audit():
-    login = client.post("/runtime/auth/login", json={"email": "super@mop.local", "password": "SuperAdmin123!"})
+    login = client.post("/runtime/auth/login", json={"email": "super@metam.local", "password": "SuperAdmin123!"})
     assert login.status_code == 200
     token = login.json()["data"]["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
@@ -1077,17 +1077,17 @@ def test_runtime_login_users_records_analytics_and_audit():
 
 def test_all_seeded_runtime_roles_can_login():
     credentials = [
-        ("super@mop.local", "SuperAdmin123!", "super_admin"),
-        ("owner@mop.local", "Owner12345!", "account_owner"),
-        ("orgadmin@mop.local", "OrgAdmin123!", "organization_admin"),
-        ("admin@mop.local", "ChangeMe123!", "admin"),
-        ("manager@mop.local", "Manager123!", "team_manager"),
-        ("supervisor@mop.local", "Supervisor123!", "supervisor"),
-        ("operator@mop.local", "Operator123!", "operator"),
-        ("auditor@mop.local", "Auditor123!", "auditor"),
-        ("qa@mop.local", "QaTester123!", "qa_tester"),
-        ("custom@mop.local", "Custom123!", "custom"),
-        ("user@mop.local", "User12345!", "user"),
+        ("super@metam.local", "SuperAdmin123!", "super_admin"),
+        ("owner@metam.local", "Owner12345!", "account_owner"),
+        ("orgadmin@metam.local", "OrgAdmin123!", "organization_admin"),
+        ("admin@metam.local", "ChangeMe123!", "admin"),
+        ("manager@metam.local", "Manager123!", "team_manager"),
+        ("supervisor@metam.local", "Supervisor123!", "supervisor"),
+        ("operator@metam.local", "Operator123!", "operator"),
+        ("auditor@metam.local", "Auditor123!", "auditor"),
+        ("qa@metam.local", "QaTester123!", "qa_tester"),
+        ("custom@metam.local", "Custom123!", "custom"),
+        ("user@metam.local", "User12345!", "user"),
     ]
     for email, password, role in credentials:
         response = client.post("/runtime/auth/login", json={"email": email, "password": password})
@@ -1096,7 +1096,7 @@ def test_all_seeded_runtime_roles_can_login():
 
 
 def test_disabled_runtime_user_cannot_login():
-    response = client.post("/runtime/auth/login", json={"email": "disabled.operator@mop.local", "password": "Disabled123!"})
+    response = client.post("/runtime/auth/login", json={"email": "disabled.operator@metam.local", "password": "Disabled123!"})
     assert response.status_code == 403
 
 
@@ -1104,7 +1104,7 @@ def test_core_platform_endpoints_require_auth_and_admin():
     assert client.get("/companies").status_code == 401
     assert client.get("/feature-flags").status_code == 401
 
-    operator_login = client.post("/runtime/auth/login", json={"email": "operator@mop.local", "password": "Operator123!"})
+    operator_login = client.post("/runtime/auth/login", json={"email": "operator@metam.local", "password": "Operator123!"})
     assert operator_login.status_code == 200
     operator_headers = {"Authorization": f"Bearer {operator_login.json()['data']['access_token']}"}
 
@@ -1125,7 +1125,7 @@ def test_core_platform_endpoints_require_auth_and_admin():
     )
     assert update_flag.status_code == 403
 
-    admin_login = client.post("/runtime/auth/login", json={"email": "admin@mop.local", "password": "ChangeMe123!"})
+    admin_login = client.post("/runtime/auth/login", json={"email": "admin@metam.local", "password": "ChangeMe123!"})
     assert admin_login.status_code == 200
     admin_headers = {"Authorization": f"Bearer {admin_login.json()['data']['access_token']}"}
 
@@ -1151,7 +1151,7 @@ def test_core_platform_endpoints_require_auth_and_admin():
 
 
 def test_runtime_user_role_is_read_only():
-    login = client.post("/runtime/auth/login", json={"email": "user@mop.local", "password": "User12345!"})
+    login = client.post("/runtime/auth/login", json={"email": "user@metam.local", "password": "User12345!"})
     assert login.status_code == 200
     token = login.json()["data"]["access_token"]
 
@@ -1167,7 +1167,7 @@ def test_runtime_user_role_is_read_only():
 
 
 def test_runtime_admin_is_company_scoped():
-    login = client.post("/runtime/auth/login", json={"email": "admin@mop.local", "password": "ChangeMe123!"})
+    login = client.post("/runtime/auth/login", json={"email": "admin@metam.local", "password": "ChangeMe123!"})
     assert login.status_code == 200
     headers = {"Authorization": f"Bearer {login.json()['data']['access_token']}"}
 
@@ -1181,13 +1181,13 @@ def test_runtime_admin_is_company_scoped():
 
 
 def test_datahub_requires_admin_and_is_company_scoped():
-    operator_login = client.post("/runtime/auth/login", json={"email": "operator@mop.local", "password": "Operator123!"})
+    operator_login = client.post("/runtime/auth/login", json={"email": "operator@metam.local", "password": "Operator123!"})
     assert operator_login.status_code == 200
     operator_headers = {"Authorization": f"Bearer {operator_login.json()['data']['access_token']}"}
     denied = client.get("/manufacturing-data-hub/connected-systems", headers=operator_headers)
     assert denied.status_code == 403
 
-    admin_login = client.post("/runtime/auth/login", json={"email": "admin@mop.local", "password": "ChangeMe123!"})
+    admin_login = client.post("/runtime/auth/login", json={"email": "admin@metam.local", "password": "ChangeMe123!"})
     assert admin_login.status_code == 200
     admin_headers = {"Authorization": f"Bearer {admin_login.json()['data']['access_token']}"}
 
@@ -1212,7 +1212,7 @@ def test_datahub_requires_admin_and_is_company_scoped():
 
 
 def test_datahub_super_admin_targets_company_and_admin_cannot_spoof_scope():
-    super_headers = runtime_headers("super@mop.local", "SuperAdmin123!")
+    super_headers = runtime_headers("super@metam.local", "SuperAdmin123!")
     catalog = client.post(
         "/manufacturing-data-hub/catalog",
         headers=super_headers,
@@ -1236,7 +1236,7 @@ def test_datahub_super_admin_targets_company_and_admin_cannot_spoof_scope():
     assert catalog.json()["data"]["company_name"] == "Apex Components Ltd"
     assert catalog.json()["data"]["lineage"]["routing_target"] == "Inventory module"
 
-    admin_headers = runtime_headers("admin@mop.local", "ChangeMe123!")
+    admin_headers = runtime_headers("admin@metam.local", "ChangeMe123!")
     spoofed = client.post(
         "/manufacturing-data-hub/catalog",
         headers=admin_headers,
@@ -1256,7 +1256,7 @@ def test_datahub_super_admin_targets_company_and_admin_cannot_spoof_scope():
 
 
 def test_datahub_company_scoped_upload_and_cloud_source_manifests():
-    super_headers = runtime_headers("super@mop.local", "SuperAdmin123!")
+    super_headers = runtime_headers("super@metam.local", "SuperAdmin123!")
     upload = client.post(
         "/manufacturing-data-hub/uploads",
         headers=super_headers,
@@ -1289,7 +1289,7 @@ def test_datahub_company_scoped_upload_and_cloud_source_manifests():
 
 
 def test_versioned_runtime_api_alias():
-    login = client.post("/api/v1/runtime/auth/login", json={"email": "super@mop.local", "password": "SuperAdmin123!"})
+    login = client.post("/api/v1/runtime/auth/login", json={"email": "super@metam.local", "password": "SuperAdmin123!"})
     assert login.status_code == 200
     token = login.json()["data"]["access_token"]
 

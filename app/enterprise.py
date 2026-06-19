@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse
 
 from .database import engine
 
-logger = logging.getLogger("mop.enterprise")
+logger = logging.getLogger("metam.enterprise")
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"), format="%(message)s")
 
 enterprise_router = APIRouter(tags=["Enterprise Platform"])
@@ -167,18 +167,18 @@ def metrics() -> str:
     average_latency = REQUEST_LATENCY_SECONDS / REQUEST_COUNT if REQUEST_COUNT else 0
     return "\n".join(
         [
-            "# HELP mop_uptime_seconds Application uptime in seconds",
-            "# TYPE mop_uptime_seconds gauge",
-            f"mop_uptime_seconds {uptime:.2f}",
-            "# HELP mop_requests_total Total HTTP requests observed by enterprise middleware",
-            "# TYPE mop_requests_total counter",
-            f"mop_requests_total {REQUEST_COUNT}",
-            "# HELP mop_errors_total Total HTTP 5xx errors observed by enterprise middleware",
-            "# TYPE mop_errors_total counter",
-            f"mop_errors_total {ERROR_COUNT}",
-            "# HELP mop_request_latency_seconds Average request latency",
-            "# TYPE mop_request_latency_seconds gauge",
-            f"mop_request_latency_seconds {average_latency:.6f}",
+            "# HELP metam_uptime_seconds Application uptime in seconds",
+            "# TYPE metam_uptime_seconds gauge",
+            f"metam_uptime_seconds {uptime:.2f}",
+            "# HELP metam_requests_total Total HTTP requests observed by enterprise middleware",
+            "# TYPE metam_requests_total counter",
+            f"metam_requests_total {REQUEST_COUNT}",
+            "# HELP metam_errors_total Total HTTP 5xx errors observed by enterprise middleware",
+            "# TYPE metam_errors_total counter",
+            f"metam_errors_total {ERROR_COUNT}",
+            "# HELP metam_request_latency_seconds Average request latency",
+            "# TYPE metam_request_latency_seconds gauge",
+            f"metam_request_latency_seconds {average_latency:.6f}",
             "",
         ]
     )

@@ -60,7 +60,7 @@ def login() -> str:
     response = request_json(
         "POST",
         "/runtime/auth/login",
-        {"email": "super@mop.local", "password": "SuperAdmin123!"},
+        {"email": "super@metam.local", "password": "SuperAdmin123!"},
     )
     return response["data"]["access_token"]
 
@@ -95,7 +95,7 @@ def role_users() -> list[SeedUser]:
         for slug, label, role, active in roles:
             users.append(
                 SeedUser(
-                    f"{slug}.{company.company_code.lower()}@mop.local",
+                    f"{slug}.{company.company_code.lower()}@metam.local",
                     f"{company.company_name} {label}",
                     role,
                     "Enterprise123!",
@@ -242,8 +242,8 @@ def enterprise_records(batch: str) -> list[dict[str, Any]]:
             [
                 record(company, "warehouse", "bin_occupancy", f"ENT-{batch}-{company.company_code}-WH-OCC-001", f"{company.company_name} Main Warehouse Occupancy", "ACTIVE", 78 + company_index, warehouse="WH-1", occupancy_percent=78 + company_index, congestion="medium"),
                 record(company, "warehouse", "bin_occupancy", f"ENT-{batch}-{company.company_code}-WH-OCC-002", f"{company.company_name} Critical Warehouse Occupancy", "ACTIVE", 88 + company_index, warehouse="WH-2", occupancy_percent=88 + company_index, congestion="high"),
-                record(company, "reporting", "scheduled_report", f"ENT-{batch}-{company.company_code}-RPT-DAILY", f"{company.company_name} Daily Executive Operations Report", "SCHEDULED", 1, cadence="daily", recipients=[f"owner.{company.company_code.lower()}@mop.local", f"admin.{company.company_code.lower()}@mop.local"]),
-                record(company, "reporting", "scheduled_report", f"ENT-{batch}-{company.company_code}-RPT-WEEKLY", f"{company.company_name} Weekly Plant Performance Report", "SCHEDULED", 1, cadence="weekly", recipients=[f"manager.{company.company_code.lower()}@mop.local"]),
+                record(company, "reporting", "scheduled_report", f"ENT-{batch}-{company.company_code}-RPT-DAILY", f"{company.company_name} Daily Executive Operations Report", "SCHEDULED", 1, cadence="daily", recipients=[f"owner.{company.company_code.lower()}@metam.local", f"admin.{company.company_code.lower()}@metam.local"]),
+                record(company, "reporting", "scheduled_report", f"ENT-{batch}-{company.company_code}-RPT-WEEKLY", f"{company.company_name} Weekly Plant Performance Report", "SCHEDULED", 1, cadence="weekly", recipients=[f"manager.{company.company_code.lower()}@metam.local"]),
                 record(company, "costing", "cost_snapshot", f"ENT-{batch}-{company.company_code}-COST-001", f"{company.company_name} Inventory Valuation Snapshot", "POSTED", 18400000 + company_index * 850000, currency="INR", variance_percent=3.4 + company_index / 10),
                 record(company, "integrations", "erp_sync", f"ENT-{batch}-{company.company_code}-ERP-SYNC", f"{company.company_name} ERP Inventory Sync", "HEALTHY", 12500 + company_index * 200, provider="SAP S/4HANA", last_sync="2026-06-12T10:00:00Z"),
                 record(company, "integrations", "iot_stream", f"ENT-{batch}-{company.company_code}-IOT-STREAM", f"{company.company_name} Machine Telemetry Stream", "DEGRADED", 4200 + company_index * 100, provider="MQTT", packet_loss_percent=1.7),

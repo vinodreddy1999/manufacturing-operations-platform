@@ -1,27 +1,27 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: mop-fullstack
+  name: metam-fullstack
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: mop-fullstack
+      app: metam-fullstack
   template:
     metadata:
       labels:
-        app: mop-fullstack
+        app: metam-fullstack
     spec:
       containers:
-        - name: mop-fullstack
-          image: vinodreddy1999/manufacturing-operations-platform-fullstack:0.2.1
+        - name: metam-fullstack
+          image: vinodreddy1999/metam-services-fullstack:0.2.1
           ports:
             - containerPort: 8080
           envFrom:
             - configMapRef:
-                name: mop-config
+                name: metam-config
             - secretRef:
-                name: mop-secrets
+                name: metam-secrets
           readinessProbe:
             httpGet:
               path: /ready

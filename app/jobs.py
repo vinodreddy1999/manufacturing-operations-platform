@@ -8,7 +8,7 @@ CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://redis:6379/1
 
 
 celery_app = Celery(
-    "manufacturing_operations_platform",
+    "metam_services",
     broker=CELERY_BROKER_URL,
     backend=CELERY_RESULT_BACKEND,
 )

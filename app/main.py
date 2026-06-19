@@ -153,7 +153,7 @@ def make_token(user: dict[str, Any], tenant: dict[str, Any]) -> str:
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "ok", "runtime": "python-fastapi", "service": "manufacturing-operations-platform"}
+    return {"status": "ok", "runtime": "python-fastapi", "service": "metam-services"}
 
 
 @app.get("/modules")

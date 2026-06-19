@@ -59,15 +59,15 @@ Build:
 
 ```bash
 docker build \
-  -t vinodreddy1999/manufacturing-operations-platform-frontend:latest \
-  -t vinodreddy1999/manufacturing-operations-platform-frontend:0.1.0 \
+  -t vinodreddy1999/metam-services-frontend:latest \
+  -t vinodreddy1999/metam-services-frontend:0.1.0 \
   .
 ```
 
 Run:
 
 ```bash
-docker run -p 8080:8080 vinodreddy1999/manufacturing-operations-platform-frontend:latest
+docker run -p 8080:8080 vinodreddy1999/metam-services-frontend:latest
 ```
 
 Open:
@@ -85,12 +85,12 @@ http://127.0.0.1:8000
 Override it if your backend is hosted elsewhere:
 
 ```bash
-docker build --build-arg VITE_API_BASE_URL=https://your-api-host -t vinodreddy1999/manufacturing-operations-platform-frontend:latest .
+docker build --build-arg VITE_API_BASE_URL=https://your-api-host -t vinodreddy1999/metam-services-frontend:latest .
 ```
 
 Push tags:
 
 ```bash
-docker push vinodreddy1999/manufacturing-operations-platform-frontend:latest
-docker push vinodreddy1999/manufacturing-operations-platform-frontend:0.1.0
+docker push vinodreddy1999/metam-services-frontend:latest
+docker push vinodreddy1999/metam-services-frontend:0.1.0
 ```

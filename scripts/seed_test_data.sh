@@ -6,7 +6,7 @@ BASE_URL="${BASE_URL:-http://127.0.0.1:8080}"
 login() {
   curl -fsS -X POST "$BASE_URL/runtime/auth/login" \
     -H "Content-Type: application/json" \
-    -d '{"email":"super@mop.local","password":"SuperAdmin123!"}' |
+    -d '{"email":"super@metam.local","password":"SuperAdmin123!"}' |
     python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["access_token"])'
 }
 
@@ -28,8 +28,8 @@ TOKEN="$(login)"
 echo "Authenticated as super admin"
 
 echo "Creating test users"
-post_json "/runtime/users" "$TOKEN" '{"email":"planner.test@mop.local","name":"Planner Test User","password":"Planner123!","role":"admin","is_active":true}' || true
-post_json "/runtime/users" "$TOKEN" '{"email":"viewer.test@mop.local","name":"Viewer Test User","password":"Viewer123!","role":"user","is_active":true}' || true
+post_json "/runtime/users" "$TOKEN" '{"email":"planner.test@metam.local","name":"Planner Test User","password":"Planner123!","role":"admin","is_active":true}' || true
+post_json "/runtime/users" "$TOKEN" '{"email":"viewer.test@metam.local","name":"Viewer Test User","password":"Viewer123!","role":"user","is_active":true}' || true
 
 echo "Creating module records"
 post_json "/runtime/records" "$TOKEN" '{"module_key":"inventory","record_type":"raw_material","record_code":"RM-COPPER-TEST","name":"Copper Wire Test Lot","status":"AVAILABLE","quantity":320,"payload":{"uom":"kg","reorder_level":150,"warehouse":"WH-A","bin":"A-03-02","unit_cost":740}}'

@@ -1,5 +1,5 @@
 image:
-  repository: vinodreddy1999/manufacturing-operations-platform-fullstack
+  repository: vinodreddy1999/metam-services-fullstack
   tag: "0.2.1"
   pullPolicy: IfNotPresent
 

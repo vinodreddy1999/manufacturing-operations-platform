@@ -218,7 +218,7 @@ function ProtectedRoute({
 }
 
 function LoginScreen({ onLogin, baseUrl }: { onLogin: () => void; baseUrl: string }) {
-  const [email, setEmail] = useState('super@mop.local');
+  const [email, setEmail] = useState('super@metam.local');
   const [password, setPassword] = useState('SuperAdmin123!');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -267,9 +267,9 @@ function LoginScreen({ onLogin, baseUrl }: { onLogin: () => void; baseUrl: strin
 
         <div className="mt-5 rounded-2xl border border-white/10 bg-white/8 p-4 text-xs text-slate-300">
           <p className="font-semibold uppercase tracking-[0.18em] text-slate-100">Seeded access</p>
-          <p>Super admin: super@mop.local / SuperAdmin123!</p>
-          <p>Admin: admin@mop.local / ChangeMe123!</p>
-          <p>User: user@mop.local / User12345!</p>
+          <p>Super admin: super@metam.local / SuperAdmin123!</p>
+          <p>Admin: admin@metam.local / ChangeMe123!</p>
+          <p>User: user@metam.local / User12345!</p>
         </div>
       </div>
     </div>

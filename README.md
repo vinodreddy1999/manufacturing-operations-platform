@@ -138,10 +138,10 @@ Docker build and run:
 ```bash
 cd frontend
 docker build \
-  -t vinodreddy1999/manufacturing-operations-platform-frontend:latest \
-  -t vinodreddy1999/manufacturing-operations-platform-frontend:0.1.0 \
+  -t vinodreddy1999/metam-services-frontend:latest \
+  -t vinodreddy1999/metam-services-frontend:0.1.0 \
   .
-docker run -p 8080:8080 vinodreddy1999/manufacturing-operations-platform-frontend:latest
+docker run -p 8080:8080 vinodreddy1999/metam-services-frontend:latest
 ```
 
 Open:
@@ -155,8 +155,8 @@ Docker Compose also includes a standalone `frontend` service exposed on port `80
 Docker Hub push:
 
 ```bash
-docker push vinodreddy1999/manufacturing-operations-platform-frontend:latest
-docker push vinodreddy1999/manufacturing-operations-platform-frontend:0.1.0
+docker push vinodreddy1999/metam-services-frontend:latest
+docker push vinodreddy1999/metam-services-frontend:0.1.0
 ```
 
 ## Full-Stack Application Image
@@ -166,30 +166,30 @@ The root `Dockerfile` now builds one deployable application image:
 - React frontend is built with Vite.
 - FastAPI serves both the backend APIs and the built frontend.
 - The app listens on port `8080`.
-- SQLite is used by default at `/data/mop.db` for a simple single-container run.
+- SQLite is used by default at `/data/metam.db` for a simple single-container run.
 - `DATABASE_URL` can point to PostgreSQL for production or Docker Compose deployments.
 
 Build:
 
 ```bash
 docker build \
-  -t vinodreddy1999/manufacturing-operations-platform-fullstack:latest \
-  -t vinodreddy1999/manufacturing-operations-platform-fullstack:0.2.7 \
+  -t vinodreddy1999/metam-services-fullstack:latest \
+  -t vinodreddy1999/metam-services-fullstack:0.2.7 \
   .
 ```
 
 Run:
 
 ```bash
-docker run --name mop-fullstack -p 8080:8080 \
-  -v mop_fullstack_data:/data \
-  vinodreddy1999/manufacturing-operations-platform-fullstack:latest
+docker run --name metam-fullstack -p 8080:8080 \
+  -v metam_fullstack_data:/data \
+  vinodreddy1999/metam-services-fullstack:latest
 ```
 
 Seed full-scale multi-company demo data after the container is running:
 
 ```bash
-docker exec mop-fullstack python scripts/seed_enterprise_data.py
+docker exec metam-fullstack python scripts/seed_enterprise_data.py
 ```
 
 Open:
@@ -201,18 +201,18 @@ http://127.0.0.1:8080
 Seeded login accounts:
 
 ```text
-Super admin: super@mop.local / SuperAdmin123!
-Admin:       admin@mop.local / ChangeMe123!
-User:        user@mop.local / User12345!
+Super admin: super@metam.local / SuperAdmin123!
+Admin:       admin@metam.local / ChangeMe123!
+User:        user@metam.local / User12345!
 ```
 
 Expanded multi-company test accounts are also seeded for each company. Use the same role password by prefix:
 
 ```text
-admin.apex@mop.local     / ChangeMe123!
-manager.apex@mop.local   / Manager123!
-operator.apex@mop.local  / Operator123!
-viewer.apex@mop.local    / User12345!
+admin.apex@metam.local     / ChangeMe123!
+manager.apex@metam.local   / Manager123!
+operator.apex@metam.local  / Operator123!
+viewer.apex@metam.local    / User12345!
 
 Replace apex with coc, nova, fresh, or med to test each seeded company.
 ```
@@ -221,8 +221,8 @@ The backend also seeds full module records for Planning, Inventory, Production, 
 
 Walkthrough artifacts:
 
-- `docs/mop-complete-working-walkthrough.html`
-- `docs/mop-complete-working-walkthrough.gif`
+- `docs/metam-services-complete-working-walkthrough.html`
+- `docs/metam-services-complete-working-walkthrough.gif`
 
 Access model:
 
@@ -239,8 +239,8 @@ python scripts/validate_multitenant_access.py
 
 Expected validation highlights:
 
-- `admin@mop.local` only sees `company-c`
-- `super@mop.local` sees all companies
+- `admin@metam.local` only sees `company-c`
+- `super@metam.local` sees all companies
 - standard users receive `403` for DataHub routes
 
 Runtime APIs added:
@@ -279,9 +279,9 @@ Default ports:
 Compose notes:
 
 - PostgreSQL is the primary metadata store in compose deployments.
-- Services share the `mop-network` Docker bridge network.
+- Services share the `metam-network` Docker bridge network.
 - `seed-enterprise-data` runs once after the app is healthy and creates multi-company demo users and records.
-- pgAdmin uses `admin@mop.localhost.com / ChangeMe123!` by default.
+- pgAdmin uses `admin@metam.localhost.com / ChangeMe123!` by default.
 
 Enterprise endpoints:
 
@@ -317,8 +317,8 @@ scripts/validate_fullstack.sh
 Docker Hub push:
 
 ```bash
-docker push vinodreddy1999/manufacturing-operations-platform-fullstack:latest
-docker push vinodreddy1999/manufacturing-operations-platform-fullstack:0.2.6
+docker push vinodreddy1999/metam-services-fullstack:latest
+docker push vinodreddy1999/metam-services-fullstack:0.2.6
 ```
 
 Docker Compose enterprise services:
@@ -353,7 +353,7 @@ Use `POST /auth/login` with:
 ```json
 {
   "tenant_slug": "precision-components",
-  "email": "admin@mop.local",
+  "email": "admin@metam.local",
   "password": "ChangeMe123!"
 }
 ```
