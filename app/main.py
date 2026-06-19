@@ -54,9 +54,9 @@ JWT_SECRET = "local-python-demo-secret"
 JWT_ALGORITHM = "HS256"
 
 app = FastAPI(
-    title="Manufacturing Operations Platform - Python Backend",
+    title="Metam Services - Python Backend",
     version="0.2.6",
-    description="Python/FastAPI implementation of the MOP backend modules.",
+    description="Python/FastAPI implementation of the Metam Services backend modules.",
 )
 configure_enterprise(app)
 

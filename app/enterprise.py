@@ -119,7 +119,7 @@ def ready() -> dict[str, Any]:
 def info() -> dict[str, Any]:
     return success_response(
         {
-            "name": "Manufacturing Operations Platform",
+            "name": "Metam Services",
             "version": "0.2.6",
             "runtime": "python-fastapi-react",
             "api_version": "v1",

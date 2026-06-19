@@ -1,1 +1,1 @@
-"""Python backend for the Manufacturing Operations Platform."""
+"""Python backend for Metam Services."""

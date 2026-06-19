@@ -1,8 +1,8 @@
-# Manufacturing Operations Platform - Detailed Documentation
+# Metam Services - Detailed Documentation
 
 ## 1. Purpose
 
-The Manufacturing Operations Platform is a Python/FastAPI backend for a multi-module manufacturing ERP/operations system. The repository currently implements a Python-only backend with operational modules for platform administration, inventory, warehouse, supplier, procurement, production, maintenance, quality, sales and distribution, customer portal, supplier portal, reporting and analytics, costing and profitability, mobile operations, integrations, AI, and future manufacturing intelligence.
+Metam Services is a Python/FastAPI backend for a multi-module manufacturing ERP/operations system. The repository currently implements a Python-only backend with operational modules for platform administration, inventory, warehouse, supplier, procurement, production, maintenance, quality, sales and distribution, customer portal, supplier portal, reporting and analytics, costing and profitability, mobile operations, integrations, AI, and future manufacturing intelligence.
 
 The platform is designed as a modular monolith first, with a separate Inventory AI FastAPI service for inventory intelligence. The current implementation prioritizes runnable APIs, sample/seed data, module separation, and rule-based AI recommendations.
 
@@ -110,7 +110,7 @@ The platform foundation includes:
 - Celery job declarations
 - Docker Compose support for API, PostgreSQL, Redis, and worker
 
-The platform is intended for multi-company manufacturing operations where a super-admin can enable applications/modules and a company admin can manage users, data access, and connected data sources.
+Metam Services is intended for multi-company operations where a super-admin can enable applications/modules and a company admin can manage users, data access, and connected data sources.
 
 ## 6. Security and Access Model
 
@@ -785,7 +785,7 @@ alembic upgrade head
 
 ## 11. Current Strengths
 
-- Broad module coverage for manufacturing operations
+- Broad module coverage for Metam Services
 - FastAPI backend is runnable locally
 - Modular-monolith structure is suitable for early-stage development
 - Many modules already have typed routes/schemas/services/repositories/models
@@ -891,4 +891,4 @@ The AI capabilities are currently rule-based/draft-oriented. A future LLM/copilo
 
 ## 15. Final Notes
 
-This repository is a strong backend foundation for an AI-assisted manufacturing operations platform. The immediate priority should not be adding more modules. The priority should be making the existing modules production-grade by completing Warehouse/Procurement depth, enforcing RBAC, moving demo data to real persistence, adding tests, and documenting API/data contracts clearly.
+This repository is a strong backend foundation for the AI-assisted Metam Services platform. The immediate priority should not be adding more modules. The priority should be making the existing modules production-grade by completing Warehouse/Procurement depth, enforcing RBAC, moving demo data to real persistence, adding tests, and documenting API/data contracts clearly.

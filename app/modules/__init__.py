@@ -1,1 +1,1 @@
-"""Business module routers for the Manufacturing Operations Platform."""
+"""Business module routers for Metam Services."""

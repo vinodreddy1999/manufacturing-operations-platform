@@ -5,7 +5,7 @@
 - Repository: `https://github.com/vinodreddy1999/manufacturing-operations-platform.git`
 - Branch: `main`
 - Source commit before deployment: `bf1f927`
-- Application: `Manufacturing Operations Platform`
+- Application: `Metam Services`
 - Docker image: `vinodreddy1999/manufacturing-operations-platform-fullstack`
 - Tags: `latest`, `0.2.2`
 - Deployment environment: Local Docker Desktop Linux engine

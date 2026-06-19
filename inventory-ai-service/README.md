@@ -1,6 +1,6 @@
 # Inventory AI Service
 
-Python FastAPI microservice for rule-based inventory intelligence in the Manufacturing Operations Platform.
+Python FastAPI microservice for rule-based inventory intelligence in Metam Services.
 
 The service analyzes inventory risk and creates recommendations or draft actions. It does not execute inventory, procurement, production, or warehouse actions automatically. Critical recommendations require human approval.
 

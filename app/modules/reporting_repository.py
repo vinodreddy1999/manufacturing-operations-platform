@@ -66,7 +66,7 @@ class ReportingRepository:
                     "report_code": code,
                     "report_name": name,
                     "category": category,
-                    "description": f"{name} for manufacturing operations analytics.",
+                    "description": f"{name} for Metam Services analytics.",
                     "source_module": category,
                     "allowed_roles": ["Executive", f"{category} Manager", "Plant Manager"],
                     "available_filters": ["date_range", "plant", "warehouse", "product", "item", "customer", "supplier", "machine", "line", "shift", "status", "risk_level"],

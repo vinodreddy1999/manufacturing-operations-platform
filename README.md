@@ -1,8 +1,8 @@
-# Manufacturing Operations Platform (Python)
+# Metam Services (Python)
 
-This repository is now a Python-only implementation of the Manufacturing Operations Platform backend.
+This repository is now a Python-only implementation of the Metam Services backend.
 
-It uses FastAPI and includes runnable backend modules for manufacturing operations:
+It uses FastAPI and includes runnable backend modules for Metam Services:
 
 - Auth
 - Platform

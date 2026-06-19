@@ -37,7 +37,7 @@ class DemoStore:
             "admin@mop.local": {
                 "id": "user-admin-001",
                 "tenant_slug": "precision-components",
-                "name": "MOP Admin",
+                "name": "Metam Services Admin",
                 "password": "ChangeMe123!",
                 "permissions": ["platform.admin"],
             }

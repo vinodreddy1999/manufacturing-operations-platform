@@ -1,6 +1,6 @@
 # End-to-End Scheme Diagram
 
-This diagram shows the current Python-only Manufacturing Operations Platform after adding the modular platform foundation, expanded Inventory module, external Customer Portal, external Supplier Portal, Reporting & Analytics, Costing & Profitability, Mobile Operations, Integrations, Manufacturing Intelligence, Frontend & Admin Platform contracts, Manufacturing Data Hub, and separate `inventory-ai-service/` microservice.
+This diagram shows the current Python-only Metam Services platform after adding the modular platform foundation, expanded Inventory module, external Customer Portal, external Supplier Portal, Reporting & Analytics, Costing & Profitability, Mobile Operations, Integrations, Manufacturing Intelligence, Frontend & Admin Platform contracts, Manufacturing Data Hub, and separate `inventory-ai-service/` microservice.
 
 There are two FastAPI services:
 

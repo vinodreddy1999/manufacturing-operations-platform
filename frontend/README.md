@@ -1,6 +1,6 @@
-# Manufacturing Operations Platform Frontend
+# Metam Services Frontend
 
-React/Vite frontend for the existing Manufacturing Operations Platform backend.
+React/Vite frontend for the existing Metam Services backend.
 
 The backend remains the source of truth. The frontend does not use mock data; screens call the FastAPI APIs directly.
 

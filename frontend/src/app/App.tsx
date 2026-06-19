@@ -83,8 +83,8 @@ export function App() {
             <Boxes className="h-5 w-5" />
           </div>
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-200">MOP</p>
-            <p className="text-xs text-slate-400">Operations Platform</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-200">METAM</p>
+            <p className="text-xs text-slate-400">Services</p>
           </div>
         </div>
         <div className="px-4 pt-4">
@@ -127,7 +127,7 @@ export function App() {
                 <Menu className="h-4 w-4" />
               </button>
               <div>
-                <p className="text-lg font-semibold tracking-tight text-white">Manufacturing Operations Platform</p>
+                <p className="text-lg font-semibold tracking-tight text-white">Metam Services</p>
                 <p className="hidden text-xs text-slate-400 sm:block">Backend: {baseUrl}</p>
               </div>
             </div>
@@ -245,7 +245,7 @@ function LoginScreen({ onLogin, baseUrl }: { onLogin: () => void; baseUrl: strin
             <Boxes className="h-5 w-5" />
           </div>
           <div>
-            <h1 className="text-xl font-semibold tracking-tight text-white">Manufacturing Operations Platform</h1>
+            <h1 className="text-xl font-semibold tracking-tight text-white">Metam Services</h1>
             <p className="text-sm text-slate-300">Full-stack runtime: {baseUrl}</p>
           </div>
         </div>

@@ -199,7 +199,7 @@ def base_frame(title: str, subtitle: str) -> tuple[Image.Image, ImageDraw.ImageD
         draw.line((index, 0, index + 480, 900), fill=color, width=2)
     draw.ellipse((1220, -160, 1780, 360), fill="#0f172a", outline="#22d3ee", width=3)
     draw.ellipse((-180, 620, 420, 1120), fill="#111827", outline="#7c3aed", width=3)
-    draw.text((72, 54), "Manufacturing Operations Platform", fill="#67e8f9", font=font(28, bold=True))
+    draw.text((72, 54), "Metam Services", fill="#67e8f9", font=font(28, bold=True))
     draw.text((72, 112), title, fill="#ffffff", font=font(58, bold=True))
     draw_wrapped(draw, subtitle, (76, 186), 1420, "#cbd5e1", size=30)
     return image, draw
@@ -372,7 +372,7 @@ def save_html(frames: list[str]) -> None:
 <head>
   <meta charset=\"utf-8\" />
   <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />
-  <title>MOP Complete Working Walkthrough</title>
+  <title>Metam Services Complete Working Walkthrough</title>
   <style>
     body {{ margin: 0; font-family: Segoe UI, Arial, sans-serif; background: #020617; color: #e2e8f0; }}
     main {{ max-width: 1180px; margin: auto; padding: 32px; }}
@@ -384,14 +384,14 @@ def save_html(frames: list[str]) -> None:
 </head>
 <body>
   <main>
-    <h1>Manufacturing Operations Platform - Complete Working Walkthrough</h1>
+    <h1>Metam Services - Complete Working Walkthrough</h1>
     <p>This animated walkthrough covers user levels, module flows, backend data, click redirects, RBAC, and deployment.</p>
     <video controls width=\"100%\" poster=\"mop-complete-working-walkthrough.gif\">
       <source src=\"mop-complete-working-walkthrough.avi\" type=\"video/x-msvideo\" />
       Your browser can still view the animated fallback below.
     </video>
     <p><a href=\"mop-complete-working-walkthrough.avi\">Download full AVI video</a></p>
-    <img src=\"mop-complete-working-walkthrough.gif\" alt=\"MOP complete working walkthrough animation fallback\" />
+    <img src=\"mop-complete-working-walkthrough.gif\" alt=\"Metam Services complete working walkthrough animation fallback\" />
     <section class=\"card\">
       <h2>Covered Sections</h2>
       <ul>{items}</ul>
