@@ -215,6 +215,7 @@ function AuthenticatedApp({ user, onLogout }: { user: RuntimeUser; onLogout: () 
               <Route path="/platform/widgets" element={<PlatformOnly user={user}><PlatformWidgetsPage /></PlatformOnly>} />
               <Route path="/admin/clients" element={<PlatformOnly user={user}><ClientManagementPage /></PlatformOnly>} />
               <Route path="/admin/clients/create" element={<PlatformOnly user={user}><CreateClientPage /></PlatformOnly>} />
+              <Route path="/admin/clients/:clientId/edit" element={<PlatformOnly user={user}><CreateClientPage /></PlatformOnly>} />
               <Route path="/admin/clients/:clientId/health" element={<PlatformOnly user={user}><ClientHealthPage /></PlatformOnly>} />
               <Route path="/admin/users" element={<ProtectedRoute user={user} section="admin"><UserManagementPage /></ProtectedRoute>} />
               <Route path="/admin/users/create" element={<ProtectedRoute user={user} section="admin"><CreateUserPage /></ProtectedRoute>} />

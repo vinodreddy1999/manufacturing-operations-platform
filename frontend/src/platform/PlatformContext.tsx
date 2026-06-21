@@ -17,6 +17,7 @@ type PlatformContextValue = {
   canSelectPlatform: boolean;
   selectClient: (clientId: string | null) => void;
   createClient: (client: Omit<PlatformClient, 'clientId' | 'createdDate' | 'disabledModules'>) => PlatformClient;
+  updateClient: (clientId: string, client: Omit<PlatformClient, 'clientId' | 'createdDate' | 'disabledModules'>) => PlatformClient;
   createUser: (user: Omit<PlatformUser, 'userId' | 'fullName' | 'clientName' | 'createdDate' | 'lastLogin'>) => PlatformUser;
   updateWidget: (widgetId: string, payload: Partial<WidgetConfig>) => void;
   resetWidgets: () => void;
@@ -74,6 +75,18 @@ export function PlatformProvider({ runtimeUser, children }: { runtimeUser: Runti
       };
       let next = { ...state, clients: [...state.clients, client] };
       next = addAudit(next, { clientId, clientName: client.clientName, userId: matchedUser.userId, moduleName: 'Admin', action: 'Created client' });
+      persist(next);
+      return client;
+    },
+    updateClient: (clientId, input) => {
+      const existing = state.clients.find((client) => client.clientId === clientId)!;
+      const client: PlatformClient = {
+        ...existing,
+        ...input,
+        disabledModules: platformModules.filter((module) => module !== 'Admin' && !input.enabledModules.includes(module)),
+      };
+      let next = { ...state, clients: state.clients.map((item) => item.clientId === clientId ? client : item) };
+      next = addAudit(next, { clientId, clientName: client.clientName, userId: matchedUser.userId, moduleName: 'Admin', action: 'Updated client access' });
       persist(next);
       return client;
     },
