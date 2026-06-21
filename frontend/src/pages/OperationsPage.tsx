@@ -15,6 +15,7 @@ import { formatCurrency, formatNumber } from '../lib/format';
 import { canWriteOperationalData } from '../lib/rbac';
 import { backend } from '../services/api';
 import type { ModuleRecord, RuntimeUser } from '../types';
+import { usePlatform } from '../platform/PlatformContext';
 
 function moduleRoute(moduleKey: string) {
   const directRoutes = new Set([
@@ -43,6 +44,7 @@ function moduleRoute(moduleKey: string) {
 }
 
 export function OperationsPage({ user }: { user: RuntimeUser }) {
+  const { currency } = usePlatform();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [newRecord, setNewRecord] = useState({
@@ -146,7 +148,7 @@ export function OperationsPage({ user }: { user: RuntimeUser }) {
       ) : null}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Inventory Value" value={formatCurrency(inventory.data?.total_inventory_value)} helper="Open inventory module" icon={<Boxes className="h-5 w-5" />} onClick={() => navigate('/inventory')} />
+        <StatCard label="Inventory Value" value={formatCurrency(inventory.data?.total_inventory_value, currency)} helper="Open inventory module" icon={<Boxes className="h-5 w-5" />} onClick={() => navigate('/inventory')} />
         <StatCard label="Backend Modules" value={formatNumber(modules.data?.length)} helper="Jump to module allocations" icon={<Factory className="h-5 w-5" />} onClick={() => document.getElementById('module-allocations')?.scrollIntoView({ behavior: 'smooth' })} />
         <StatCard label="Low Stock Risks" value={formatNumber(analytics.data?.inventory_low_stock_count ?? inventory.data?.low_stock_risks?.length)} helper="Open inventory risks" icon={<ShieldCheck className="h-5 w-5" />} onClick={() => navigate('/inventory')} />
         <StatCard label="Maintenance Ready" value="Active" helper="Open maintenance module" icon={<Wrench className="h-5 w-5" />} onClick={() => navigate('/maintenance')} />

@@ -1,8 +1,10 @@
 import { ArrowUpRight } from 'lucide-react';
 import { formatMetricValue } from '../calculations';
 import type { ImpactMetric } from '../types';
+import { usePlatform } from '../../platform/PlatformContext';
 
 export function ImprovementTable({ metrics, onOpen }: { metrics: ImpactMetric[]; onOpen: (metric: ImpactMetric) => void }) {
+  const { currency } = usePlatform();
   return (
     <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-950/25">
       <div className="overflow-x-auto">
@@ -12,10 +14,10 @@ export function ImprovementTable({ metrics, onOpen }: { metrics: ImpactMetric[];
             {metrics.map((metric) => (
               <tr key={metric.id} className="hover:bg-white/[0.04]">
                 <td className="px-4 py-3 font-medium text-white"><p>{metric.metricName}</p><p className="mt-1 text-xs font-normal text-slate-500">{metric.dataSource}</p></td>
-                <td className="px-4 py-3 text-slate-300">{formatMetricValue(metric.previousValue, metric.unit)}</td>
-                <td className="px-4 py-3 text-white">{formatMetricValue(metric.currentValue, metric.unit)}</td>
+                <td className="px-4 py-3 text-slate-300">{formatMetricValue(metric.previousValue, metric.unit, currency)}</td>
+                <td className="px-4 py-3 text-white">{formatMetricValue(metric.currentValue, metric.unit, currency)}</td>
                 <td className="px-4 py-3 text-slate-300">{metric.percentageChange > 0 ? '+' : ''}{metric.percentageChange}%</td>
-                <td className="px-4 py-3 text-emerald-200">{formatMetricValue(metric.financialImpact, 'INR')}</td>
+                <td className="px-4 py-3 text-emerald-200">{formatMetricValue(metric.financialImpact, 'INR', currency)}</td>
                 <td className="max-w-64 px-4 py-3 text-slate-300">{metric.operationalImpact}</td>
                 <td className="px-4 py-3 text-slate-300">{metric.responsibleDepartment}</td>
                 <td className="px-4 py-3"><span className={`rounded-full border px-2.5 py-1 text-xs ${metric.status === 'Improved' ? 'border-emerald-300/20 bg-emerald-400/10 text-emerald-100' : metric.status === 'Declined' ? 'border-rose-300/20 bg-rose-400/10 text-rose-100' : 'border-white/10 bg-white/5 text-slate-300'}`}>{metric.status}</span></td>

@@ -69,6 +69,28 @@ See the GitHub-rendered end-to-end scheme diagram here:
 
 [End-to-End Scheme Diagram](docs/end-to-end-scheme.md)
 
+## Platform And Client Contexts
+
+The frontend separates cross-client administration from tenant operations:
+
+- Super Admin starts in **Platform View** and can inspect client, user, module, subscription, system, audit, and widget health.
+- Selecting a client switches to that client's operational dashboard and configured currency.
+- Company Admin and other tenant roles start directly in their assigned client and cannot select another tenant.
+- Client module allocation controls which operational sections appear; non-admin users are further limited to their assigned modules.
+- Client creation records enabled and disabled modules, market, region, currency, subscription state, creation date, and an audit event.
+- User creation is constrained to applications and modules enabled for the selected client.
+
+Frontend routes:
+
+- `/platform` - platform overview
+- `/platform/modules/:moduleName` - module health by client
+- `/platform/widgets` - platform widget visibility and ordering
+- `/admin/clients` and `/admin/clients/create` - client administration
+- `/admin/clients/:clientId/health` - client health and allocation
+- `/admin/users` and `/admin/users/create` - searchable, client-scoped user administration
+
+The demonstration register includes five clients, 23 users, multiple currencies, disabled-module scenarios, subscription states, and audit events. Browser-created demo changes persist in local storage; production tenant authorization and database isolation remain enforced by the existing backend contracts.
+
 ## Run Locally
 
 ```bash

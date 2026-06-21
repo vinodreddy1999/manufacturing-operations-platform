@@ -6,11 +6,11 @@ type StatusBadgeProps = {
 
 export function StatusBadge({ status }: StatusBadgeProps) {
   const normalized = status.toLowerCase();
-  const state = normalized.includes('healthy') || normalized.includes('ok') || normalized.includes('visible') || normalized.includes('active')
+  const state = normalized.includes('healthy') || normalized.includes('ok') || normalized.includes('visible') || normalized.includes('active') || normalized.includes('enabled')
     ? 'good'
-    : normalized.includes('warning') || normalized.includes('pending')
+    : normalized.includes('warning') || normalized.includes('pending') || normalized.includes('attention') || normalized.includes('trial')
       ? 'warn'
-      : normalized.includes('failed') || normalized.includes('error') || normalized.includes('hidden')
+      : normalized.includes('failed') || normalized.includes('error') || normalized.includes('hidden') || normalized.includes('critical') || normalized.includes('suspended') || normalized.includes('disabled')
         ? 'bad'
         : 'neutral';
 

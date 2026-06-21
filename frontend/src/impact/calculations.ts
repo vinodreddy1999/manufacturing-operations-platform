@@ -47,8 +47,8 @@ export function calculateImpactTotals(modules: ModuleImpact[]): ImpactTotals {
   };
 }
 
-export function formatMetricValue(value: number, unit: string) {
-  if (unit === 'INR') return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(value);
+export function formatMetricValue(value: number, unit: string, currency = 'INR') {
+  if (unit === 'INR') return new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 0 }).format(value);
   if (unit === '%') return `${round(value)}%`;
   return `${new Intl.NumberFormat('en-IN', { maximumFractionDigits: 1 }).format(value)} ${unit}`.trim();
 }

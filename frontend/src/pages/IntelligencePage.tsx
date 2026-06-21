@@ -8,8 +8,10 @@ import { Panel } from '../components/Panel';
 import { StatCard } from '../components/StatCard';
 import { formatCurrency, formatNumber } from '../lib/format';
 import { backend } from '../services/api';
+import { usePlatform } from '../platform/PlatformContext';
 
 export function IntelligencePage() {
+  const { currency } = usePlatform();
   const command = useQuery({
     queryKey: ['manufacturing-intelligence-command-center'],
     queryFn: backend.commandCenter,
@@ -37,7 +39,7 @@ export function IntelligencePage() {
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Operational Risks" value={formatNumber(command.data?.top_operational_risks?.length)} helper="Cross-module risks" icon={<BrainCircuit className="h-5 w-5" />} />
         <StatCard label="Customer Impacts" value={formatNumber(customerImpact.length)} helper="Sales/customer risk links" icon={<Users className="h-5 w-5" />} />
-        <StatCard label="Cost Impact" value={formatCurrency(costImpact?.total_estimated_impact)} helper="Estimated financial exposure" icon={<CircleDollarSign className="h-5 w-5" />} />
+        <StatCard label="Cost Impact" value={formatCurrency(costImpact?.total_estimated_impact, currency)} helper="Estimated financial exposure" icon={<CircleDollarSign className="h-5 w-5" />} />
         <StatCard label="Recommendations" value={formatNumber(command.data?.recommendations?.length)} helper="Draft-only actions" icon={<Route className="h-5 w-5" />} />
       </div>
 

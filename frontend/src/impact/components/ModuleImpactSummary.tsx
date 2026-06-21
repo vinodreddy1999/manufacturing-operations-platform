@@ -8,9 +8,11 @@ import { ImpactTracker } from './ImpactTracker';
 import { ImprovementTable } from './ImprovementTable';
 import { SavingsCard } from './SavingsCard';
 import { TrendChart } from './TrendChart';
+import { usePlatform } from '../../platform/PlatformContext';
 
 export function ModuleImpactSummary({ moduleKey, compact = false }: { moduleKey: string; compact?: boolean }) {
   const navigate = useNavigate();
+  const { currency } = usePlatform();
   const module = getModuleImpact(moduleKey);
   if (!module) return null;
   const improved = module.metrics.filter((metric) => metric.status === 'Improved');
@@ -23,7 +25,7 @@ export function ModuleImpactSummary({ moduleKey, compact = false }: { moduleKey:
   return (
     <ImpactTracker title={`${module.name} impact`} description={`Before-versus-after performance, financial savings, operational outcomes, and accountable ownership for ${module.department}.`}>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <SavingsCard label="Financial impact" value={formatMetricValue(moneySaved, 'INR')} helper="Completed and validated improvements" icon={<Banknote className="h-5 w-5" />} onClick={() => openMetric(leadMetric.id)} />
+        <SavingsCard label="Financial impact" value={formatMetricValue(moneySaved, 'INR', currency)} helper="Completed and validated improvements" icon={<Banknote className="h-5 w-5" />} onClick={() => openMetric(leadMetric.id)} />
         <SavingsCard label="Average improvement" value={`${averageChange}%`} helper={`${improved.length} metrics improved`} icon={<Gauge className="h-5 w-5" />} onClick={() => openMetric(leadMetric.id)} />
         <SavingsCard label="Opportunities" value={String(declined.length)} helper="Metrics requiring owner action" icon={<Target className="h-5 w-5" />} onClick={() => declined[0] && openMetric(declined[0].id)} />
         <SavingsCard label="Reporting window" value="Q1 to Q2" helper="Last refreshed 20 Jun 2026" icon={<Clock3 className="h-5 w-5" />} onClick={() => openMetric(leadMetric.id)} />

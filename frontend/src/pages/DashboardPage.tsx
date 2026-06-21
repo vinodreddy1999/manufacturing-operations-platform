@@ -13,6 +13,7 @@ import { StatusBadge } from '../components/StatusBadge';
 import { formatCurrency, formatNumber, toTitle } from '../lib/format';
 import { backend } from '../services/api';
 import type { ModuleRecord, RuntimeUser } from '../types';
+import { usePlatform } from '../platform/PlatformContext';
 
 function statusScore(records: ModuleRecord[] | undefined, moduleKey: string, fallback: number) {
   const moduleRecords = records?.filter((record) => record.module_key === moduleKey) ?? [];
@@ -52,6 +53,7 @@ function moduleRoute(moduleKey: string) {
 
 export function DashboardPage({ user }: { user: RuntimeUser }) {
   const navigate = useNavigate();
+  const { currency, selectedClient } = usePlatform();
   const admin = useQuery({ queryKey: ['admin-dashboard'], queryFn: backend.adminDashboard });
   const inventory = useQuery({ queryKey: ['inventory-dashboard'], queryFn: backend.inventoryDashboard });
   const analytics = useQuery({ queryKey: ['runtime-analytics'], queryFn: backend.analytics });
@@ -98,7 +100,7 @@ export function DashboardPage({ user }: { user: RuntimeUser }) {
     },
     {
       label: 'Inventory Value',
-      value: formatCurrency(inventory.data?.total_inventory_value),
+      value: formatCurrency(inventory.data?.total_inventory_value, currency),
       helper: `${formatNumber(analytics.data?.inventory_total_quantity)} units tracked`,
       accent: 'amber' as const,
       route: '/inventory',
@@ -161,7 +163,7 @@ export function DashboardPage({ user }: { user: RuntimeUser }) {
       <PageHeader
         eyebrow="Executive Dashboard"
         title="Operations overview"
-        description="Phase 1 operational dashboard focused on management visibility, approvals, notifications, integrations, and module status."
+        description={`Operational visibility, approvals, notifications, integrations, and module status for ${selectedClient?.clientName ?? 'the selected client'}.`}
       />
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
