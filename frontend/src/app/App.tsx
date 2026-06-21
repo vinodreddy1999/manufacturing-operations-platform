@@ -1,6 +1,6 @@
 import { FormEvent, Suspense, lazy, useMemo, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { NavLink, Route, Routes, useNavigate } from 'react-router-dom';
+import { Navigate, NavLink, Route, Routes, useNavigate } from 'react-router-dom';
 import {
   Activity,
   BadgeCheck,
@@ -27,7 +27,7 @@ import { apiConfig, backend } from '../services/api';
 import type { RuntimeUser } from '../types';
 import { PlatformProvider, usePlatform } from '../platform/PlatformContext';
 
-const AdminPage = lazy(() => import('../pages/AdminPage').then((module) => ({ default: module.AdminPage })));
+const AdminCenterPage = lazy(() => import('../pages/AdminCenterPage').then((module) => ({ default: module.AdminCenterPage })));
 const DataHubPage = lazy(() => import('../pages/DataHubPage').then((module) => ({ default: module.DataHubPage })));
 const DashboardPage = lazy(() => import('../pages/DashboardPage').then((module) => ({ default: module.DashboardPage })));
 const IntelligencePage = lazy(() => import('../pages/IntelligencePage').then((module) => ({ default: module.IntelligencePage })));
@@ -102,14 +102,13 @@ export function App() {
 function AuthenticatedApp({ user, onLogout }: { user: RuntimeUser; onLogout: () => void }) {
   const navigate = useNavigate();
   const { state, selectedClientId, selectedClient, isPlatformContext, canSelectPlatform, selectClient, platformUser } = usePlatform();
-  const isAdministrativeUser = ['super_admin', 'account_owner', 'organization_admin', 'admin'].includes(user.role);
   const allowedNavItems = isPlatformContext
     ? platformNavItems
     : navItems.filter((item) => {
         const moduleName = 'moduleName' in item ? item.moduleName : undefined;
         return canAccessSection(user, item.section)
           && (!moduleName || selectedClient?.enabledModules.includes(moduleName))
-          && (isAdministrativeUser || !moduleName || platformUser.assignedModules.includes(moduleName));
+          && (!moduleName || platformUser.assignedModules.includes(moduleName));
       });
 
   return (
@@ -220,7 +219,17 @@ function AuthenticatedApp({ user, onLogout }: { user: RuntimeUser; onLogout: () 
               <Route path="/admin/users" element={<ProtectedRoute user={user} section="admin"><UserManagementPage /></ProtectedRoute>} />
               <Route path="/admin/users/create" element={<ProtectedRoute user={user} section="admin"><CreateUserPage /></ProtectedRoute>} />
               <Route path="/dashboard/:focus" element={<DashboardPage user={user} />} />
-              <Route path="/admin" element={<ProtectedRoute user={user} section="admin"><AdminPage user={user} /></ProtectedRoute>} />
+              <Route path="/admin" element={<ProtectedRoute user={user} section="admin"><Navigate to="/admin/company" replace /></ProtectedRoute>} />
+              <Route path="/admin/company" element={<ProtectedRoute user={user} section="admin"><AdminCenterPage section="company" user={user} /></ProtectedRoute>} />
+              <Route path="/admin/roles" element={<ProtectedRoute user={user} section="admin"><AdminCenterPage section="roles" user={user} /></ProtectedRoute>} />
+              <Route path="/admin/access" element={<ProtectedRoute user={user} section="admin"><AdminCenterPage section="access" user={user} /></ProtectedRoute>} />
+              <Route path="/admin/modules" element={<ProtectedRoute user={user} section="admin"><AdminCenterPage section="modules" user={user} /></ProtectedRoute>} />
+              <Route path="/admin/dashboards" element={<ProtectedRoute user={user} section="admin"><AdminCenterPage section="dashboards" user={user} /></ProtectedRoute>} />
+              <Route path="/admin/data-scope" element={<ProtectedRoute user={user} section="admin"><AdminCenterPage section="data-scope" user={user} /></ProtectedRoute>} />
+              <Route path="/admin/audit" element={<ProtectedRoute user={user} section="admin"><AdminCenterPage section="audit" user={user} /></ProtectedRoute>} />
+              <Route path="/admin/business-impact" element={<ProtectedRoute user={user} section="admin"><AdminCenterPage section="business-impact" user={user} /></ProtectedRoute>} />
+              <Route path="/admin/recommendations" element={<ProtectedRoute user={user} section="admin"><AdminCenterPage section="recommendations" user={user} /></ProtectedRoute>} />
+              <Route path="/admin/settings" element={<ProtectedRoute user={user} section="admin"><AdminCenterPage section="settings" user={user} /></ProtectedRoute>} />
               <Route path="/data-hub" element={<ProtectedRoute user={user} section="data-hub"><DataHubPage user={user} /></ProtectedRoute>} />
               <Route path="/operations" element={<ProtectedRoute user={user} section="operations"><OperationsPage user={user} /></ProtectedRoute>} />
               <Route path="/intelligence" element={<ProtectedRoute user={user} section="intelligence"><IntelligencePage /></ProtectedRoute>} />

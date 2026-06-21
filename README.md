@@ -91,6 +91,24 @@ Frontend routes:
 
 The demonstration register includes five clients, 23 users, multiple currencies, disabled-module scenarios, subscription states, and audit events. Browser-created demo changes persist in local storage; production tenant authorization and database isolation remain enforced by the existing backend contracts.
 
+## Administration Center
+
+The business-facing administration workspace is organized into permission-aware routes:
+
+- `/admin/company` - company profile and access summary
+- `/admin/users` - searchable, filterable user governance
+- `/admin/roles` - role scopes, permissions, applications, and modules
+- `/admin/access` - user, role, module, and dashboard permission matrices
+- `/admin/modules` - company-enabled modules and navigation preview
+- `/admin/dashboards` - dashboard assignments and visibility
+- `/admin/data-scope` - client, region, plant, warehouse, department, and line scopes
+- `/admin/audit` - business-readable audit and compliance history
+- `/admin/business-impact` - delivered value and operational improvement
+- `/admin/recommendations` - opportunity pipeline and owner accountability
+- `/admin/settings` - general, currency, notification, integration, security, and branding preferences
+
+Company Admin is locked to its assigned client and cannot assign platform authority or re-enable modules disabled by Platform Admin. Operational navigation is the intersection of company-enabled and user-assigned modules.
+
 ## Run Locally
 
 ```bash

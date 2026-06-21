@@ -17,8 +17,10 @@ type PlatformContextValue = {
   canSelectPlatform: boolean;
   selectClient: (clientId: string | null) => void;
   createClient: (client: Omit<PlatformClient, 'clientId' | 'createdDate' | 'disabledModules'>) => PlatformClient;
-  updateClient: (clientId: string, client: Omit<PlatformClient, 'clientId' | 'createdDate' | 'disabledModules'>) => PlatformClient;
+  updateClient: (clientId: string, client: Omit<PlatformClient, 'clientId' | 'createdDate' | 'disabledModules'>, action?: string) => PlatformClient;
   createUser: (user: Omit<PlatformUser, 'userId' | 'fullName' | 'clientName' | 'createdDate' | 'lastLogin'>) => PlatformUser;
+  updateUser: (userId: string, payload: Partial<PlatformUser>, action?: string) => void;
+  recordAudit: (input: Omit<PlatformAuditLog, 'logId' | 'timestamp'>) => void;
   updateWidget: (widgetId: string, payload: Partial<WidgetConfig>) => void;
   resetWidgets: () => void;
 };
@@ -78,7 +80,7 @@ export function PlatformProvider({ runtimeUser, children }: { runtimeUser: Runti
       persist(next);
       return client;
     },
-    updateClient: (clientId, input) => {
+    updateClient: (clientId, input, action = 'Updated client access') => {
       const existing = state.clients.find((client) => client.clientId === clientId)!;
       const client: PlatformClient = {
         ...existing,
@@ -86,19 +88,27 @@ export function PlatformProvider({ runtimeUser, children }: { runtimeUser: Runti
         disabledModules: platformModules.filter((module) => module !== 'Admin' && !input.enabledModules.includes(module)),
       };
       let next = { ...state, clients: state.clients.map((item) => item.clientId === clientId ? client : item) };
-      next = addAudit(next, { clientId, clientName: client.clientName, userId: matchedUser.userId, moduleName: 'Admin', action: 'Updated client access' });
+      next = addAudit(next, { clientId, clientName: client.clientName, userId: matchedUser.userId, moduleName: 'Admin', action, description: `${action} for ${client.clientName}`, status: 'Completed' });
       persist(next);
       return client;
     },
     createUser: (input) => {
-      const client = state.clients.find((item) => item.clientId === input.clientId)!;
+      const client = input.clientId ? state.clients.find((item) => item.clientId === input.clientId) : undefined;
       const userId = nextId('USR', state.users.map((user) => user.userId));
-      const user: PlatformUser = { ...input, userId, fullName: `${input.firstName} ${input.lastName}`.trim(), clientName: client.clientName, createdDate: new Date().toISOString().slice(0, 10), lastLogin: 'Never' };
+      const user: PlatformUser = { ...input, userId, fullName: `${input.firstName} ${input.lastName}`.trim(), clientName: client?.clientName ?? 'Platform', createdDate: new Date().toISOString().slice(0, 10), lastLogin: 'Never' };
       let next = { ...state, users: [...state.users, user] };
-      next = addAudit(next, { clientId: client.clientId, clientName: client.clientName, userId, moduleName: 'Admin', action: 'Created user' });
+      next = addAudit(next, { clientId: client?.clientId ?? null, clientName: client?.clientName ?? 'Platform', userId, moduleName: 'Admin', action: 'Created User', description: `Created user ${user.fullName}`, status: 'Completed' });
       persist(next);
       return user;
     },
+    updateUser: (userId, payload, action = 'Updated user') => {
+      const currentUser = state.users.find((user) => user.userId === userId)!;
+      const updatedUser = { ...currentUser, ...payload };
+      let next = { ...state, users: state.users.map((user) => user.userId === userId ? updatedUser : user) };
+      next = addAudit(next, { clientId: updatedUser.clientId, clientName: updatedUser.clientName, userId: matchedUser.userId, moduleName: 'Admin', action, description: `${action}: ${updatedUser.fullName}`, status: 'Completed' });
+      persist(next);
+    },
+    recordAudit: (input) => persist(addAudit(state, input)),
     updateWidget: (widgetId, payload) => persist({ ...state, widgets: state.widgets.map((widget) => widget.widgetId === widgetId ? { ...widget, ...payload } : widget) }),
     resetWidgets: () => persist({ ...state, widgets: initialWidgets }),
   }), [state, runtimeUser, matchedUser, selectedClientId, selectedClient, canSelectPlatform]);

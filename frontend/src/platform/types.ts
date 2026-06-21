@@ -12,6 +12,10 @@ export type PlatformClient = {
   disabledModules: string[];
   status: ClientStatus;
   createdDate: string;
+  industry?: string;
+  plants?: number;
+  warehouses?: number;
+  lastUpdated?: string;
 };
 
 export type PlatformUser = {
@@ -25,6 +29,9 @@ export type PlatformUser = {
   clientName: string;
   region: string;
   market: string;
+  department?: string;
+  plant?: string;
+  warehouse?: string;
   roles: string[];
   assignedApplications: string[];
   assignedModules: string[];
@@ -41,6 +48,8 @@ export type PlatformAuditLog = {
   moduleName: string;
   action: string;
   timestamp: string;
+  description?: string;
+  status?: 'Completed' | 'Pending' | 'Failed';
 };
 
 export type WidgetConfig = {
