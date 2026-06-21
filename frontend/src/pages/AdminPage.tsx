@@ -12,6 +12,7 @@ import { StatusBadge } from '../components/StatusBadge';
 import { AccessDeniedState } from '../components/AccessDeniedState';
 import { canCreateCompanies, canManagePlatform } from '../lib/rbac';
 import { backend } from '../services/api';
+import { ModuleImpactSummary } from '../impact/components/ModuleImpactSummary';
 import type { RuntimeUser } from '../types';
 
 const roleOptions: Array<{ value: RuntimeUser['role']; label: string }> = [
@@ -300,6 +301,7 @@ export function AdminPage({ user }: { user: RuntimeUser }) {
           />
         </Panel>
       </div>
+      <ModuleImpactSummary moduleKey="admin" />
     </div>
   );
 }

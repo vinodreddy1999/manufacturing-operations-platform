@@ -62,6 +62,18 @@ export const moduleDefinitions = [
     ],
   },
   {
+    key: 'warehouse',
+    title: 'Warehouse',
+    icon: Forklift,
+    description: 'Warehouse locations, receiving, put-away, picking, dispatch, cycle counts, and material movement.',
+    features: ['Space Utilization', 'Receiving', 'Put-away', 'Picking', 'Dispatch', 'Cycle Counting', 'Bin Management', 'Material Handling'],
+    sampleRows: [
+      { code: 'WH-HYD-01', name: 'Hyderabad central warehouse', status: 'Active', owner: 'Warehouse Manager', quantity: 82 },
+      { code: 'PICK-1208', name: 'Production material pick', status: 'In Progress', owner: 'Warehouse Operator', quantity: 48 },
+      { code: 'COUNT-A14', name: 'Zone A cycle count', status: 'Scheduled', owner: 'Inventory Controller', quantity: 160 },
+    ],
+  },
+  {
     key: 'production',
     title: 'Production',
     icon: PackageCheck,

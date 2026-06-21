@@ -1,6 +1,6 @@
 import { FormEvent, useMemo, useRef, useState } from 'react';
 import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query';
-import { Cable, CloudUpload, Database, Gauge, RadioTower, Route, ShieldCheck, Trash2, UploadCloud } from 'lucide-react';
+import { Cable, Database, Gauge, RadioTower, Route, ShieldCheck, Trash2, UploadCloud } from 'lucide-react';
 
 import { DataTable } from '../components/DataTable';
 import { ErrorState } from '../components/ErrorState';
@@ -11,6 +11,7 @@ import { StatCard } from '../components/StatCard';
 import { StatusBadge } from '../components/StatusBadge';
 import { canManagePlatform, canUseDataHubUploads } from '../lib/rbac';
 import { backend } from '../services/api';
+import { ModuleImpactSummary } from '../impact/components/ModuleImpactSummary';
 import type { Company, ConnectedSystem, DataCatalogEntry, DataMappingRule, RuntimeUser } from '../types';
 
 const acceptedFormats = '.csv,.tsv,.xls,.xlsx,.xlsm,.json,.xml,.txt,.ods';
@@ -718,6 +719,8 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
           </div>
         </div>
       </div>
+      <ModuleImpactSummary moduleKey="integration-hub" />
+      <ModuleImpactSummary moduleKey="data-hub" />
     </>
   );
 }

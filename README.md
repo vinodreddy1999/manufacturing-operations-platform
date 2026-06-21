@@ -92,7 +92,16 @@ A production-oriented React/Vite frontend is available in:
 frontend/
 ```
 
-It uses live backend responses only. No frontend mock data is used.
+Operational records use live backend responses. The explicitly simulated Improvement & Savings Impact model is the only frontend dataset pending its future backend API.
+
+### Improvement & Savings Impact
+
+The frontend includes a calculation-ready impact layer for Inventory, Production, Maintenance, Quality, Procurement, Sales, Costing, Planning, Warehouse, Compliance, Customer Portal, Supplier Portal, Integration Hub, Manufacturing Data Hub, Admin, and Document Management.
+
+- `Reports & Analytics` opens the cross-module Business Impact Dashboard.
+- Every supported module includes before/after metrics, savings, trends, outputs, and an improvement register.
+- `/impact/:module/:metric` provides metric history, source data, accountable ownership, related records, review notes, and CSV/JSON exports.
+- Impact values are deterministic simulated data and are visibly labelled as such. Existing backend data and AI services are unchanged; impact API integration is a future step.
 
 Stack:
 

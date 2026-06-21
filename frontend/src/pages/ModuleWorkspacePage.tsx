@@ -13,6 +13,7 @@ import { StatusBadge } from '../components/StatusBadge';
 import { getModuleDefinition } from '../data/phase1';
 import { canWriteOperationalData } from '../lib/rbac';
 import { backend } from '../services/api';
+import { ModuleImpactSummary } from '../impact/components/ModuleImpactSummary';
 import type { ModuleRecord, RuntimeUser } from '../types';
 
 function statusIsOpen(status: string) {
@@ -220,6 +221,7 @@ export function ModuleWorkspacePage({ moduleKey, user }: { moduleKey: string; us
           </div>
         </Panel>
       </div>
+      <ModuleImpactSummary moduleKey={moduleKey} />
     </>
   );
 }
