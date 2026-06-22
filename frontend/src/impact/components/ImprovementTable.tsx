@@ -2,12 +2,13 @@ import { ArrowUpRight } from 'lucide-react';
 import { formatMetricValue } from '../calculations';
 import type { ImpactMetric } from '../types';
 import { usePlatform } from '../../platform/PlatformContext';
+import { ScrollableTableFrame } from '../../components/ScrollableTableFrame';
 
 export function ImprovementTable({ metrics, onOpen }: { metrics: ImpactMetric[]; onOpen: (metric: ImpactMetric) => void }) {
   const { currency } = usePlatform();
   return (
     <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-950/25">
-      <div className="overflow-x-auto">
+      <ScrollableTableFrame count={metrics.length}>
         <table className="min-w-[1100px] divide-y divide-white/10 text-sm">
           <thead className="bg-slate-950/45"><tr>{['Metric', 'Previous', 'Current', 'Change', 'Financial impact', 'Operational impact', 'Owner', 'Status', ''].map((label) => <th key={label} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.1em] text-slate-400">{label}</th>)}</tr></thead>
           <tbody className="divide-y divide-white/10">
@@ -26,7 +27,7 @@ export function ImprovementTable({ metrics, onOpen }: { metrics: ImpactMetric[];
             ))}
           </tbody>
         </table>
-      </div>
+      </ScrollableTableFrame>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { Children, useState, type ReactNode } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { BarChart3, Building2, Check, FileCheck2, KeyRound, LayoutDashboard, Lightbulb, LockKeyhole, Search, Settings, ShieldCheck, SlidersHorizontal, UsersRound } from 'lucide-react';
 
@@ -14,6 +14,7 @@ import { PageHeader } from '../components/PageHeader';
 import { Panel } from '../components/Panel';
 import { StatCard } from '../components/StatCard';
 import { StatusBadge } from '../components/StatusBadge';
+import { ScrollableTableFrame } from '../components/ScrollableTableFrame';
 
 export type AdminSection = 'company' | 'roles' | 'access' | 'modules' | 'dashboards' | 'data-scope' | 'audit' | 'business-impact' | 'recommendations' | 'settings';
 
@@ -162,7 +163,7 @@ function SelectClientNotice() { return <Panel title="Select a client" descriptio
 function TagList({ title, items }: { title: string; items: string[] }) { return <div className="rounded-xl border border-white/10 bg-slate-950/30 p-4"><p className="text-sm font-semibold text-white">{title}</p><div className="mt-3 flex flex-wrap gap-2">{items.map((item) => <span key={item} className="rounded-lg border border-white/10 bg-white/[0.05] px-2.5 py-1.5 text-xs text-slate-300">{item}</span>)}</div></div>; }
 function ChoiceRow({ title, items, selected, onChange }: { title: string; items: string[]; selected: string[]; onChange: (items: string[]) => void }) { return <fieldset><legend className="mb-2 text-sm font-semibold text-white">{title}</legend><div className="flex flex-wrap gap-2">{items.map((item) => <label key={item} className={`cursor-pointer rounded-xl border px-3 py-2 text-sm ${selected.includes(item) ? 'border-cyan-300/30 bg-cyan-400/10 text-white' : 'border-white/10 text-slate-400'}`}><input className="sr-only" type="checkbox" checked={selected.includes(item)} onChange={() => onChange(selected.includes(item) ? selected.filter((value) => value !== item) : [...selected, item])} />{item}</label>)}</div></fieldset>; }
 function Field({ label, className = '', children }: { label: string; className?: string; children: ReactNode }) { return <label className={`text-sm text-slate-300 ${className}`}>{label}{children}</label>; }
-function AdminTable({ headers, children }: { headers: string[]; children: ReactNode }) { return <div className="overflow-x-auto"><table className="min-w-full text-sm"><thead><tr className="border-b border-white/10 text-left text-xs uppercase tracking-[0.08em] text-slate-500">{headers.map((header) => <th key={header} className="whitespace-nowrap px-3 py-3">{header}</th>)}</tr></thead><tbody>{children}</tbody></table></div>; }
+function AdminTable({ headers, children }: { headers: string[]; children: ReactNode }) { return <ScrollableTableFrame count={Children.count(children)}><table className="min-w-full text-sm"><thead><tr className="border-b border-white/10 text-left text-xs uppercase tracking-[0.08em] text-slate-500">{headers.map((header) => <th key={header} className="whitespace-nowrap px-3 py-3">{header}</th>)}</tr></thead><tbody>{children}</tbody></table></ScrollableTableFrame>; }
 function Cell({ children, strong = false, accent = false }: { children: ReactNode; strong?: boolean; accent?: boolean }) { return <td className={`whitespace-nowrap px-3 py-3 ${strong ? 'font-medium text-white' : accent ? 'text-cyan-200' : 'text-slate-300'}`}>{children}</td>; }
 function industryFor(client: PlatformClient) { if (/food/i.test(client.clientName)) return 'Food & Beverage'; if (/pack|plastic/i.test(client.clientName)) return 'Packaging & Materials'; if (/component|tech/i.test(client.clientName)) return 'Industrial Components'; return 'Discrete Manufacturing'; }
 function ownerFor(module: string) { if (/cost|sales/i.test(module)) return 'Finance & Commercial'; if (/data|integration|AI/i.test(module)) return 'Data & Intelligence'; if (/quality|compliance/i.test(module)) return 'Quality & Governance'; return `${module} Manager`; }
