@@ -1,4 +1,5 @@
-import { Activity, Building2, CircleDollarSign, ServerCog, UsersRound } from 'lucide-react';
+import { Activity, Building2, ChevronDown, CircleDollarSign, ServerCog, UsersRound } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -11,12 +12,29 @@ import { usePlatform } from '../platform/PlatformContext';
 
 const slug = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
+function ColumnFilter({ label, active, children, width = 'w-64' }: { label: string; active?: boolean; children: ReactNode; width?: string }) {
+  return (
+    <details className="group relative">
+      <summary className="flex cursor-pointer list-none items-center gap-2 rounded-md py-1 hover:text-cyan-200">
+        <span>{label}</span>
+        {active && <span className="h-1.5 w-1.5 rounded-full bg-cyan-300" />}
+        <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" />
+      </summary>
+      <div className={`absolute left-0 top-full z-30 mt-2 ${width} rounded-lg border border-white/10 bg-[#111b30] p-3 normal-case tracking-normal shadow-2xl`}>
+        {children}
+      </div>
+    </details>
+  );
+}
+
 export function PlatformDashboardPage() {
   const navigate = useNavigate();
   const { state } = usePlatform();
   const [moduleHealthClientId, setModuleHealthClientId] = useState('all');
   const [moduleSearch, setModuleSearch] = useState('');
   const [moduleAvailability, setModuleAvailability] = useState<'all' | 'enabled' | 'disabled'>('all');
+  const [moduleHealthStatus, setModuleHealthStatus] = useState<'all' | 'healthy' | 'attention' | 'disabled'>('all');
+  const [moduleUpdatedSearch, setModuleUpdatedSearch] = useState('');
   const [scrolledModulePosition, setScrolledModulePosition] = useState(1);
   const [hoveredModulePosition, setHoveredModulePosition] = useState<number | null>(null);
   const activeClients = state.clients.filter((client) => client.status === 'Active').length;
@@ -41,7 +59,12 @@ export function PlatformDashboardPage() {
     const matchesAvailability = moduleAvailability === 'all'
       || (moduleAvailability === 'enabled' && row.disabledClients === 0)
       || (moduleAvailability === 'disabled' && row.disabledClients > 0);
-    return matchesSearch && matchesAvailability;
+    const matchesHealth = moduleHealthStatus === 'all'
+      || (moduleHealthStatus === 'healthy' && row.status === 'Healthy')
+      || (moduleHealthStatus === 'attention' && row.status === 'Attention Needed')
+      || (moduleHealthStatus === 'disabled' && row.status === 'Disabled by Platform Admin');
+    const matchesUpdated = row.lastUpdated.toLowerCase().includes(moduleUpdatedSearch.trim().toLowerCase());
+    return matchesSearch && matchesAvailability && matchesHealth && matchesUpdated;
   });
   const currentModulePosition = visibleModuleRows.length === 0
     ? 0
@@ -61,16 +84,18 @@ export function PlatformDashboardPage() {
         <StatCard label="Audit Activity" value={state.auditLogs.length} helper="Recent platform and client actions" accent="amber" />
       </div>
       <Panel title="Module Health" description={moduleHealthDescription}>
-        <div className="mb-4 grid gap-3 lg:grid-cols-[minmax(220px,1fr)_220px_280px]">
-          <label className="text-sm text-slate-400"><span className="mb-1 block">Search module</span><input className="form-input w-full py-2" type="search" placeholder="Search by module name..." value={moduleSearch} onChange={(event) => { setModuleSearch(event.target.value); setScrolledModulePosition(1); }} /></label>
-          <label className="text-sm text-slate-400"><span className="mb-1 block">Availability</span><select className="form-input w-full py-2" value={moduleAvailability} onChange={(event) => { setModuleAvailability(event.target.value as 'all' | 'enabled' | 'disabled'); setScrolledModulePosition(1); }}><option value="all">All statuses</option><option value="enabled">Enabled</option><option value="disabled">Disabled</option></select></label>
-          <label className="text-sm text-slate-400"><span className="mb-1 block">Client</span><select className="form-input w-full py-2" value={moduleHealthClientId} onChange={(event) => { setModuleHealthClientId(event.target.value); setScrolledModulePosition(1); }}><option value="all">All Clients</option>{state.clients.map((client) => <option key={client.clientId} value={client.clientId}>{client.clientName}</option>)}</select></label>
-        </div>
         <div className="overflow-x-auto">
-          <div className="max-h-[321px] min-w-[760px] overflow-y-auto [scrollbar-color:rgba(34,211,238,0.45)_rgba(255,255,255,0.04)]" onScroll={(event) => setScrolledModulePosition(Math.min(Math.floor(event.currentTarget.scrollTop / 54) + 1, Math.max(visibleModuleRows.length, 1)))}>
+          <div className="max-h-[321px] min-w-[980px] overflow-y-auto [scrollbar-color:rgba(34,211,238,0.45)_rgba(255,255,255,0.04)]" onScroll={(event) => setScrolledModulePosition(Math.min(Math.floor(event.currentTarget.scrollTop / 54) + 1, Math.max(visibleModuleRows.length, 1)))}>
             <table className="w-full table-fixed text-sm">
-              <thead className="sticky top-0 z-10 bg-[#0d1527]"><tr className="h-12 border-b border-white/10 text-left text-xs uppercase tracking-[0.1em] text-slate-500">{['Module Name','Availability','Health Status','Last Updated',''].map((item) => <th key={item} className="px-3 py-3">{item}</th>)}</tr></thead>
-              <tbody>{visibleModuleRows.map((row, index) => <tr key={row.moduleName} className="h-[54px] border-b border-white/10 hover:bg-white/[0.04]" onMouseEnter={() => setHoveredModulePosition(index + 1)} onMouseLeave={() => setHoveredModulePosition(null)}><td className="px-3 py-3 font-medium text-white">{row.moduleName}</td><td className="px-3 py-3">{row.disabledClients === 0 ? <span className="text-emerald-200">Enabled</span> : moduleHealthClient ? <span className="text-rose-200">Disabled</span> : <span className="text-amber-200">{row.enabledClients} enabled / {row.disabledClients} disabled</span>}</td><td className="px-3 py-3"><StatusBadge status={row.status} /></td><td className="px-3 py-3 text-slate-400">{row.lastUpdated}</td><td className="px-3 py-3 text-right"><button className="form-button-subtle py-1 text-xs" onClick={() => navigate(`/platform/modules/${slug(row.moduleName)}${moduleHealthClient ? `?clientId=${moduleHealthClient.clientId}` : ''}`)}>View</button></td></tr>)}</tbody>
+              <thead className="sticky top-0 z-20 bg-[#0d1527]"><tr className="h-12 border-b border-white/10 text-left text-xs uppercase tracking-[0.1em] text-slate-500">
+                <th className="px-3 py-3"><ColumnFilter label="Module Name" active={Boolean(moduleSearch)}><input autoFocus className="form-input w-full py-2 text-sm" type="search" placeholder="Search module name..." value={moduleSearch} onChange={(event) => { setModuleSearch(event.target.value); setScrolledModulePosition(1); }} /></ColumnFilter></th>
+                <th className="px-3 py-3"><ColumnFilter label="Availability" active={moduleAvailability !== 'all'} width="w-52"><select className="form-input w-full py-2 text-sm" value={moduleAvailability} onChange={(event) => { setModuleAvailability(event.target.value as 'all' | 'enabled' | 'disabled'); setScrolledModulePosition(1); }}><option value="all">All availability</option><option value="enabled">Enabled</option><option value="disabled">Disabled</option></select></ColumnFilter></th>
+                <th className="px-3 py-3"><ColumnFilter label="Health Status" active={moduleHealthStatus !== 'all'} width="w-56"><select className="form-input w-full py-2 text-sm" value={moduleHealthStatus} onChange={(event) => { setModuleHealthStatus(event.target.value as 'all' | 'healthy' | 'attention' | 'disabled'); setScrolledModulePosition(1); }}><option value="all">All health statuses</option><option value="healthy">Healthy</option><option value="attention">Attention Needed</option><option value="disabled">Disabled</option></select></ColumnFilter></th>
+                <th className="px-3 py-3"><ColumnFilter label="Client" active={moduleHealthClientId !== 'all'}><select className="form-input w-full py-2 text-sm" value={moduleHealthClientId} onChange={(event) => { setModuleHealthClientId(event.target.value); setScrolledModulePosition(1); }}><option value="all">All Clients</option>{state.clients.map((client) => <option key={client.clientId} value={client.clientId}>{client.clientName}</option>)}</select></ColumnFilter></th>
+                <th className="px-3 py-3"><ColumnFilter label="Last Updated" active={Boolean(moduleUpdatedSearch)}><input className="form-input w-full py-2 text-sm" type="search" placeholder="Search date or time..." value={moduleUpdatedSearch} onChange={(event) => { setModuleUpdatedSearch(event.target.value); setScrolledModulePosition(1); }} /></ColumnFilter></th>
+                <th className="w-24 px-3 py-3" />
+              </tr></thead>
+              <tbody>{visibleModuleRows.map((row, index) => <tr key={row.moduleName} className="h-[54px] border-b border-white/10 hover:bg-white/[0.04]" onMouseEnter={() => setHoveredModulePosition(index + 1)} onMouseLeave={() => setHoveredModulePosition(null)}><td className="px-3 py-3 font-medium text-white">{row.moduleName}</td><td className="px-3 py-3">{row.disabledClients === 0 ? <span className="text-emerald-200">Enabled</span> : moduleHealthClient ? <span className="text-rose-200">Disabled</span> : <span className="text-amber-200">{row.enabledClients} enabled / {row.disabledClients} disabled</span>}</td><td className="px-3 py-3"><StatusBadge status={row.status} /></td><td className="px-3 py-3 text-slate-300">{moduleHealthClient?.clientName ?? 'All Clients'}</td><td className="px-3 py-3 text-slate-400">{row.lastUpdated}</td><td className="px-3 py-3 text-right"><button className="form-button-subtle py-1 text-xs" onClick={() => navigate(`/platform/modules/${slug(row.moduleName)}${moduleHealthClient ? `?clientId=${moduleHealthClient.clientId}` : ''}`)}>View</button></td></tr>)}</tbody>
             </table>
             {visibleModuleRows.length === 0 && <div className="flex h-[270px] items-center justify-center text-sm text-slate-400">No modules match your search and filter.</div>}
           </div>
