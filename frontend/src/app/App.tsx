@@ -163,7 +163,7 @@ function AuthenticatedApp({ user, onLogout }: { user: RuntimeUser; onLogout: () 
                 <Menu className="h-4 w-4" />
               </button>
               <div className="min-w-0">
-                <select className="form-input max-w-[260px] py-1.5 text-sm" value={selectedClientId ?? 'platform'} onChange={(event) => { const value = event.target.value; selectClient(value === 'platform' ? null : value); navigate(value === 'platform' ? '/platform' : '/'); }}>
+                <select className="form-input max-w-[260px] py-1.5 text-sm" value={selectedClientId ?? 'platform'} onChange={(event) => { const value = event.target.value; selectClient(value === 'platform' ? null : value); }}>
                   {canSelectPlatform ? <option value="platform">Platform View</option> : null}
                   {state.clients.filter((client) => canSelectPlatform || client.clientId === platformUser.clientId).map((client) => <option key={client.clientId} value={client.clientId}>{client.clientName}</option>)}
                 </select>
@@ -209,7 +209,7 @@ function AuthenticatedApp({ user, onLogout }: { user: RuntimeUser; onLogout: () 
           <Suspense fallback={<LoadingState label="Loading workspace view" />}>
             <Routes>
               <Route path="/" element={isPlatformContext ? <PlatformDashboardPage /> : <DashboardPage user={user} />} />
-              <Route path="/platform" element={<PlatformOnly user={user}><PlatformDashboardPage /></PlatformOnly>} />
+              <Route path="/platform" element={<PlatformOnly user={user}>{isPlatformContext ? <PlatformDashboardPage /> : <DashboardPage user={user} />}</PlatformOnly>} />
               <Route path="/platform/modules/:moduleName" element={<PlatformOnly user={user}><PlatformModulePage /></PlatformOnly>} />
               <Route path="/platform/widgets" element={<PlatformOnly user={user}><PlatformWidgetsPage /></PlatformOnly>} />
               <Route path="/admin/clients" element={<PlatformOnly user={user}><ClientManagementPage /></PlatformOnly>} />

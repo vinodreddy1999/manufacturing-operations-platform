@@ -5,12 +5,11 @@ import { useNavigate } from 'react-router-dom';
 
 import { PageHeader } from '../components/PageHeader';
 import { Panel } from '../components/Panel';
+import { PlatformEmbeddedWorkspace, type PlatformWorkspace } from '../components/PlatformEmbeddedWorkspace';
 import { StatCard } from '../components/StatCard';
 import { StatusBadge } from '../components/StatusBadge';
 import { platformModules } from '../platform/data';
 import { usePlatform } from '../platform/PlatformContext';
-
-const slug = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
 function ColumnFilter({ label, active, children, width = 'w-64' }: { label: string; active?: boolean; children: ReactNode; width?: string }) {
   return (
@@ -20,7 +19,7 @@ function ColumnFilter({ label, active, children, width = 'w-64' }: { label: stri
         {active && <span className="h-1.5 w-1.5 rounded-full bg-cyan-300" />}
         <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" />
       </summary>
-      <div className={`absolute left-0 top-full z-30 mt-2 ${width} rounded-lg border border-white/10 bg-[#111b30] p-3 normal-case tracking-normal shadow-2xl`}>
+      <div className={`mt-2 ${width} max-w-full rounded-lg border border-white/10 bg-[#111b30] p-3 normal-case tracking-normal shadow-2xl`}>
         {children}
       </div>
     </details>
@@ -37,7 +36,12 @@ export function PlatformDashboardPage() {
   const [moduleUpdatedSearch, setModuleUpdatedSearch] = useState('');
   const [scrolledModulePosition, setScrolledModulePosition] = useState(1);
   const [hoveredModulePosition, setHoveredModulePosition] = useState<number | null>(null);
+  const [activeWorkspace, setActiveWorkspace] = useState<PlatformWorkspace | null>(null);
   const activeClients = state.clients.filter((client) => client.status === 'Active').length;
+  const trialClients = state.clients.filter((client) => client.status === 'Trial').length;
+  const inactiveClients = state.clients.filter((client) => client.status === 'Suspended').length;
+  const activeUsers = state.users.filter((user) => user.status === 'Active').length;
+  const disabledUsers = state.users.filter((user) => user.status === 'Disabled').length;
   const moduleHealthClient = state.clients.find((client) => client.clientId === moduleHealthClientId);
   const moduleHealthClients = moduleHealthClient ? [moduleHealthClient] : state.clients;
   const moduleRows = platformModules.map((moduleName, index) => {
@@ -73,16 +77,24 @@ export function PlatformDashboardPage() {
     <div className="space-y-6">
       <PageHeader eyebrow="Platform Context" title="Super Admin Platform Dashboard" description="Platform-wide client, user, subscription, module, system, and audit health. Operational client widgets are intentionally hidden in this context." />
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Total Clients" value={state.clients.length} helper={`${activeClients} active`} icon={<Building2 className="h-5 w-5" />} onClick={() => navigate('/admin/clients')} />
-        <StatCard label="Suspended / Trial" value={state.clients.filter((client) => client.status !== 'Active').length} helper="Subscription attention" accent="amber" icon={<CircleDollarSign className="h-5 w-5" />} onClick={() => navigate('/admin/clients')} />
-        <StatCard label="Total Users" value={state.users.length} helper={`${state.users.filter((user) => user.status === 'Active').length} active`} accent="emerald" icon={<UsersRound className="h-5 w-5" />} onClick={() => navigate('/admin/users')} />
-        <StatCard label="System Health" value="Healthy" helper="API, database and workers" accent="violet" icon={<ServerCog className="h-5 w-5" />} />
+        <StatCard label="Total Clients" value={state.clients.length} helper="Open embedded client workspace" icon={<Building2 className="h-5 w-5" />} onClick={() => setActiveWorkspace('clients')} />
+        <StatCard label="Active Clients" value={activeClients} helper="Enabled subscriptions" accent="emerald" icon={<Building2 className="h-5 w-5" />} onClick={() => setActiveWorkspace('clients')} />
+        <StatCard label="Inactive Clients" value={inactiveClients} helper="Suspended clients" accent="amber" icon={<Building2 className="h-5 w-5" />} onClick={() => setActiveWorkspace('clients')} />
+        <StatCard label="Trial Clients" value={trialClients} helper="Trial subscriptions" accent="violet" icon={<CircleDollarSign className="h-5 w-5" />} onClick={() => setActiveWorkspace('subscriptions')} />
+        <StatCard label="Total Users" value={state.users.length} helper="Open embedded user workspace" icon={<UsersRound className="h-5 w-5" />} onClick={() => setActiveWorkspace('users')} />
+        <StatCard label="Active Users" value={activeUsers} helper="Currently enabled" accent="emerald" icon={<UsersRound className="h-5 w-5" />} onClick={() => setActiveWorkspace('users')} />
+        <StatCard label="Locked Users" value={0} helper="No locked accounts" accent="amber" icon={<UsersRound className="h-5 w-5" />} onClick={() => setActiveWorkspace('users')} />
+        <StatCard label="Disabled Users" value={disabledUsers} helper="Access disabled" accent="violet" icon={<UsersRound className="h-5 w-5" />} onClick={() => setActiveWorkspace('users')} />
       </div>
-      <div className="grid gap-4 md:grid-cols-3">
-        <StatCard label="Module Health" value={`${moduleRows.filter((row) => row.status === 'Healthy').length}/${moduleRows.length}`} helper={moduleHealthClient ? `${moduleHealthClient.clientName} modules healthy` : 'Platform modules healthy'} icon={<Activity className="h-5 w-5" />} onClick={() => navigate(`/platform/modules/${slug(moduleRows[0].moduleName)}${moduleHealthClient ? `?clientId=${moduleHealthClient.clientId}` : ''}`)} />
-        <StatCard label="Subscription Health" value={`${activeClients}/${state.clients.length}`} helper="Active client subscriptions" accent="emerald" />
-        <StatCard label="Audit Activity" value={state.auditLogs.length} helper="Recent platform and client actions" accent="amber" />
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Module Health" value={`${moduleRows.filter((row) => row.status === 'Healthy').length}/${moduleRows.length}`} helper={moduleHealthClient ? `${moduleHealthClient.clientName} modules healthy` : 'Platform modules healthy'} icon={<Activity className="h-5 w-5" />} onClick={() => setActiveWorkspace('modules')} />
+        <StatCard label="Subscription Health" value={`${activeClients}/${state.clients.length}`} helper="Plans and renewals" accent="emerald" icon={<CircleDollarSign className="h-5 w-5" />} onClick={() => setActiveWorkspace('subscriptions')} />
+        <StatCard label="Integration Health" value={`${state.clients.length - 1}/${state.clients.length}`} helper="Connected data sources" accent="violet" icon={<ServerCog className="h-5 w-5" />} onClick={() => setActiveWorkspace('integrations')} />
+        <StatCard label="Audit Activity" value={state.auditLogs.length} helper="Recent governed actions" accent="amber" icon={<Activity className="h-5 w-5" />} onClick={() => setActiveWorkspace('audit')} />
+        <StatCard label="Business Impact" value="$4.8M" helper="Estimated annual value" accent="emerald" icon={<CircleDollarSign className="h-5 w-5" />} onClick={() => setActiveWorkspace('impact')} />
+        <StatCard label="System Health" value="Healthy" helper="API, database and workers" accent="violet" icon={<ServerCog className="h-5 w-5" />} onClick={() => setActiveWorkspace('integrations')} />
       </div>
+      {activeWorkspace && <PlatformEmbeddedWorkspace active={activeWorkspace} onChange={setActiveWorkspace} onClose={() => setActiveWorkspace(null)} />}
       <Panel title="Module Health" description={moduleHealthDescription}>
         <div className="overflow-x-auto">
           <div className="max-h-[321px] min-w-[980px] overflow-y-auto [scrollbar-color:rgba(34,211,238,0.45)_rgba(255,255,255,0.04)]" onScroll={(event) => setScrolledModulePosition(Math.min(Math.floor(event.currentTarget.scrollTop / 54) + 1, Math.max(visibleModuleRows.length, 1)))}>
@@ -95,7 +107,7 @@ export function PlatformDashboardPage() {
                 <th className="px-3 py-3"><ColumnFilter label="Last Updated" active={Boolean(moduleUpdatedSearch)}><input className="form-input w-full py-2 text-sm" type="search" placeholder="Search date or time..." value={moduleUpdatedSearch} onChange={(event) => { setModuleUpdatedSearch(event.target.value); setScrolledModulePosition(1); }} /></ColumnFilter></th>
                 <th className="w-24 px-3 py-3" />
               </tr></thead>
-              <tbody>{visibleModuleRows.map((row, index) => <tr key={row.moduleName} className="h-[54px] border-b border-white/10 hover:bg-white/[0.04]" onMouseEnter={() => setHoveredModulePosition(index + 1)} onMouseLeave={() => setHoveredModulePosition(null)}><td className="px-3 py-3 font-medium text-white">{row.moduleName}</td><td className="px-3 py-3">{row.disabledClients === 0 ? <span className="text-emerald-200">Enabled</span> : moduleHealthClient ? <span className="text-rose-200">Disabled</span> : <span className="text-amber-200">{row.enabledClients} enabled / {row.disabledClients} disabled</span>}</td><td className="px-3 py-3"><StatusBadge status={row.status} /></td><td className="px-3 py-3 text-slate-300">{moduleHealthClient?.clientName ?? 'All Clients'}</td><td className="px-3 py-3 text-slate-400">{row.lastUpdated}</td><td className="px-3 py-3 text-right"><button className="form-button-subtle py-1 text-xs" onClick={() => navigate(`/platform/modules/${slug(row.moduleName)}${moduleHealthClient ? `?clientId=${moduleHealthClient.clientId}` : ''}`)}>View</button></td></tr>)}</tbody>
+              <tbody>{visibleModuleRows.map((row, index) => <tr key={row.moduleName} className="h-[54px] border-b border-white/10 hover:bg-white/[0.04]" onMouseEnter={() => setHoveredModulePosition(index + 1)} onMouseLeave={() => setHoveredModulePosition(null)}><td className="px-3 py-3 font-medium text-white">{row.moduleName}</td><td className="px-3 py-3">{row.disabledClients === 0 ? <span className="text-emerald-200">Enabled</span> : moduleHealthClient ? <span className="text-rose-200">Disabled</span> : <span className="text-amber-200">{row.enabledClients} enabled / {row.disabledClients} disabled</span>}</td><td className="px-3 py-3"><StatusBadge status={row.status} /></td><td className="px-3 py-3 text-slate-300">{moduleHealthClient?.clientName ?? 'All Clients'}</td><td className="px-3 py-3 text-slate-400">{row.lastUpdated}</td><td className="px-3 py-3 text-right"><button className="form-button-subtle py-1 text-xs" onClick={() => setActiveWorkspace('modules')}>View</button></td></tr>)}</tbody>
             </table>
             {visibleModuleRows.length === 0 && <div className="flex h-[270px] items-center justify-center text-sm text-slate-400">No modules match your search and filter.</div>}
           </div>
