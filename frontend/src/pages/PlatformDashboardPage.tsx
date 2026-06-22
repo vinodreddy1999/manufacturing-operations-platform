@@ -1,4 +1,4 @@
-import { Activity, Building2, ChevronDown, CircleDollarSign, ServerCog, UsersRound } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -6,7 +6,6 @@ import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../components/PageHeader';
 import { Panel } from '../components/Panel';
 import { PlatformEmbeddedWorkspace, type PlatformWorkspace } from '../components/PlatformEmbeddedWorkspace';
-import { StatCard } from '../components/StatCard';
 import { StatusBadge } from '../components/StatusBadge';
 import { platformModules } from '../platform/data';
 import { usePlatform } from '../platform/PlatformContext';
@@ -36,12 +35,7 @@ export function PlatformDashboardPage() {
   const [moduleUpdatedSearch, setModuleUpdatedSearch] = useState('');
   const [scrolledModulePosition, setScrolledModulePosition] = useState(1);
   const [hoveredModulePosition, setHoveredModulePosition] = useState<number | null>(null);
-  const [activeWorkspace, setActiveWorkspace] = useState<PlatformWorkspace | null>(null);
-  const activeClients = state.clients.filter((client) => client.status === 'Active').length;
-  const trialClients = state.clients.filter((client) => client.status === 'Trial').length;
-  const inactiveClients = state.clients.filter((client) => client.status === 'Suspended').length;
-  const activeUsers = state.users.filter((user) => user.status === 'Active').length;
-  const disabledUsers = state.users.filter((user) => user.status === 'Disabled').length;
+  const [activeWorkspace, setActiveWorkspace] = useState<PlatformWorkspace>('clients');
   const moduleHealthClient = state.clients.find((client) => client.clientId === moduleHealthClientId);
   const moduleHealthClients = moduleHealthClient ? [moduleHealthClient] : state.clients;
   const moduleRows = platformModules.map((moduleName, index) => {
@@ -75,26 +69,8 @@ export function PlatformDashboardPage() {
     : Math.min(hoveredModulePosition ?? scrolledModulePosition, visibleModuleRows.length);
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Platform Context" title="Super Admin Platform Dashboard" description="Platform-wide client, user, subscription, module, system, and audit health. Operational client widgets are intentionally hidden in this context." />
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Total Clients" value={state.clients.length} helper="Open embedded client workspace" icon={<Building2 className="h-5 w-5" />} onClick={() => setActiveWorkspace('clients')} />
-        <StatCard label="Active Clients" value={activeClients} helper="Enabled subscriptions" accent="emerald" icon={<Building2 className="h-5 w-5" />} onClick={() => setActiveWorkspace('clients')} />
-        <StatCard label="Inactive Clients" value={inactiveClients} helper="Suspended clients" accent="amber" icon={<Building2 className="h-5 w-5" />} onClick={() => setActiveWorkspace('clients')} />
-        <StatCard label="Trial Clients" value={trialClients} helper="Trial subscriptions" accent="violet" icon={<CircleDollarSign className="h-5 w-5" />} onClick={() => setActiveWorkspace('subscriptions')} />
-        <StatCard label="Total Users" value={state.users.length} helper="Open embedded user workspace" icon={<UsersRound className="h-5 w-5" />} onClick={() => setActiveWorkspace('users')} />
-        <StatCard label="Active Users" value={activeUsers} helper="Currently enabled" accent="emerald" icon={<UsersRound className="h-5 w-5" />} onClick={() => setActiveWorkspace('users')} />
-        <StatCard label="Locked Users" value={0} helper="No locked accounts" accent="amber" icon={<UsersRound className="h-5 w-5" />} onClick={() => setActiveWorkspace('users')} />
-        <StatCard label="Disabled Users" value={disabledUsers} helper="Access disabled" accent="violet" icon={<UsersRound className="h-5 w-5" />} onClick={() => setActiveWorkspace('users')} />
-      </div>
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Module Health" value={`${moduleRows.filter((row) => row.status === 'Healthy').length}/${moduleRows.length}`} helper={moduleHealthClient ? `${moduleHealthClient.clientName} modules healthy` : 'Platform modules healthy'} icon={<Activity className="h-5 w-5" />} onClick={() => setActiveWorkspace('modules')} />
-        <StatCard label="Subscription Health" value={`${activeClients}/${state.clients.length}`} helper="Plans and renewals" accent="emerald" icon={<CircleDollarSign className="h-5 w-5" />} onClick={() => setActiveWorkspace('subscriptions')} />
-        <StatCard label="Integration Health" value={`${state.clients.length - 1}/${state.clients.length}`} helper="Connected data sources" accent="violet" icon={<ServerCog className="h-5 w-5" />} onClick={() => setActiveWorkspace('integrations')} />
-        <StatCard label="Audit Activity" value={state.auditLogs.length} helper="Recent governed actions" accent="amber" icon={<Activity className="h-5 w-5" />} onClick={() => setActiveWorkspace('audit')} />
-        <StatCard label="Business Impact" value="$4.8M" helper="Estimated annual value" accent="emerald" icon={<CircleDollarSign className="h-5 w-5" />} onClick={() => setActiveWorkspace('impact')} />
-        <StatCard label="System Health" value="Healthy" helper="API, database and workers" accent="violet" icon={<ServerCog className="h-5 w-5" />} onClick={() => setActiveWorkspace('integrations')} />
-      </div>
-      {activeWorkspace && <PlatformEmbeddedWorkspace active={activeWorkspace} onChange={setActiveWorkspace} onClose={() => setActiveWorkspace(null)} />}
+      <PageHeader eyebrow="Platform Context" title="Platform Management Services" description="A single embedded workspace for clients, users, modules, subscriptions, integrations, audit, and business impact." />
+      <PlatformEmbeddedWorkspace active={activeWorkspace} onChange={setActiveWorkspace} />
       <Panel title="Module Health" description={moduleHealthDescription}>
         <div className="overflow-x-auto">
           <div className="max-h-[321px] min-w-[980px] overflow-y-auto [scrollbar-color:rgba(34,211,238,0.45)_rgba(255,255,255,0.04)]" onScroll={(event) => setScrolledModulePosition(Math.min(Math.floor(event.currentTarget.scrollTop / 54) + 1, Math.max(visibleModuleRows.length, 1)))}>
