@@ -1,6 +1,6 @@
 import { FormEvent, Suspense, lazy, useMemo, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Navigate, NavLink, Route, Routes, useNavigate } from 'react-router-dom';
+import { Navigate, NavLink, Route, Routes } from 'react-router-dom';
 import {
   Activity,
   BadgeCheck,
@@ -15,9 +15,6 @@ import {
   ShoppingCart,
   Truck,
   Wrench,
-  Building2,
-  UsersRound,
-  SlidersHorizontal,
 } from 'lucide-react';
 
 import { AccessDeniedState } from '../components/AccessDeniedState';
@@ -66,9 +63,6 @@ const navItems = [
 
 const platformNavItems = [
   { to: '/platform', label: 'Platform', icon: LayoutDashboard },
-  { to: '/admin/clients', label: 'Clients', icon: Building2 },
-  { to: '/admin/users', label: 'Users', icon: UsersRound },
-  { to: '/platform/widgets', label: 'Widgets', icon: SlidersHorizontal },
   { to: '/admin', label: 'Admin', icon: ShieldCheck },
 ];
 
@@ -100,7 +94,6 @@ export function App() {
 }
 
 function AuthenticatedApp({ user, onLogout }: { user: RuntimeUser; onLogout: () => void }) {
-  const navigate = useNavigate();
   const { state, selectedClientId, selectedClient, isPlatformContext, canSelectPlatform, selectClient, platformUser } = usePlatform();
   const allowedNavItems = isPlatformContext
     ? platformNavItems
