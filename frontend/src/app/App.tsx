@@ -34,12 +34,6 @@ const BusinessImpactDashboard = lazy(() => import('../pages/BusinessImpactDashbo
 const ImpactDrilldownPage = lazy(() => import('../pages/ImpactDrilldownPage').then((module) => ({ default: module.ImpactDrilldownPage })));
 const PlatformDashboardPage = lazy(() => import('../pages/PlatformDashboardPage').then((module) => ({ default: module.PlatformDashboardPage })));
 const PlatformModulePage = lazy(() => import('../pages/PlatformModulePage').then((module) => ({ default: module.PlatformModulePage })));
-const PlatformWidgetsPage = lazy(() => import('../pages/PlatformWidgetsPage').then((module) => ({ default: module.PlatformWidgetsPage })));
-const ClientManagementPage = lazy(() => import('../pages/ClientManagementPage').then((module) => ({ default: module.ClientManagementPage })));
-const CreateClientPage = lazy(() => import('../pages/CreateClientPage').then((module) => ({ default: module.CreateClientPage })));
-const ClientHealthPage = lazy(() => import('../pages/ClientHealthPage').then((module) => ({ default: module.ClientHealthPage })));
-const UserManagementPage = lazy(() => import('../pages/UserManagementPage').then((module) => ({ default: module.UserManagementPage })));
-const CreateUserPage = lazy(() => import('../pages/CreateUserPage').then((module) => ({ default: module.CreateUserPage })));
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, section: 'dashboard' as const },
@@ -204,13 +198,13 @@ function AuthenticatedApp({ user, onLogout }: { user: RuntimeUser; onLogout: () 
               <Route path="/" element={isPlatformContext ? <PlatformDashboardPage /> : <DashboardPage user={user} />} />
               <Route path="/platform" element={<PlatformOnly user={user}>{isPlatformContext ? <PlatformDashboardPage /> : <DashboardPage user={user} />}</PlatformOnly>} />
               <Route path="/platform/modules/:moduleName" element={<PlatformOnly user={user}><PlatformModulePage /></PlatformOnly>} />
-              <Route path="/platform/widgets" element={<PlatformOnly user={user}><PlatformWidgetsPage /></PlatformOnly>} />
-              <Route path="/admin/clients" element={<PlatformOnly user={user}><ClientManagementPage /></PlatformOnly>} />
-              <Route path="/admin/clients/create" element={<PlatformOnly user={user}><CreateClientPage /></PlatformOnly>} />
-              <Route path="/admin/clients/:clientId/edit" element={<PlatformOnly user={user}><CreateClientPage /></PlatformOnly>} />
-              <Route path="/admin/clients/:clientId/health" element={<PlatformOnly user={user}><ClientHealthPage /></PlatformOnly>} />
-              <Route path="/admin/users" element={<ProtectedRoute user={user} section="admin"><UserManagementPage /></ProtectedRoute>} />
-              <Route path="/admin/users/create" element={<ProtectedRoute user={user} section="admin"><CreateUserPage /></ProtectedRoute>} />
+              <Route path="/platform/widgets" element={<Navigate to="/platform?workspace=modules" replace />} />
+              <Route path="/admin/clients" element={<Navigate to="/platform?workspace=clients" replace />} />
+              <Route path="/admin/clients/create" element={<Navigate to="/platform?workspace=clients" replace />} />
+              <Route path="/admin/clients/:clientId/edit" element={<Navigate to="/platform?workspace=clients" replace />} />
+              <Route path="/admin/clients/:clientId/health" element={<Navigate to="/platform?workspace=clients" replace />} />
+              <Route path="/admin/users" element={<Navigate to="/platform?workspace=users" replace />} />
+              <Route path="/admin/users/create" element={<Navigate to="/platform?workspace=users" replace />} />
               <Route path="/dashboard/:focus" element={<DashboardPage user={user} />} />
               <Route path="/admin" element={<ProtectedRoute user={user} section="admin"><Navigate to="/admin/company" replace /></ProtectedRoute>} />
               <Route path="/admin/company" element={<ProtectedRoute user={user} section="admin"><AdminCenterPage section="company" user={user} /></ProtectedRoute>} />

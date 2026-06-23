@@ -1,7 +1,7 @@
 import { ChevronDown } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
 import { PageHeader } from '../components/PageHeader';
 import { Panel } from '../components/Panel';
@@ -26,8 +26,14 @@ function ColumnFilter({ label, active, children, width = 'w-64' }: { label: stri
   );
 }
 
+const platformWorkspaces: PlatformWorkspace[] = ['clients', 'users', 'modules', 'subscriptions', 'integrations', 'audit', 'impact'];
+
+function isPlatformWorkspace(value: string | null): value is PlatformWorkspace {
+  return Boolean(value && platformWorkspaces.includes(value as PlatformWorkspace));
+}
+
 export function PlatformDashboardPage() {
-  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { state } = usePlatform();
   const [moduleHealthClientId, setModuleHealthClientId] = useState('all');
   const [moduleSearch, setModuleSearch] = useState('');
@@ -36,7 +42,20 @@ export function PlatformDashboardPage() {
   const [moduleUpdatedSearch, setModuleUpdatedSearch] = useState('');
   const [scrolledModulePosition, setScrolledModulePosition] = useState(1);
   const [hoveredModulePosition, setHoveredModulePosition] = useState<number | null>(null);
-  const [activeWorkspace, setActiveWorkspace] = useState<PlatformWorkspace>('clients');
+  const [activeWorkspace, setActiveWorkspace] = useState<PlatformWorkspace>(() => {
+    const workspace = searchParams.get('workspace');
+    return isPlatformWorkspace(workspace) ? workspace : 'clients';
+  });
+  useEffect(() => {
+    const workspace = searchParams.get('workspace');
+    if (isPlatformWorkspace(workspace) && workspace !== activeWorkspace) {
+      setActiveWorkspace(workspace);
+    }
+  }, [activeWorkspace, searchParams]);
+  function changeWorkspace(workspace: PlatformWorkspace) {
+    setActiveWorkspace(workspace);
+    setSearchParams({ workspace });
+  }
   const moduleHealthClient = state.clients.find((client) => client.clientId === moduleHealthClientId);
   const moduleHealthClients = moduleHealthClient ? [moduleHealthClient] : state.clients;
   const moduleRows = platformModules.map((moduleName, index) => {
@@ -71,7 +90,7 @@ export function PlatformDashboardPage() {
   return (
     <div className="space-y-6">
       <PageHeader eyebrow="Platform Context" title="Platform Management Services" description="A single embedded workspace for clients, users, modules, subscriptions, integrations, audit, and business impact." />
-      <PlatformEmbeddedWorkspace active={activeWorkspace} onChange={setActiveWorkspace} />
+      <PlatformEmbeddedWorkspace active={activeWorkspace} onChange={changeWorkspace} />
       <Panel title="Module Health" description={moduleHealthDescription}>
         <div className="overflow-x-auto">
           <div className="max-h-[321px] min-w-[980px] overflow-y-auto [scrollbar-color:rgba(34,211,238,0.45)_rgba(255,255,255,0.04)]" onScroll={(event) => setScrolledModulePosition(Math.min(Math.floor(event.currentTarget.scrollTop / 54) + 1, Math.max(visibleModuleRows.length, 1)))}>
@@ -84,7 +103,7 @@ export function PlatformDashboardPage() {
                 <th className="px-3 py-3"><ColumnFilter label="Last Updated" active={Boolean(moduleUpdatedSearch)}><input className="form-input w-full py-2 text-sm" type="search" placeholder="Search date or time..." value={moduleUpdatedSearch} onChange={(event) => { setModuleUpdatedSearch(event.target.value); setScrolledModulePosition(1); }} /></ColumnFilter></th>
                 <th className="w-24 px-3 py-3" />
               </tr></thead>
-              <tbody>{visibleModuleRows.map((row, index) => <tr key={row.moduleName} className="h-[54px] border-b border-white/10 hover:bg-white/[0.04]" onMouseEnter={() => setHoveredModulePosition(index + 1)} onMouseLeave={() => setHoveredModulePosition(null)}><td className="px-3 py-3 font-medium text-white">{row.moduleName}</td><td className="px-3 py-3">{row.disabledClients === 0 ? <span className="text-emerald-200">Enabled</span> : moduleHealthClient ? <span className="text-rose-200">Disabled</span> : <span className="text-amber-200">{row.enabledClients} enabled / {row.disabledClients} disabled</span>}</td><td className="px-3 py-3"><StatusBadge status={row.status} /></td><td className="px-3 py-3 text-slate-300">{moduleHealthClient?.clientName ?? 'All Clients'}</td><td className="px-3 py-3 text-slate-400">{row.lastUpdated}</td><td className="px-3 py-3 text-right"><button className="form-button-subtle py-1 text-xs" onClick={() => setActiveWorkspace('modules')}>View</button></td></tr>)}</tbody>
+              <tbody>{visibleModuleRows.map((row, index) => <tr key={row.moduleName} className="h-[54px] border-b border-white/10 hover:bg-white/[0.04]" onMouseEnter={() => setHoveredModulePosition(index + 1)} onMouseLeave={() => setHoveredModulePosition(null)}><td className="px-3 py-3 font-medium text-white">{row.moduleName}</td><td className="px-3 py-3">{row.disabledClients === 0 ? <span className="text-emerald-200">Enabled</span> : moduleHealthClient ? <span className="text-rose-200">Disabled</span> : <span className="text-amber-200">{row.enabledClients} enabled / {row.disabledClients} disabled</span>}</td><td className="px-3 py-3"><StatusBadge status={row.status} /></td><td className="px-3 py-3 text-slate-300">{moduleHealthClient?.clientName ?? 'All Clients'}</td><td className="px-3 py-3 text-slate-400">{row.lastUpdated}</td><td className="px-3 py-3 text-right"><button className="form-button-subtle py-1 text-xs" onClick={() => changeWorkspace('modules')}>View</button></td></tr>)}</tbody>
             </table>
             {visibleModuleRows.length === 0 && <div className="flex h-[270px] items-center justify-center text-sm text-slate-400">No modules match your search and filter.</div>}
           </div>
@@ -92,7 +111,7 @@ export function PlatformDashboardPage() {
         </div>
       </Panel>
       <Panel title="Client Health" description="Commercial context, module allocation, users, and current client health.">
-        <ScrollableTableFrame count={state.clients.length}><table className="min-w-[1050px] w-full text-sm"><thead><tr className="border-b border-white/10 text-left text-xs uppercase tracking-[0.1em] text-slate-500">{['Client ID','Client Name','Region','Market','Currency','Enabled','Disabled','Active Users','Health',''].map((item) => <th key={item} className="px-3 py-3">{item}</th>)}</tr></thead><tbody>{state.clients.map((client) => <tr key={client.clientId} className="border-b border-white/10 hover:bg-white/[0.04]"><td className="px-3 py-3 text-cyan-200">{client.clientId}</td><td className="px-3 py-3 font-medium text-white">{client.clientName}</td><td className="px-3 py-3">{client.region}</td><td className="px-3 py-3">{client.market}</td><td className="px-3 py-3">{client.currency}</td><td className="px-3 py-3 text-emerald-200">{client.enabledModules.length}</td><td className="px-3 py-3 text-rose-200">{client.disabledModules.length}</td><td className="px-3 py-3">{state.users.filter((user) => user.clientId === client.clientId && user.status === 'Active').length}</td><td className="px-3 py-3"><StatusBadge status={client.status === 'Active' ? client.disabledModules.length > 1 ? 'Attention Needed' : 'Healthy' : client.status} /></td><td className="px-3 py-3"><button className="form-button-subtle py-1 text-xs" onClick={() => navigate(`/admin/clients/${client.clientId}/health`)}>Health</button></td></tr>)}</tbody></table></ScrollableTableFrame>
+        <ScrollableTableFrame count={state.clients.length}><table className="min-w-[1050px] w-full text-sm"><thead><tr className="border-b border-white/10 text-left text-xs uppercase tracking-[0.1em] text-slate-500">{['Client ID','Client Name','Region','Market','Currency','Enabled','Disabled','Active Users','Health',''].map((item) => <th key={item} className="px-3 py-3">{item}</th>)}</tr></thead><tbody>{state.clients.map((client) => <tr key={client.clientId} className="border-b border-white/10 hover:bg-white/[0.04]"><td className="px-3 py-3 text-cyan-200">{client.clientId}</td><td className="px-3 py-3 font-medium text-white">{client.clientName}</td><td className="px-3 py-3">{client.region}</td><td className="px-3 py-3">{client.market}</td><td className="px-3 py-3">{client.currency}</td><td className="px-3 py-3 text-emerald-200">{client.enabledModules.length}</td><td className="px-3 py-3 text-rose-200">{client.disabledModules.length}</td><td className="px-3 py-3">{state.users.filter((user) => user.clientId === client.clientId && user.status === 'Active').length}</td><td className="px-3 py-3"><StatusBadge status={client.status === 'Active' ? client.disabledModules.length > 1 ? 'Attention Needed' : 'Healthy' : client.status} /></td><td className="px-3 py-3"><button className="form-button-subtle py-1 text-xs" onClick={() => changeWorkspace('clients')}>View</button></td></tr>)}</tbody></table></ScrollableTableFrame>
       </Panel>
     </div>
   );
