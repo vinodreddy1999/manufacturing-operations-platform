@@ -30,6 +30,7 @@ const DashboardPage = lazy(() => import('../pages/DashboardPage').then((module) 
 const IntelligencePage = lazy(() => import('../pages/IntelligencePage').then((module) => ({ default: module.IntelligencePage })));
 const InventoryModulePage = lazy(() => import('../pages/InventoryModulePage').then((module) => ({ default: module.InventoryModulePage })));
 const ModuleWorkspacePage = lazy(() => import('../pages/ModuleWorkspacePage').then((module) => ({ default: module.ModuleWorkspacePage })));
+const MaintenanceModulePage = lazy(() => import('../pages/MaintenanceModulePage').then((module) => ({ default: module.MaintenanceModulePage })));
 const OperationsPage = lazy(() => import('../pages/OperationsPage').then((module) => ({ default: module.OperationsPage })));
 const PlanningModulePage = lazy(() => import('../pages/PlanningModulePage').then((module) => ({ default: module.PlanningModulePage })));
 const ProductionModulePage = lazy(() => import('../pages/ProductionModulePage').then((module) => ({ default: module.ProductionModulePage })));
@@ -228,7 +229,7 @@ function AuthenticatedApp({ user, onLogout }: { user: RuntimeUser; onLogout: () 
               <Route path="/inventory/*" element={<ProtectedRoute user={user} section="operations"><InventoryModulePage user={user} /></ProtectedRoute>} />
               <Route path="/warehouse/*" element={<ProtectedRoute user={user} section="operations"><WarehouseModulePage user={user} /></ProtectedRoute>} />
               <Route path="/production/*" element={<ProtectedRoute user={user} section="operations"><ProductionModulePage user={user} /></ProtectedRoute>} />
-              <Route path="/maintenance" element={<ProtectedRoute user={user} section="operations"><ModuleWorkspacePage moduleKey="maintenance" user={user} /></ProtectedRoute>} />
+              <Route path="/maintenance/*" element={<ProtectedRoute user={user} section="operations"><MaintenanceModulePage user={user} /></ProtectedRoute>} />
               <Route path="/quality" element={<ProtectedRoute user={user} section="operations"><ModuleWorkspacePage moduleKey="quality" user={user} /></ProtectedRoute>} />
               <Route path="/procurement" element={<ProtectedRoute user={user} section="operations"><ModuleWorkspacePage moduleKey="procurement" user={user} /></ProtectedRoute>} />
               <Route path="/sales" element={<ProtectedRoute user={user} section="operations"><ModuleWorkspacePage moduleKey="sales" user={user} /></ProtectedRoute>} />
