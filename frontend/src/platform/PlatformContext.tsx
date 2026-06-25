@@ -20,6 +20,7 @@ type PlatformContextValue = {
   updateClient: (clientId: string, client: Omit<PlatformClient, 'clientId' | 'createdDate' | 'disabledModules'>, action?: string) => PlatformClient;
   createUser: (user: Omit<PlatformUser, 'userId' | 'fullName' | 'clientName' | 'createdDate' | 'lastLogin'>) => PlatformUser;
   updateUser: (userId: string, payload: Partial<PlatformUser>, action?: string) => void;
+  replacePlatformState: (next: PlatformState) => void;
   recordAudit: (input: Omit<PlatformAuditLog, 'logId' | 'timestamp'>) => void;
   updateWidget: (widgetId: string, payload: Partial<WidgetConfig>) => void;
   resetWidgets: () => void;
@@ -108,6 +109,7 @@ export function PlatformProvider({ runtimeUser, children }: { runtimeUser: Runti
       next = addAudit(next, { clientId: updatedUser.clientId, clientName: updatedUser.clientName, userId: matchedUser.userId, moduleName: 'Admin', action, description: `${action}: ${updatedUser.fullName}`, status: 'Completed' });
       persist(next);
     },
+    replacePlatformState: (next) => persist(next),
     recordAudit: (input) => persist(addAudit(state, input)),
     updateWidget: (widgetId, payload) => persist({ ...state, widgets: state.widgets.map((widget) => widget.widgetId === widgetId ? { ...widget, ...payload } : widget) }),
     resetWidgets: () => persist({ ...state, widgets: initialWidgets }),
