@@ -9,10 +9,11 @@ import { MultiSelectAccessGrid } from './MultiSelectAccessGrid';
 import { Panel } from './Panel';
 import { StatusBadge } from './StatusBadge';
 
-export type PlatformWorkspace = 'clients' | 'users' | 'modules' | 'subscriptions' | 'integrations' | 'audit' | 'impact';
+export type PlatformWorkspace = 'clients' | 'markets' | 'users' | 'modules' | 'subscriptions' | 'integrations' | 'audit' | 'impact';
 
 const workspaceTabs: Array<[PlatformWorkspace, string]> = [
   ['clients', 'Clients'],
+  ['markets', 'Markets'],
   ['users', 'Users'],
   ['modules', 'Modules'],
   ['subscriptions', 'Subscriptions'],
@@ -31,11 +32,13 @@ const marketOptions = [
 
 const clientEditableModules = platformModules.filter((item) => item !== 'Admin');
 const clientEditableApplications = platformApplications.filter((item) => item !== 'Platform Management');
+type SubscriptionCycle = NonNullable<PlatformClient['subscriptionCycle']>;
 
 export function PlatformEmbeddedWorkspace({ active, onChange }: { active: PlatformWorkspace; onChange: (workspace: PlatformWorkspace) => void }) {
   const { state } = usePlatform();
   const counts: Record<PlatformWorkspace, number> = {
     clients: state.clients.length,
+    markets: marketRows(state.clients).length,
     users: state.users.length,
     modules: platformModules.length,
     subscriptions: state.clients.length,
@@ -55,6 +58,7 @@ export function PlatformEmbeddedWorkspace({ active, onChange }: { active: Platfo
         ))}
       </div>
       {active === 'clients' && <ClientsWorkspace />}
+      {active === 'markets' && <MarketsWorkspace />}
       {active === 'users' && <UsersWorkspace />}
       {active === 'modules' && <ModulesWorkspace />}
       {active === 'subscriptions' && <SubscriptionsWorkspace />}
@@ -72,6 +76,7 @@ function ClientsWorkspace() {
   const [status, setStatus] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<PlatformClient | null>(null);
+  const [viewingClient, setViewingClient] = useState<PlatformClient | null>(null);
   const [reason, setReason] = useState('');
   const [notice, setNotice] = useState('');
 
@@ -119,7 +124,7 @@ function ClientsWorkspace() {
             <Cell>{client.createdDate}</Cell>
             <Cell>
               <div className="flex flex-wrap gap-2">
-                <button className="form-button-subtle py-1 text-xs" onClick={() => setNotice(`${client.clientName}: ${client.enabledApplications.length} applications, ${client.enabledModules.length} modules, ${state.users.filter((user) => user.clientId === client.clientId).length} users.`)}>View</button>
+                <button className="form-button-subtle py-1 text-xs" onClick={() => setViewingClient(client)}>View</button>
                 <button className="form-button-subtle py-1 text-xs" onClick={() => setEditingClient(client)}>Edit</button>
                 <button className="form-button-subtle py-1 text-xs" onClick={() => toggleClient(client)}>{client.status === 'Suspended' ? 'Enable' : 'Disable'}</button>
               </div>
@@ -129,6 +134,7 @@ function ClientsWorkspace() {
       </Table>
       {createOpen && <ClientCreateDrawer onClose={() => setCreateOpen(false)} />}
       {editingClient && <ClientEditDrawer client={editingClient} onClose={() => setEditingClient(null)} />}
+      {viewingClient && <ClientDetailDrawer client={viewingClient} onClose={() => setViewingClient(null)} />}
     </div>
   );
 }
@@ -296,6 +302,167 @@ function ClientEditDrawer({ client, onClose }: { client: PlatformClient; onClose
       <MultiSelectAccessGrid title="Assigned Users" description="Add or remove users for this client." items={state.users.filter((user) => !user.roles.includes('Super Admin')).map(userLabel)} selectedItems={form.users} onChange={(users) => setForm({ ...form, users })} searchPlaceholder="Search users..." columns={2} showSelectAll showClear showSelectedCount />
       <Field label="Change Reason"><input className="form-input mt-1 w-full" placeholder="Required audit reason" value={form.reason} onChange={(event) => setForm({ ...form, reason: event.target.value })} /></Field>
       <DrawerActions error={error} cancel={onClose} submit={submit} submitLabel="Save Client" />
+    </Drawer>,
+    document.body,
+  );
+}
+
+function ClientDetailDrawer({ client, onClose }: { client: PlatformClient; onClose: () => void }) {
+  const { state } = usePlatform();
+  const users = state.users.filter((user) => user.clientId === client.clientId);
+  const audit = state.auditLogs.filter((log) => log.clientId === client.clientId || log.clientName === client.clientName);
+  const subscription = getSubscription(client, state.clients.indexOf(client));
+
+  return createPortal(
+    <Drawer title={`${client.clientName} Data`} description="Client profile, subscriptions, access, users, and audit activity in one place." onClose={onClose}>
+      <div className="grid gap-3 md:grid-cols-4">
+        <Metric label="Market" value={client.market} />
+        <Metric label="Users" value={users.length} />
+        <Metric label="Modules" value={client.enabledModules.length} />
+        <Metric label="Audit Events" value={audit.length} />
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="rounded-xl border border-white/10 bg-slate-950/30 p-4">
+          <h4 className="font-semibold text-white">Subscription Cycle</h4>
+          <div className="mt-3 grid gap-2 text-sm text-slate-300">
+            <span>Plan: {subscription.plan}</span>
+            <span>Cycle: {subscription.cycle}</span>
+            <span>Start: {subscription.startDate}</span>
+            <span>End: {subscription.endDate}</span>
+          </div>
+        </div>
+        <div className="rounded-xl border border-white/10 bg-slate-950/30 p-4">
+          <h4 className="font-semibold text-white">Enabled Applications</h4>
+          <p className="mt-3 text-sm text-slate-300">{client.enabledApplications.join(', ')}</p>
+        </div>
+      </div>
+      <Table headers={['Module', 'Status']} count={clientEditableModules.length}>
+        {clientEditableModules.map((module) => (
+          <tr key={module} className="border-b border-white/10">
+            <Cell strong>{module}</Cell>
+            <Cell><StatusBadge status={client.enabledModules.includes(module) ? 'Enabled' : 'Disabled'} /></Cell>
+          </tr>
+        ))}
+      </Table>
+      <Table headers={['User ID', 'Name', 'Role', 'Status']} count={users.length}>
+        {users.map((user) => (
+          <tr key={user.userId} className="border-b border-white/10">
+            <Cell accent>{user.userId}</Cell>
+            <Cell strong>{user.fullName}</Cell>
+            <Cell>{user.roles.join(', ')}</Cell>
+            <Cell><StatusBadge status={user.status} /></Cell>
+          </tr>
+        ))}
+      </Table>
+      <Table headers={['Timestamp', 'Module', 'Action', 'Description']} minWidth="min-w-[900px]" count={audit.length}>
+        {audit.map((log) => (
+          <tr key={log.logId} className="border-b border-white/10">
+            <Cell>{log.timestamp}</Cell>
+            <Cell>{log.moduleName}</Cell>
+            <Cell strong>{log.action}</Cell>
+            <Cell>{log.description ?? 'Platform change recorded'}</Cell>
+          </tr>
+        ))}
+      </Table>
+    </Drawer>,
+    document.body,
+  );
+}
+
+function MarketsWorkspace() {
+  const { state } = usePlatform();
+  const [search, setSearch] = useState('');
+  const [region, setRegion] = useState('');
+  const [editingMarket, setEditingMarket] = useState<MarketRow | null>(null);
+  const rows = marketRows(state.clients).filter((row) =>
+    (!search || `${row.market} ${row.region} ${row.currency}`.toLowerCase().includes(search.toLowerCase()))
+    && (!region || row.region === region));
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 md:grid-cols-[1fr_240px_auto]">
+        <SearchField value={search} onChange={setSearch} placeholder="Search market, region, or currency..." />
+        <Select value={region} onChange={setRegion} label="All regions" options={unique(rows.map((row) => row.region))} />
+        <button className="form-button-primary inline-flex items-center justify-center gap-2" onClick={() => setEditingMarket(emptyMarketRow())}><Plus className="h-4 w-4" />Add Market</button>
+      </div>
+      <Table headers={['Region', 'Market', 'Currency', 'Timezone', 'Clients', 'Users', 'Actions']} count={rows.length}>
+        {rows.map((row) => (
+          <tr key={`${row.region}-${row.market}`} className="border-b border-white/10 hover:bg-white/[0.04]">
+            <Cell>{row.region}</Cell>
+            <Cell strong>{row.market}</Cell>
+            <Cell>{row.currency}</Cell>
+            <Cell>{row.timezone}</Cell>
+            <Cell>{row.clientCount}</Cell>
+            <Cell>{state.users.filter((user) => user.market === row.market).length}</Cell>
+            <Cell><button className="form-button-subtle py-1 text-xs" onClick={() => setEditingMarket(row)}>Edit</button></Cell>
+          </tr>
+        ))}
+      </Table>
+      {editingMarket && <MarketEditDrawer market={editingMarket} onClose={() => setEditingMarket(null)} />}
+    </div>
+  );
+}
+
+function MarketEditDrawer({ market, onClose }: { market: MarketRow; onClose: () => void }) {
+  const { state, platformUser, replacePlatformState } = usePlatform();
+  const [form, setForm] = useState({
+    region: market.region,
+    market: market.market,
+    currency: market.currency,
+    timezone: market.timezone,
+    clients: state.clients.filter((client) => client.market === market.market && client.region === market.region).map(clientLabel),
+    reason: '',
+  });
+  const [error, setError] = useState('');
+
+  function changeRegion(region: string) {
+    const option = marketOptions.find((item) => item.region === region);
+    setForm({ ...form, region, market: option?.market ?? form.market, currency: (option?.currency ?? form.currency) as CurrencyCode, timezone: option?.timezone ?? form.timezone });
+  }
+
+  function changeMarket(marketName: string) {
+    const option = marketOptions.find((item) => item.market === marketName);
+    setForm({ ...form, market: marketName, currency: (option?.currency ?? form.currency) as CurrencyCode, timezone: option?.timezone ?? form.timezone });
+  }
+
+  function submit() {
+    const marketName = form.market.trim();
+    if (!form.region.trim() || !marketName) { setError('Region and Market are required.'); return; }
+    if (!form.clients.length) { setError('Assign at least one client to this market.'); return; }
+    if (!form.reason.trim()) { setError('A change reason is required.'); return; }
+
+    const selectedClientIds = new Set(form.clients.map(parseOptionId));
+    const nextClients = state.clients.map((client) => selectedClientIds.has(client.clientId)
+      ? { ...client, region: form.region, market: marketName, currency: form.currency, lastUpdated: new Date().toISOString() }
+      : client);
+    const nextUsers = state.users.map((user) => {
+      const client = nextClients.find((item) => item.clientId === user.clientId);
+      return client ? { ...user, region: client.region, market: client.market, clientName: client.clientName } : user;
+    });
+
+    replacePlatformState(withAudit({ ...state, clients: nextClients, users: nextUsers }, platformUser, {
+      clientId: null,
+      clientName: 'Platform',
+      moduleName: 'Admin',
+      action: market.market ? 'Edited Market' : 'Created Market',
+      description: `Market ${marketName} assigned to ${form.clients.length} clients. Currency ${form.currency}. Timezone ${form.timezone}. Reason: ${form.reason.trim()}.`,
+      status: 'Completed',
+    }));
+    onClose();
+  }
+
+  const regionMarkets = marketOptions.filter((item) => item.region === form.region);
+  return createPortal(
+    <Drawer title={market.market ? `Edit ${market.market}` : 'Add Market'} description="Manage market defaults and assign clients manually with audit reason." onClose={onClose}>
+      <div className="grid gap-3 md:grid-cols-2">
+        <Field label="Region"><select className="form-input mt-1 w-full" value={form.region} onChange={(event) => changeRegion(event.target.value)}>{unique(marketOptions.map((item) => item.region)).map((item) => <option key={item}>{item}</option>)}</select></Field>
+        <Field label="Market"><input list="market-list" className="form-input mt-1 w-full" value={form.market} onChange={(event) => changeMarket(event.target.value)} /><datalist id="market-list">{regionMarkets.map((item) => <option key={item.market} value={item.market} />)}</datalist></Field>
+        <Field label="Currency"><select className="form-input mt-1 w-full" value={form.currency} onChange={(event) => setForm({ ...form, currency: event.target.value as CurrencyCode })}>{['USD', 'INR', 'EUR', 'GBP', 'AED'].map((item) => <option key={item}>{item}</option>)}</select></Field>
+        <Field label="Timezone"><input className="form-input mt-1 w-full" value={form.timezone} onChange={(event) => setForm({ ...form, timezone: event.target.value })} /></Field>
+      </div>
+      <MultiSelectAccessGrid title="Assigned Clients" description="Add or remove clients for this market." items={state.clients.map(clientLabel)} selectedItems={form.clients} onChange={(clients) => setForm({ ...form, clients })} searchPlaceholder="Search clients..." columns={2} showSelectAll showClear showSelectedCount />
+      <Field label="Change Reason"><input className="form-input mt-1 w-full" placeholder="Required audit reason" value={form.reason} onChange={(event) => setForm({ ...form, reason: event.target.value })} /></Field>
+      <DrawerActions error={error} cancel={onClose} submit={submit} submitLabel="Save Market" />
     </Drawer>,
     document.body,
   );
@@ -597,14 +764,88 @@ function ModuleEditDrawer({ moduleName, onClose }: { moduleName: string; onClose
 
 function SubscriptionsWorkspace() {
   const { state } = usePlatform();
+  const [search, setSearch] = useState('');
+  const [status, setStatus] = useState('');
+  const [editingClient, setEditingClient] = useState<PlatformClient | null>(null);
+  const rows = state.clients.filter((client) =>
+    (!search || `${client.clientName} ${client.clientId} ${client.market}`.toLowerCase().includes(search.toLowerCase()))
+    && (!status || client.status === status));
   return (
-    <Table headers={['Client', 'Plan', 'Start Date', 'End Date', 'User Limit', 'Storage Limit', 'Status']} count={state.clients.length}>
-      {state.clients.map((client, index) => (
-        <tr key={client.clientId} className="border-b border-white/10">
-          <Cell strong>{client.clientName}</Cell><Cell>{client.status === 'Trial' ? 'Enterprise Trial' : 'Enterprise'}</Cell><Cell>{client.createdDate}</Cell><Cell>{client.status === 'Trial' ? '2026-07-10' : '2027-01-01'}</Cell><Cell>{100 + index * 50}</Cell><Cell>{`${500 + index * 250} GB`}</Cell><Cell><StatusBadge status={client.status} /></Cell>
-        </tr>
-      ))}
-    </Table>
+    <div className="space-y-4">
+      <div className="grid gap-3 md:grid-cols-[1fr_240px]">
+        <SearchField value={search} onChange={setSearch} placeholder="Search client, market, or ID..." />
+        <Select value={status} onChange={setStatus} label="All statuses" options={['Active', 'Trial', 'Suspended']} />
+      </div>
+      <Table headers={['Client', 'Plan', 'Cycle', 'Start Date', 'End Date', 'User Limit', 'Storage Limit', 'Status', 'Action']} minWidth="min-w-[1100px]" count={rows.length}>
+        {rows.map((client) => {
+          const subscription = getSubscription(client, state.clients.indexOf(client));
+          return (
+            <tr key={client.clientId} className="border-b border-white/10 hover:bg-white/[0.04]">
+              <Cell strong>{client.clientName}</Cell>
+              <Cell>{subscription.plan}</Cell>
+              <Cell>{subscription.cycle}</Cell>
+              <Cell>{subscription.startDate}</Cell>
+              <Cell>{subscription.endDate}</Cell>
+              <Cell>{subscription.userLimit}</Cell>
+              <Cell>{subscription.storageLimitGb} GB</Cell>
+              <Cell><StatusBadge status={client.status} /></Cell>
+              <Cell><button className="form-button-subtle py-1 text-xs" onClick={() => setEditingClient(client)}>Edit</button></Cell>
+            </tr>
+          );
+        })}
+      </Table>
+      {editingClient && <SubscriptionEditDrawer client={editingClient} onClose={() => setEditingClient(null)} />}
+    </div>
+  );
+}
+
+function SubscriptionEditDrawer({ client, onClose }: { client: PlatformClient; onClose: () => void }) {
+  const { state, platformUser, replacePlatformState } = usePlatform();
+  const current = getSubscription(client, state.clients.indexOf(client));
+  const [form, setForm] = useState({ ...current, status: client.status, reason: '' });
+  const [error, setError] = useState('');
+
+  function submit() {
+    if (!form.startDate || !form.endDate) { setError('Start date and end date are required.'); return; }
+    if (new Date(form.endDate) <= new Date(form.startDate)) { setError('End date must be after start date.'); return; }
+    if (!form.reason.trim()) { setError('A change reason is required.'); return; }
+    const nextClient: PlatformClient = {
+      ...client,
+      status: form.status,
+      subscriptionPlan: form.plan,
+      subscriptionCycle: form.cycle,
+      subscriptionStartDate: form.startDate,
+      subscriptionEndDate: form.endDate,
+      userLimit: Number(form.userLimit),
+      storageLimitGb: Number(form.storageLimitGb),
+      lastUpdated: new Date().toISOString(),
+    };
+    replacePlatformState(withAudit({ ...state, clients: state.clients.map((item) => item.clientId === client.clientId ? nextClient : item) }, platformUser, {
+      clientId: client.clientId,
+      clientName: client.clientName,
+      moduleName: 'Admin',
+      action: 'Edited Subscription Cycle',
+      description: `Plan ${form.plan}, ${form.cycle} cycle, ${form.startDate} to ${form.endDate}. Reason: ${form.reason.trim()}.`,
+      status: 'Completed',
+    }));
+    onClose();
+  }
+
+  return createPortal(
+    <Drawer title={`Edit Subscription - ${client.clientName}`} description="Align client subscription cycles, limits, renewal dates, and audit reason." onClose={onClose}>
+      <div className="grid gap-3 md:grid-cols-2">
+        <Field label="Plan"><select className="form-input mt-1 w-full" value={form.plan} onChange={(event) => setForm({ ...form, plan: event.target.value })}><option>Enterprise Trial</option><option>Enterprise</option><option>Enterprise Plus</option><option>Suspended</option></select></Field>
+        <Field label="Cycle"><select className="form-input mt-1 w-full" value={form.cycle} onChange={(event) => setForm({ ...form, cycle: event.target.value as SubscriptionCycle })}><option>Monthly</option><option>Quarterly</option><option>Annual</option></select></Field>
+        <Field label="Start Date"><input className="form-input mt-1 w-full" type="date" value={form.startDate} onChange={(event) => setForm({ ...form, startDate: event.target.value })} /></Field>
+        <Field label="End Date"><input className="form-input mt-1 w-full" type="date" value={form.endDate} onChange={(event) => setForm({ ...form, endDate: event.target.value })} /></Field>
+        <Field label="User Limit"><input className="form-input mt-1 w-full" type="number" min="1" value={form.userLimit} onChange={(event) => setForm({ ...form, userLimit: Number(event.target.value) })} /></Field>
+        <Field label="Storage Limit GB"><input className="form-input mt-1 w-full" type="number" min="1" value={form.storageLimitGb} onChange={(event) => setForm({ ...form, storageLimitGb: Number(event.target.value) })} /></Field>
+        <Field label="Client Status"><select className="form-input mt-1 w-full" value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as ClientStatus })}><option>Active</option><option>Trial</option><option>Suspended</option></select></Field>
+      </div>
+      <Field label="Change Reason"><input className="form-input mt-1 w-full" placeholder="Required audit reason" value={form.reason} onChange={(event) => setForm({ ...form, reason: event.target.value })} /></Field>
+      <DrawerActions error={error} cancel={onClose} submit={submit} submitLabel="Save Subscription" />
+    </Drawer>,
+    document.body,
   );
 }
 
@@ -625,13 +866,24 @@ function AuditWorkspace() {
   const { state } = usePlatform();
   const [search, setSearch] = useState('');
   const [client, setClient] = useState('');
-  const rows = state.auditLogs.filter((log) => (!search || `${log.userId} ${log.action} ${log.moduleName} ${log.description ?? ''}`.toLowerCase().includes(search.toLowerCase())) && (!client || log.clientId === client));
+  const [module, setModule] = useState('');
+  const [action, setAction] = useState('');
+  const rows = state.auditLogs.filter((log) =>
+    (!search || `${log.userId} ${log.clientName} ${log.action} ${log.moduleName} ${log.description ?? ''}`.toLowerCase().includes(search.toLowerCase()))
+    && (!client || log.clientId === client)
+    && (!module || log.moduleName === module)
+    && (!action || log.action === action));
+  const clientName = state.clients.find((item) => item.clientId === client)?.clientName ?? 'All clients';
+  const summary = `${rows.length} audit events for ${clientName}${module ? ` / ${module}` : ''}`;
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 md:grid-cols-[1fr_260px]">
+      <div className="grid gap-3 lg:grid-cols-[1fr_240px_220px_260px]">
         <SearchField value={search} onChange={setSearch} placeholder="Search user, action, entity or module..." />
         <Select value={client} onChange={setClient} label="All clients" options={state.clients.map((item) => [item.clientId, item.clientName])} />
+        <Select value={module} onChange={setModule} label="All modules" options={unique(state.auditLogs.map((log) => log.moduleName))} />
+        <Select value={action} onChange={setAction} label="All actions" options={unique(state.auditLogs.map((log) => log.action))} />
       </div>
+      <Notice>{summary}. Every row includes timestamp, actor, client, module, action, reason/description, and result.</Notice>
       <Table headers={['Timestamp', 'User', 'Client', 'Module', 'Action', 'Description', 'Status']} minWidth="min-w-[1050px]" count={rows.length}>
         {rows.map((log) => (
           <tr key={log.logId} className="border-b border-white/10">
@@ -739,6 +991,48 @@ function Notice({ children }: { children: ReactNode }) {
 
 function Metric({ label, value }: { label: string; value: string | number }) {
   return <div className="rounded-xl border border-white/10 bg-slate-950/30 p-5"><p className="text-sm text-slate-400">{label}</p><p className="mt-2 text-3xl font-semibold text-white">{value}</p></div>;
+}
+
+type MarketRow = {
+  region: string;
+  market: string;
+  currency: CurrencyCode;
+  timezone: string;
+  clientCount: number;
+};
+
+function marketRows(clients: PlatformClient[]): MarketRow[] {
+  const configured = marketOptions.map((option) => ({
+    region: option.region,
+    market: option.market,
+    currency: option.currency as CurrencyCode,
+    timezone: option.timezone,
+    clientCount: clients.filter((client) => client.region === option.region && client.market === option.market).length,
+  }));
+  const configuredKeys = new Set(configured.map((row) => `${row.region}|${row.market}`));
+  const custom = unique(clients.map((client) => `${client.region}|${client.market}`))
+    .filter((key) => !configuredKeys.has(key))
+    .map((key) => {
+      const [region, market] = key.split('|');
+      const client = clients.find((item) => item.region === region && item.market === market)!;
+      return { region, market, currency: client.currency, timezone: 'Custom', clientCount: clients.filter((item) => item.region === region && item.market === market).length };
+    });
+  return [...configured, ...custom].sort((a, b) => `${a.region} ${a.market}`.localeCompare(`${b.region} ${b.market}`));
+}
+
+function emptyMarketRow(): MarketRow {
+  return { region: 'North America', market: '', currency: 'USD', timezone: 'America/New_York', clientCount: 0 };
+}
+
+function getSubscription(client: PlatformClient, index: number) {
+  return {
+    plan: client.subscriptionPlan ?? (client.status === 'Trial' ? 'Enterprise Trial' : client.status === 'Suspended' ? 'Suspended' : 'Enterprise'),
+    cycle: client.subscriptionCycle ?? 'Annual',
+    startDate: client.subscriptionStartDate ?? client.createdDate,
+    endDate: client.subscriptionEndDate ?? (client.status === 'Trial' ? '2026-07-10' : '2027-01-01'),
+    userLimit: client.userLimit ?? 100 + Math.max(0, index) * 50,
+    storageLimitGb: client.storageLimitGb ?? 500 + Math.max(0, index) * 250,
+  };
 }
 
 function userLabel(user: PlatformUser) {

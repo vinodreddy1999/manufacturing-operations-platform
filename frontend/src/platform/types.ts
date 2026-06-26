@@ -16,6 +16,12 @@ export type PlatformClient = {
   plants?: number;
   warehouses?: number;
   lastUpdated?: string;
+  subscriptionPlan?: string;
+  subscriptionStartDate?: string;
+  subscriptionEndDate?: string;
+  subscriptionCycle?: 'Monthly' | 'Quarterly' | 'Annual';
+  userLimit?: number;
+  storageLimitGb?: number;
 };
 
 export type PlatformUser = {
