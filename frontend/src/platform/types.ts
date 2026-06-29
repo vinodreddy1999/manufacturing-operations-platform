@@ -44,6 +44,12 @@ export type PlatformUser = {
   status: 'Active' | 'Disabled';
   lastLogin: string;
   createdDate: string;
+  temporaryPassword?: string;
+  passwordDelivery?: 'Manual';
+  passwordLastSet?: string;
+  passwordExpiresAt?: string;
+  passwordResetRequired?: boolean;
+  passwordExpiryPromptDays?: number;
 };
 
 export type PlatformAuditLog = {

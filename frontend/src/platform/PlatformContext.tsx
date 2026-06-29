@@ -42,6 +42,12 @@ function nextId(prefix: string, values: string[]) {
   return `${prefix}-${String(next).padStart(6, '0')}`;
 }
 
+function addDays(date: Date, days: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next.toISOString().slice(0, 10);
+}
+
 export function PlatformProvider({ runtimeUser, children }: { runtimeUser: RuntimeUser; children: ReactNode }) {
   const [state, setState] = useState<PlatformState>(loadState);
   const canSelectPlatform = runtimeUser.role === 'super_admin';
@@ -96,7 +102,21 @@ export function PlatformProvider({ runtimeUser, children }: { runtimeUser: Runti
     createUser: (input) => {
       const client = input.clientId ? state.clients.find((item) => item.clientId === input.clientId) : undefined;
       const userId = nextId('USR', state.users.map((user) => user.userId));
-      const user: PlatformUser = { ...input, userId, fullName: `${input.firstName} ${input.lastName}`.trim(), clientName: client?.clientName ?? 'Platform', createdDate: new Date().toISOString().slice(0, 10), lastLogin: 'Never' };
+      const today = new Date();
+      const createdDate = today.toISOString().slice(0, 10);
+      const user: PlatformUser = {
+        ...input,
+        userId,
+        fullName: `${input.firstName} ${input.lastName}`.trim(),
+        clientName: client?.clientName ?? 'Platform',
+        createdDate,
+        lastLogin: 'Never',
+        passwordDelivery: input.passwordDelivery ?? 'Manual',
+        passwordLastSet: input.passwordLastSet ?? createdDate,
+        passwordExpiresAt: input.passwordExpiresAt ?? addDays(today, 90),
+        passwordResetRequired: input.passwordResetRequired ?? true,
+        passwordExpiryPromptDays: input.passwordExpiryPromptDays ?? 14,
+      };
       let next = { ...state, users: [...state.users, user] };
       next = addAudit(next, { clientId: client?.clientId ?? null, clientName: client?.clientName ?? 'Platform', userId, moduleName: 'Admin', action: 'Created User', description: `Created user ${user.fullName}`, status: 'Completed' });
       persist(next);

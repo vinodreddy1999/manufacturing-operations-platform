@@ -5,6 +5,13 @@ export const platformModules = ['Admin', 'Planning', 'Inventory', 'Warehouse', '
 export const platformRoles = ['Super Admin', 'Company Admin', 'Plant Manager', 'Planning Manager', 'Inventory Manager', 'Warehouse Manager', 'Production Manager', 'Maintenance Manager', 'Quality Manager', 'Procurement Manager', 'Sales Manager', 'Finance Manager', 'Supervisor', 'Operator', 'Technician', 'Customer User', 'Supplier User', 'Viewer'];
 
 const allClientModules = platformModules.filter((module) => module !== 'Admin');
+const passwordPolicy = {
+  passwordDelivery: 'Manual' as const,
+  passwordLastSet: '2026-06-01',
+  passwordExpiresAt: '2026-08-30',
+  passwordResetRequired: false,
+  passwordExpiryPromptDays: 14,
+};
 
 export const initialClients: PlatformClient[] = [
   { clientId: 'CLT-000001', clientName: 'ABC Manufacturing', region: 'North America', market: 'United States', currency: 'USD', enabledApplications: platformApplications.filter((item) => item !== 'Platform Management'), enabledModules: allClientModules, disabledModules: [], status: 'Active', createdDate: '2025-01-15' },
@@ -38,13 +45,14 @@ function makeUser(index: number): PlatformUser {
     assignedApplications: client.enabledApplications,
     assignedModules: manager ? client.enabledModules : client.enabledModules.slice(0, 8 + (index % 5)),
     status: index === 18 ? 'Disabled' : 'Active', lastLogin: `2026-06-${String(20 - (index % 9)).padStart(2, '0')} 09:30`, createdDate: client.createdDate,
+    ...passwordPolicy,
   };
 }
 
 export const initialUsers: PlatformUser[] = [
-  { userId: 'USR-000001', firstName: 'Metam', lastName: 'Administrator', fullName: 'Metam Administrator', loginName: 'super', email: 'super@metam.local', clientId: null, clientName: 'Platform', region: 'Global', market: 'Global', department: 'Platform Operations', plant: 'All Plants', warehouse: 'All Warehouses', roles: ['Super Admin'], assignedApplications: platformApplications, assignedModules: platformModules, status: 'Active', lastLogin: '2026-06-21 08:00', createdDate: '2025-01-01' },
-  { userId: 'USR-000002', firstName: 'ABC', lastName: 'Administrator', fullName: 'ABC Administrator', loginName: 'admin', email: 'admin@metam.local', clientId: 'CLT-000001', clientName: 'ABC Manufacturing', region: 'North America', market: 'United States', department: 'Administration', plant: 'All Plants', warehouse: 'All Warehouses', roles: ['Company Admin'], assignedApplications: initialClients[0].enabledApplications, assignedModules: initialClients[0].enabledModules, status: 'Active', lastLogin: '2026-06-20 16:20', createdDate: '2025-01-15' },
-  { userId: 'USR-000003', firstName: 'Demo', lastName: 'Viewer', fullName: 'Demo Viewer', loginName: 'user', email: 'user@metam.local', clientId: 'CLT-000001', clientName: 'ABC Manufacturing', region: 'North America', market: 'United States', department: 'Operations', plant: 'Plant A', warehouse: 'Warehouse A', roles: ['Viewer'], assignedApplications: ['Operations', 'Reports & Analytics'], assignedModules: ['Planning', 'Inventory', 'Production', 'Quality', 'Reports & Analytics'], status: 'Active', lastLogin: '2026-06-19 14:10', createdDate: '2025-02-01' },
+  { userId: 'USR-000001', firstName: 'Metam', lastName: 'Administrator', fullName: 'Metam Administrator', loginName: 'super', email: 'super@metam.local', clientId: null, clientName: 'Platform', region: 'Global', market: 'Global', department: 'Platform Operations', plant: 'All Plants', warehouse: 'All Warehouses', roles: ['Super Admin'], assignedApplications: platformApplications, assignedModules: platformModules, status: 'Active', lastLogin: '2026-06-21 08:00', createdDate: '2025-01-01', ...passwordPolicy },
+  { userId: 'USR-000002', firstName: 'ABC', lastName: 'Administrator', fullName: 'ABC Administrator', loginName: 'admin', email: 'admin@metam.local', clientId: 'CLT-000001', clientName: 'ABC Manufacturing', region: 'North America', market: 'United States', department: 'Administration', plant: 'All Plants', warehouse: 'All Warehouses', roles: ['Company Admin'], assignedApplications: initialClients[0].enabledApplications, assignedModules: initialClients[0].enabledModules, status: 'Active', lastLogin: '2026-06-20 16:20', createdDate: '2025-01-15', ...passwordPolicy },
+  { userId: 'USR-000003', firstName: 'Demo', lastName: 'Viewer', fullName: 'Demo Viewer', loginName: 'user', email: 'user@metam.local', clientId: 'CLT-000001', clientName: 'ABC Manufacturing', region: 'North America', market: 'United States', department: 'Operations', plant: 'Plant A', warehouse: 'Warehouse A', roles: ['Viewer'], assignedApplications: ['Operations', 'Reports & Analytics'], assignedModules: ['Planning', 'Inventory', 'Production', 'Quality', 'Reports & Analytics'], status: 'Active', lastLogin: '2026-06-19 14:10', createdDate: '2025-02-01', ...passwordPolicy },
   ...names.map((_, index) => makeUser(index)),
 ];
 
