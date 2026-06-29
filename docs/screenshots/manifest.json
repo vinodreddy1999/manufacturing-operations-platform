@@ -1,0 +1,114 @@
+[
+  {
+    "file": "01-login.png",
+    "title": "Login screen",
+    "role": null,
+    "url": "/",
+    "path": "C:\\Users\\vinod\\metam-services\\docs\\screenshots\\01-login.png"
+  },
+  {
+    "file": "02-super-admin-platform-dashboard.png",
+    "title": "Super Admin - Platform dashboard",
+    "role": "super",
+    "url": "/platform",
+    "path": "C:\\Users\\vinod\\metam-services\\docs\\screenshots\\02-super-admin-platform-dashboard.png"
+  },
+  {
+    "file": "03-super-admin-clients-workspace.png",
+    "title": "Super Admin - Clients workspace",
+    "role": "super",
+    "url": "/platform?workspace=clients",
+    "path": "C:\\Users\\vinod\\metam-services\\docs\\screenshots\\03-super-admin-clients-workspace.png"
+  },
+  {
+    "file": "04-super-admin-create-client-drawer.png",
+    "title": "Super Admin - Create client drawer",
+    "role": "super",
+    "url": "/platform?workspace=clients",
+    "path": "C:\\Users\\vinod\\metam-services\\docs\\screenshots\\04-super-admin-create-client-drawer.png"
+  },
+  {
+    "file": "05-super-admin-users-workspace.png",
+    "title": "Super Admin - Users workspace",
+    "role": "super",
+    "url": "/platform?workspace=users",
+    "path": "C:\\Users\\vinod\\metam-services\\docs\\screenshots\\05-super-admin-users-workspace.png"
+  },
+  {
+    "file": "06-super-admin-modules-health.png",
+    "title": "Super Admin - Module health and filters",
+    "role": "super",
+    "url": "/platform?workspace=modules",
+    "path": "C:\\Users\\vinod\\metam-services\\docs\\screenshots\\06-super-admin-modules-health.png"
+  },
+  {
+    "file": "07-super-admin-audit-workspace.png",
+    "title": "Super Admin - Audit workspace",
+    "role": "super",
+    "url": "/platform?workspace=audit",
+    "path": "C:\\Users\\vinod\\metam-services\\docs\\screenshots\\07-super-admin-audit-workspace.png"
+  },
+  {
+    "file": "08-admin-company-center.png",
+    "title": "Admin - Company center",
+    "role": "admin",
+    "url": "/admin/company",
+    "path": "C:\\Users\\vinod\\metam-services\\docs\\screenshots\\08-admin-company-center.png"
+  },
+  {
+    "file": "09-admin-data-hub.png",
+    "title": "Admin - DataHub",
+    "role": "admin",
+    "url": "/data-hub",
+    "path": "C:\\Users\\vinod\\metam-services\\docs\\screenshots\\09-admin-data-hub.png"
+  },
+  {
+    "file": "10-planning-control-tower.png",
+    "title": "Planning module",
+    "role": "admin",
+    "url": "/planning",
+    "path": "C:\\Users\\vinod\\metam-services\\docs\\screenshots\\10-planning-control-tower.png"
+  },
+  {
+    "file": "11-inventory-control-tower.png",
+    "title": "Inventory module",
+    "role": "admin",
+    "url": "/inventory",
+    "path": "C:\\Users\\vinod\\metam-services\\docs\\screenshots\\11-inventory-control-tower.png"
+  },
+  {
+    "file": "12-warehouse-control-tower.png",
+    "title": "Warehouse module",
+    "role": "admin",
+    "url": "/warehouse",
+    "path": "C:\\Users\\vinod\\metam-services\\docs\\screenshots\\12-warehouse-control-tower.png"
+  },
+  {
+    "file": "13-production-control-tower.png",
+    "title": "Production module",
+    "role": "admin",
+    "url": "/production",
+    "path": "C:\\Users\\vinod\\metam-services\\docs\\screenshots\\13-production-control-tower.png"
+  },
+  {
+    "file": "14-maintenance-control-tower.png",
+    "title": "Maintenance module",
+    "role": "admin",
+    "url": "/maintenance",
+    "path": "C:\\Users\\vinod\\metam-services\\docs\\screenshots\\14-maintenance-control-tower.png"
+  },
+  {
+    "file": "15-quality-generic-backend-workspace.png",
+    "title": "Quality generic backend workspace",
+    "role": "admin",
+    "url": "/quality",
+    "path": "C:\\Users\\vinod\\metam-services\\docs\\screenshots\\15-quality-generic-backend-workspace.png"
+  },
+  {
+    "file": "16-user-limited-dashboard.png",
+    "title": "User - Limited dashboard",
+    "role": "user",
+    "url": "/",
+    "path": "C:\\Users\\vinod\\metam-services\\docs\\screenshots\\16-user-limited-dashboard.png"
+  }
+]

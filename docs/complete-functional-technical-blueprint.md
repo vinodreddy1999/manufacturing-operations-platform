@@ -10,6 +10,8 @@ pgAdmin URL: `http://localhost:5050`
 
 This document explains the application as if the reader has never seen it before. It covers what the platform does, who can use it, what each role can see, how navigation works, which frontend screens exist, which backend APIs exist, what data is stored, where gaps remain, and how the system is deployed.
 
+For real-time screenshots captured from the running Docker application, see [Metam Services - Real-Time Screenshot Walkthrough](real-time-screenshot-walkthrough.md).
+
 ## 1. Plain-English Product Overview
 
 Metam Services is a multi-tenant manufacturing operations platform.
@@ -1349,4 +1351,3 @@ Not yet complete:
 8. Build dedicated Compliance, Documents, Customer Portal, Supplier Portal.
 9. Add AI recommendations into each module as draft-only actions.
 10. Add automated E2E tests for all roles and module flows.
-
