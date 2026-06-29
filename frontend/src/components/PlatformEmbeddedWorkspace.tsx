@@ -1,4 +1,4 @@
-import { Download, Plus, Search } from 'lucide-react';
+import { Plus, Search } from 'lucide-react';
 import { useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -497,7 +497,7 @@ function UsersWorkspace() {
         <Select value={status} onChange={setStatus} label="All statuses" options={['Active', 'Disabled']} />
         <button className="form-button-primary inline-flex items-center justify-center gap-2" onClick={() => setCreateOpen(true)}><Plus className="h-4 w-4" />Add User</button>
       </div>
-      <Table headers={['User ID', 'Name', 'Email', 'Login', 'Role', 'Client', 'Market', 'Password Status', 'Password Expires', 'Last Login', 'Status', 'Action']} minWidth="min-w-[1380px]" count={rows.length}>
+      <Table headers={['User ID', 'Name', 'Email', 'Login', 'Role', 'Client', 'Market', 'Last Login', 'Status', 'Action']} minWidth="min-w-[1180px]" count={rows.length}>
         {rows.map((user) => (
           <tr key={user.userId} className="border-b border-white/10 hover:bg-white/[0.04]">
             <Cell accent>{user.userId}</Cell>
@@ -507,8 +507,6 @@ function UsersWorkspace() {
             <Cell>{user.roles.join(', ')}</Cell>
             <Cell>{user.clientName}</Cell>
             <Cell>{user.market}</Cell>
-            <Cell><StatusBadge status={passwordStatus(user)} /></Cell>
-            <Cell>{user.passwordExpiresAt ?? 'Not set'}</Cell>
             <Cell>{user.lastLogin}</Cell>
             <Cell><StatusBadge status={user.status} /></Cell>
             <Cell>
@@ -534,40 +532,36 @@ function UserCreateModal({ onClose }: { onClose: () => void }) {
     lastName: '',
     email: '',
     loginName: '',
-    temporaryPassword: '',
     clientId: initialClient.clientId,
     department: 'Operations',
     plant: 'Plant A',
-    roles: [] as string[],
-    applications: [] as string[],
-    modules: [] as string[],
+    role: 'Viewer',
+    applications: [...initialClient.enabledApplications],
+    modules: [...initialClient.enabledModules],
     reason: '',
   });
   const [error, setError] = useState('');
   const client = state.clients.find((item) => item.clientId === form.clientId) ?? initialClient;
 
   function changeClient(clientId: string) {
-    setForm({ ...form, clientId, applications: [], modules: [], roles: [] });
+    const next = state.clients.find((item) => item.clientId === clientId)!;
+    setForm({ ...form, clientId, applications: [...next.enabledApplications], modules: [...next.enabledModules] });
   }
 
   function submit() {
     if (!form.firstName.trim() || !form.lastName.trim() || !form.email.trim() || !form.loginName.trim()) { setError('First name, last name, email, and login name are required.'); return; }
-    if (form.temporaryPassword.length < 8) { setError('Manual temporary password is required and must be at least 8 characters.'); return; }
     if (state.users.some((user) => user.email.toLowerCase() === form.email.trim().toLowerCase())) { setError('Email must be unique.'); return; }
     if (state.users.some((user) => user.loginName.toLowerCase() === form.loginName.trim().toLowerCase())) { setError('Login Name must be unique.'); return; }
-    if (!form.roles.length) { setError('Assign at least one existing role manually. Default role access starts at zero.'); return; }
     if (!form.applications.length || !form.modules.length) { setError('Assign at least one application and one module.'); return; }
     if (!form.reason) { setError('An access assignment reason is required.'); return; }
-    const today = new Date().toISOString().slice(0, 10);
-    const user = createUser({ firstName: form.firstName.trim(), lastName: form.lastName.trim(), email: form.email.trim(), loginName: form.loginName.trim(), clientId: client.clientId, region: client.region, market: client.market, department: form.department, plant: form.plant, warehouse: 'Warehouse A', roles: form.roles, assignedApplications: form.applications, assignedModules: form.modules, status: 'Active', temporaryPassword: form.temporaryPassword, passwordDelivery: 'Manual', passwordLastSet: today, passwordExpiresAt: addDaysIso(today, 90), passwordResetRequired: true, passwordExpiryPromptDays: 14 });
-    recordAudit({ clientId: client.clientId, clientName: client.clientName, userId: platformUser.userId, moduleName: 'Admin', action: 'User access assigned', description: `Created ${user.fullName}. Manual password set and 90-day reset policy enforced. Reason: ${form.reason}.`, status: 'Completed' });
+    const user = createUser({ firstName: form.firstName.trim(), lastName: form.lastName.trim(), email: form.email.trim(), loginName: form.loginName.trim(), clientId: client.clientId, region: client.region, market: client.market, department: form.department, plant: form.plant, warehouse: 'Warehouse A', roles: [form.role], assignedApplications: form.applications, assignedModules: form.modules, status: 'Active' });
+    recordAudit({ clientId: client.clientId, clientName: client.clientName, userId: platformUser.userId, moduleName: 'Admin', action: 'User access assigned', description: `Created ${user.fullName}. Reason: ${form.reason}.`, status: 'Completed' });
     onClose();
   }
 
   return createPortal(
     <Drawer title="Create User" description="Identity, organization, role, application, and module access." onClose={onClose}>
       <UserFormFields form={form} setForm={setForm} clients={state.clients} client={client} changeClient={changeClient} mode="create" />
-      <MultiSelectAccessGrid title="Assigned Roles" description="Default role access starts at zero. Select existing roles manually; roles cannot be created here." items={platformRoles.filter((role) => role !== 'Super Admin')} selectedItems={form.roles} onChange={(roles) => setForm({ ...form, roles })} searchPlaceholder="Search roles..." columns={2} showClear showSelectedCount />
       <AccessSections applications={form.applications} modules={form.modules} appItems={client.enabledApplications} moduleItems={client.enabledModules} setApplications={(applications) => setForm({ ...form, applications })} setModules={(modules) => setForm({ ...form, modules })} />
       <Field label="Assignment Reason"><select className="form-input mt-1 w-full" value={form.reason} onChange={(event) => setForm({ ...form, reason: event.target.value })}><option value="">Select required reason</option><option>Business Requirement</option><option>Client Request</option><option>New Employee</option><option>Role Change</option><option>Other</option></select></Field>
       <DrawerActions error={error} cancel={onClose} submit={submit} submitLabel="Create User" />
@@ -589,9 +583,6 @@ function UserEditModal({ user, onClose }: { user: PlatformUser; onClose: () => v
     plant: user.plant ?? 'Plant A',
     roles: [...user.roles],
     status: user.status,
-    temporaryPassword: '',
-    passwordResetRequired: user.passwordResetRequired ?? false,
-    passwordExpiresAt: user.passwordExpiresAt ?? addDaysIso(new Date().toISOString().slice(0, 10), 90),
     applications: intersectOrDefault(user.assignedApplications, initialClient.enabledApplications),
     modules: intersectOrDefault(user.assignedModules, initialClient.enabledModules),
     reason: '',
@@ -627,12 +618,6 @@ function UserEditModal({ user, onClose }: { user: PlatformUser; onClose: () => v
       assignedApplications: form.applications,
       assignedModules: form.modules,
       status: form.status,
-      temporaryPassword: form.temporaryPassword || user.temporaryPassword,
-      passwordDelivery: 'Manual',
-      passwordResetRequired: form.passwordResetRequired,
-      passwordExpiresAt: form.passwordExpiresAt,
-      passwordLastSet: form.temporaryPassword ? new Date().toISOString().slice(0, 10) : user.passwordLastSet,
-      passwordExpiryPromptDays: user.passwordExpiryPromptDays ?? 14,
     }, `Edited user: ${form.reason.trim()}`);
     onClose();
   }
@@ -642,7 +627,6 @@ function UserEditModal({ user, onClose }: { user: PlatformUser; onClose: () => v
       <UserFormFields form={form} setForm={setForm} clients={state.clients} client={client} changeClient={changeClient} mode="edit" />
       <MultiSelectAccessGrid title="Assigned Roles" description="Add or remove role access for this user." items={platformRoles.filter((role) => role !== 'Super Admin' || user.roles.includes('Super Admin'))} selectedItems={form.roles} onChange={(roles) => setForm({ ...form, roles })} searchPlaceholder="Search roles..." columns={2} showSelectAll showClear showSelectedCount />
       <AccessSections applications={form.applications} modules={form.modules} appItems={client.enabledApplications} moduleItems={client.enabledModules} setApplications={(applications) => setForm({ ...form, applications })} setModules={(modules) => setForm({ ...form, modules })} />
-      <PasswordPolicyFields form={form} setForm={setForm} />
       <Field label="Change Reason"><input className="form-input mt-1 w-full" placeholder="Required audit reason" value={form.reason} onChange={(event) => setForm({ ...form, reason: event.target.value })} /></Field>
       <DrawerActions error={error} cancel={onClose} submit={submit} submitLabel="Save User" />
     </Drawer>,
@@ -655,15 +639,11 @@ type UserFormState = {
   lastName: string;
   email: string;
   loginName: string;
-  temporaryPassword?: string;
   clientId: string;
   department: string;
   plant: string;
   role?: string;
-  roles?: string[];
   status?: PlatformUser['status'];
-  passwordResetRequired?: boolean;
-  passwordExpiresAt?: string;
 };
 
 function UserFormFields<T extends UserFormState>({ form, setForm, clients, client, changeClient, mode }: {
@@ -680,30 +660,13 @@ function UserFormFields<T extends UserFormState>({ form, setForm, clients, clien
       <Field label="Last Name"><input className="form-input mt-1 w-full" value={form.lastName} onChange={(event) => setForm({ ...form, lastName: event.target.value })} /></Field>
       <Field label="Email"><input className="form-input mt-1 w-full" type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} /></Field>
       <Field label="Login Name"><input className="form-input mt-1 w-full" value={form.loginName} onChange={(event) => setForm({ ...form, loginName: event.target.value })} /></Field>
-      {mode === 'create' && <Field label="Manual Temporary Password"><input className="form-input mt-1 w-full" type="text" value={form.temporaryPassword ?? ''} onChange={(event) => setForm({ ...form, temporaryPassword: event.target.value })} placeholder="Set and share manually" /></Field>}
       <Field label="Client"><select className="form-input mt-1 w-full" value={form.clientId} onChange={(event) => changeClient(event.target.value)}>{clients.map((item) => <option key={item.clientId} value={item.clientId}>{item.clientName}</option>)}</select></Field>
       <Field label="Region / Market"><input className="form-input mt-1 w-full" value={`${client.region} / ${client.market}`} disabled /></Field>
       <Field label="Department"><input className="form-input mt-1 w-full" value={form.department} onChange={(event) => setForm({ ...form, department: event.target.value })} /></Field>
       <Field label="Plant"><input className="form-input mt-1 w-full" value={form.plant} onChange={(event) => setForm({ ...form, plant: event.target.value })} /></Field>
+      {mode === 'create' && <Field label="Role"><select className="form-input mt-1 w-full" value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value })}>{platformRoles.filter((item) => item !== 'Super Admin').map((item) => <option key={item}>{item}</option>)}</select></Field>}
       {mode === 'edit' && <Field label="Status"><select className="form-input mt-1 w-full" value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as PlatformUser['status'] })}><option>Active</option><option>Disabled</option></select></Field>}
     </div>
-  );
-}
-
-function PasswordPolicyFields<T extends UserFormState>({ form, setForm }: { form: T; setForm: Dispatch<SetStateAction<T>> }) {
-  return (
-    <fieldset className="rounded-2xl border border-white/10 bg-slate-950/20 p-4 sm:p-5">
-      <legend className="sr-only">Password policy</legend>
-      <div className="grid gap-3 md:grid-cols-3">
-        <Field label="Reset Password Manually"><input className="form-input mt-1 w-full" type="text" value={form.temporaryPassword ?? ''} onChange={(event) => setForm({ ...form, temporaryPassword: event.target.value })} placeholder="Optional new temporary password" /></Field>
-        <Field label="Password Expires At"><input className="form-input mt-1 w-full" type="date" value={form.passwordExpiresAt ?? ''} onChange={(event) => setForm({ ...form, passwordExpiresAt: event.target.value })} /></Field>
-        <label className="mt-6 flex items-center gap-3 rounded-xl border border-white/10 bg-slate-950/30 px-3 py-2 text-sm text-slate-200">
-          <input type="checkbox" checked={Boolean(form.passwordResetRequired)} onChange={(event) => setForm({ ...form, passwordResetRequired: event.target.checked })} />
-          Require reset on next login
-        </label>
-      </div>
-      <p className="mt-3 text-xs text-slate-500">Manual passwords expire every 90 days. Users should be prompted 14 days before expiry.</p>
-    </fieldset>
   );
 }
 
@@ -725,10 +688,9 @@ function ModulesWorkspace() {
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 md:grid-cols-[1fr_240px_auto]">
+      <div className="grid gap-3 md:grid-cols-[1fr_240px]">
         <SearchField value={search} onChange={setSearch} placeholder="Search module name or category..." />
         <Select value={status} onChange={setStatus} label="All statuses" options={['Healthy', 'Attention Needed', 'Critical']} />
-        <button className="form-button-subtle inline-flex items-center justify-center gap-2" onClick={() => downloadCsv('platform-module-details.csv', rows)}><Download className="h-4 w-4" />Download Details</button>
       </div>
       <Table headers={['Module', 'Category', 'Client Access', 'Users', 'Status', 'Action']} count={rows.length}>
         {rows.map((row) => (
@@ -1088,33 +1050,6 @@ function parseOptionId(label: string) {
 function intersectOrDefault(current: string[], allowed: string[]) {
   const next = current.filter((item) => allowed.includes(item));
   return next.length ? next : [...allowed];
-}
-
-function passwordStatus(user: PlatformUser) {
-  if (user.passwordResetRequired) return 'Reset Required';
-  if (!user.passwordExpiresAt) return 'Not Configured';
-  const days = Math.ceil((new Date(user.passwordExpiresAt).getTime() - Date.now()) / 86_400_000);
-  if (days < 0) return 'Expired';
-  if (days <= (user.passwordExpiryPromptDays ?? 14)) return 'Expiring Soon';
-  return 'Active';
-}
-
-function addDaysIso(dateText: string, days: number) {
-  const date = new Date(dateText);
-  date.setDate(date.getDate() + days);
-  return date.toISOString().slice(0, 10);
-}
-
-function downloadCsv(filename: string, rows: Array<Record<string, unknown>>) {
-  const headers = Object.keys(rows[0] ?? { message: '' });
-  const escape = (value: unknown) => `"${String(value ?? '').replaceAll('"', '""')}"`;
-  const csv = [headers.join(','), ...rows.map((row) => headers.map((header) => escape(row[header])).join(','))].join('\n');
-  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  link.click();
-  URL.revokeObjectURL(url);
 }
 
 function withAudit(state: PlatformState, platformUser: PlatformUser, input: Omit<PlatformAuditLog, 'logId' | 'timestamp' | 'userId'>) {
