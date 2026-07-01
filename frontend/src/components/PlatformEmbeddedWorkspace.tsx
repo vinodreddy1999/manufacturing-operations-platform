@@ -271,7 +271,7 @@ function ClientCreateDrawer({ onClose }: { onClose: () => void }) {
   });
   const [error, setError] = useState('');
 
-  function submit() {
+  async function submit() {
     const name = form.clientName.trim();
     if (!name) { setError('Client Name is required.'); return; }
     if (state.clients.some((client) => client.clientName.toLowerCase() === name.toLowerCase())) { setError('Client Name must be unique.'); return; }
@@ -351,7 +351,7 @@ function ClientEditDrawer({ client, onClose }: { client: PlatformClient; onClose
     setForm({ ...form, plants: [...form.plants, { plantId: makePlantId(client.clientId, form.plants.length + 1), plantName: '', status: 'Active' }] });
   }
 
-  function submit() {
+  async function submit() {
     const name = form.clientName.trim();
     if (!name) { setError('Client Name is required.'); return; }
     if (state.clients.some((item) => item.clientId !== client.clientId && item.clientName.toLowerCase() === name.toLowerCase())) { setError('Client Name must be unique.'); return; }
@@ -687,7 +687,7 @@ function UserCreateModal({ onClose }: { onClose: () => void }) {
     setForm({ ...form, clientId, plant: clientPlants(next)[0]?.plantName ?? '', applications: [...next.enabledApplications], modules: [...next.enabledModules] });
   }
 
-  function submit() {
+  async function submit() {
     if (!form.firstName.trim() || !form.lastName.trim() || !form.email.trim() || !form.loginName.trim()) { setError('First name, last name, email, and login name are required.'); return; }
     if (emailExists) { setError('Email ID already exists.'); return; }
     if (loginExists) { setError('Login name already exists.'); return; }
@@ -696,8 +696,22 @@ function UserCreateModal({ onClose }: { onClose: () => void }) {
     if (passwordErrors.length) { setError(`Password criteria missing: ${passwordErrors.join(' ')}`); return; }
     if (!form.applications.length || !form.modules.length) { setError('Assign at least one application and one module.'); return; }
     if (!form.reason) { setError('An access assignment reason is required.'); return; }
+    try {
+      await backend.createUser({
+        email: form.email.trim(),
+        name: `${form.firstName.trim()} ${form.lastName.trim()}`.trim(),
+        password: form.password,
+        role: mapPlatformRoleToRuntime(form.role),
+        is_active: true,
+        company_id: client.clientId,
+        plant_id: form.plant,
+      });
+    } catch (apiError) {
+      setError(apiError instanceof Error ? apiError.message : 'Backend user creation failed.');
+      return;
+    }
     const user = createUser({ firstName: form.firstName.trim(), lastName: form.lastName.trim(), email: form.email.trim(), loginName: form.loginName.trim(), clientId: client.clientId, region: client.region, market: client.market, department: form.department, plant: form.plant, warehouse: 'Warehouse A', roles: [form.role], assignedApplications: form.applications, assignedModules: form.modules, status: 'Active', passwordExpiresAt: passwordExpiryDate(), passwordResetRequired: true, passwordUpdatedAt: new Date().toISOString(), passwordHistoryHint: ['Initial password set by admin'] });
-    recordAudit({ clientId: client.clientId, clientName: client.clientName, userId: platformUser.userId, moduleName: 'Admin', action: 'User access assigned', description: `Created ${user.fullName}; manual protected password set and must be shared securely. Reason: ${form.reason}.`, status: 'Completed' });
+    recordAudit({ clientId: client.clientId, clientName: client.clientName, userId: platformUser.userId, moduleName: 'Admin', action: 'User access assigned', description: `Created runtime login and platform user ${user.fullName}; manual protected password set and must be shared securely. Reason: ${form.reason}.`, status: 'Completed' });
     onClose();
   }
 
@@ -749,7 +763,7 @@ function UserEditModal({ user, onClose }: { user: PlatformUser; onClose: () => v
     setForm({ ...form, clientId, plant: clientPlants(next)[0]?.plantName ?? '', applications: intersectOrDefault(form.applications, next.enabledApplications), modules: intersectOrDefault(form.modules, next.enabledModules) });
   }
 
-  function submit() {
+  async function submit() {
     if (!form.firstName.trim() || !form.lastName.trim() || !form.email.trim() || !form.loginName.trim()) { setError('First name, last name, email, and login name are required.'); return; }
     if (emailExists) { setError('Email ID already exists.'); return; }
     if (loginExists) { setError('Login name already exists.'); return; }
@@ -763,6 +777,18 @@ function UserEditModal({ user, onClose }: { user: PlatformUser; onClose: () => v
     if (!form.roles.length) { setError('Assign at least one role.'); return; }
     if (!form.applications.length || !form.modules.length) { setError('Assign at least one application and one module.'); return; }
     if (!form.reason.trim()) { setError('A change reason is required.'); return; }
+    if (form.resetPassword) {
+      try {
+        const runtimeUsers = await backend.users();
+        const runtimeUser = runtimeUsers.find((item) => item.email.toLowerCase() === user.email.toLowerCase());
+        if (runtimeUser) {
+          await backend.resetUserPassword(runtimeUser.id, { new_password: form.resetPassword, confirm_password: form.resetPasswordConfirm, force_change_on_login: form.forceChangeOnLogin });
+        }
+      } catch (apiError) {
+        setError(apiError instanceof Error ? apiError.message : 'Backend password reset failed.');
+        return;
+      }
+    }
     updateUser(user.userId, {
       firstName: form.firstName.trim(),
       lastName: form.lastName.trim(),
@@ -1452,6 +1478,17 @@ function generateClientPassword() {
   ];
   while (chars.length < 16) chars.push(all[Math.floor(Math.random() * all.length)]);
   return chars.sort(() => Math.random() - 0.5).join('');
+}
+
+function mapPlatformRoleToRuntime(role: string) {
+  if (role === 'Super Admin') return 'super_admin';
+  if (role === 'Company Admin') return 'admin';
+  if (role.includes('Manager')) return 'team_manager';
+  if (role === 'Supervisor') return 'supervisor';
+  if (role === 'Operator' || role === 'Technician') return 'operator';
+  if (role === 'Quality Manager') return 'qa_tester';
+  if (role === 'Viewer') return 'user';
+  return 'user';
 }
 
 function clientUserExportRows(users: PlatformUser[], client: PlatformClient) {
