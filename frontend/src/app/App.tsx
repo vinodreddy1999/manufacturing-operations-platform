@@ -1,6 +1,6 @@
 import { FormEvent, Suspense, lazy, useMemo, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Navigate, NavLink, Route, Routes } from 'react-router-dom';
+import { Navigate, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import {
   Activity,
   BadgeCheck,
@@ -109,6 +109,8 @@ export function App() {
 
 function AuthenticatedApp({ user, onLogout }: { user: RuntimeUser; onLogout: () => void }) {
   const { state, selectedClientId, selectedClient, isPlatformContext, canSelectPlatform, selectClient, platformUser } = usePlatform();
+  const location = useLocation();
+  const navigate = useNavigate();
   const allowedNavItems = isPlatformContext
     ? platformNavItems
     : navItems.filter((item) => {
@@ -170,7 +172,20 @@ function AuthenticatedApp({ user, onLogout }: { user: RuntimeUser; onLogout: () 
                 <Menu className="h-4 w-4" />
               </button>
               <div className="min-w-0">
-                <select className="form-input max-w-[260px] py-1.5 text-sm" value={selectedClientId ?? 'platform'} onChange={(event) => { const value = event.target.value; selectClient(value === 'platform' ? null : value); }}>
+                <select
+                  className="form-input max-w-[260px] py-1.5 text-sm"
+                  value={selectedClientId ?? 'platform'}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    if (value === 'platform') {
+                      selectClient(null);
+                      navigate('/platform');
+                      return;
+                    }
+                    selectClient(value);
+                    if (location.pathname.startsWith('/platform')) navigate('/');
+                  }}
+                >
                   {canSelectPlatform ? <option value="platform">Platform View</option> : null}
                   {state.clients.filter((client) => canSelectPlatform || client.clientId === platformUser.clientId).map((client) => <option key={client.clientId} value={client.clientId}>{client.clientName}</option>)}
                 </select>
