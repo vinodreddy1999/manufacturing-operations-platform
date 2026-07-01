@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 
 import { platformApplications, platformModules, platformRoles } from '../platform/data';
 import { usePlatform } from '../platform/PlatformContext';
+import { backend } from '../services/api';
 import type { ClientStatus, CurrencyCode, PlatformAuditLog, PlatformClient, PlatformState, PlatformUser } from '../platform/types';
 import { MultiSelectAccessGrid } from './MultiSelectAccessGrid';
 import { Panel } from './Panel';
@@ -670,6 +671,8 @@ function UserCreateModal({ onClose }: { onClose: () => void }) {
     department: 'Operations',
     plant: 'Plant A',
     role: 'Viewer',
+    password: '',
+    confirmPassword: '',
     applications: [...initialClient.enabledApplications],
     modules: [...initialClient.enabledModules],
     reason: '',
@@ -688,10 +691,13 @@ function UserCreateModal({ onClose }: { onClose: () => void }) {
     if (!form.firstName.trim() || !form.lastName.trim() || !form.email.trim() || !form.loginName.trim()) { setError('First name, last name, email, and login name are required.'); return; }
     if (emailExists) { setError('Email ID already exists.'); return; }
     if (loginExists) { setError('Login name already exists.'); return; }
+    if (form.password !== form.confirmPassword) { setError('Password and re-entered password must match.'); return; }
+    const passwordErrors = passwordCriteriaErrors(form.password);
+    if (passwordErrors.length) { setError(`Password criteria missing: ${passwordErrors.join(' ')}`); return; }
     if (!form.applications.length || !form.modules.length) { setError('Assign at least one application and one module.'); return; }
     if (!form.reason) { setError('An access assignment reason is required.'); return; }
-    const user = createUser({ firstName: form.firstName.trim(), lastName: form.lastName.trim(), email: form.email.trim(), loginName: form.loginName.trim(), clientId: client.clientId, region: client.region, market: client.market, department: form.department, plant: form.plant, warehouse: 'Warehouse A', roles: [form.role], assignedApplications: form.applications, assignedModules: form.modules, status: 'Active' });
-    recordAudit({ clientId: client.clientId, clientName: client.clientName, userId: platformUser.userId, moduleName: 'Admin', action: 'User access assigned', description: `Created ${user.fullName}. Reason: ${form.reason}.`, status: 'Completed' });
+    const user = createUser({ firstName: form.firstName.trim(), lastName: form.lastName.trim(), email: form.email.trim(), loginName: form.loginName.trim(), clientId: client.clientId, region: client.region, market: client.market, department: form.department, plant: form.plant, warehouse: 'Warehouse A', roles: [form.role], assignedApplications: form.applications, assignedModules: form.modules, status: 'Active', passwordExpiresAt: passwordExpiryDate(), passwordResetRequired: true, passwordUpdatedAt: new Date().toISOString(), passwordHistoryHint: ['Initial password set by admin'] });
+    recordAudit({ clientId: client.clientId, clientName: client.clientName, userId: platformUser.userId, moduleName: 'Admin', action: 'User access assigned', description: `Created ${user.fullName}; manual protected password set and must be shared securely. Reason: ${form.reason}.`, status: 'Completed' });
     onClose();
   }
 
@@ -699,6 +705,12 @@ function UserCreateModal({ onClose }: { onClose: () => void }) {
     <Drawer title="Create User" description="Identity, organization, role, application, and module access." onClose={onClose}>
       <Field label="User Unique ID"><input className="form-input mt-1 w-full" value={userIdPreview} disabled /></Field>
       <UserFormFields form={form} setForm={setForm} clients={state.clients} client={client} changeClient={changeClient} mode="create" emailExists={emailExists} loginExists={loginExists} />
+      <PasswordSetupFields
+        password={form.password}
+        confirmPassword={form.confirmPassword}
+        onPasswordChange={(password) => setForm({ ...form, password })}
+        onConfirmPasswordChange={(confirmPassword) => setForm({ ...form, confirmPassword })}
+      />
       <AccessSections applications={form.applications} modules={form.modules} appItems={client.enabledApplications} moduleItems={client.enabledModules} setApplications={(applications) => setForm({ ...form, applications })} setModules={(modules) => setForm({ ...form, modules })} />
       <Field label="Assignment Reason"><select className="form-input mt-1 w-full" value={form.reason} onChange={(event) => setForm({ ...form, reason: event.target.value })}><option value="">Select required reason</option><option>Business Requirement</option><option>Client Request</option><option>New Employee</option><option>Role Change</option><option>Other</option></select></Field>
       <DrawerActions error={error} cancel={onClose} submit={submit} submitLabel="Create User" />
@@ -708,7 +720,7 @@ function UserCreateModal({ onClose }: { onClose: () => void }) {
 }
 
 function UserEditModal({ user, onClose }: { user: PlatformUser; onClose: () => void }) {
-  const { state, updateUser } = usePlatform();
+  const { state, updateUser, recordAudit, platformUser } = usePlatform();
   const initialClient = state.clients.find((item) => item.clientId === user.clientId) ?? state.clients[0];
   const [form, setForm] = useState({
     firstName: user.firstName,
@@ -722,6 +734,9 @@ function UserEditModal({ user, onClose }: { user: PlatformUser; onClose: () => v
     status: user.status,
     applications: intersectOrDefault(user.assignedApplications, initialClient.enabledApplications),
     modules: intersectOrDefault(user.assignedModules, initialClient.enabledModules),
+    resetPassword: '',
+    resetPasswordConfirm: '',
+    forceChangeOnLogin: true,
     reason: '',
   });
   const [error, setError] = useState('');
@@ -738,6 +753,13 @@ function UserEditModal({ user, onClose }: { user: PlatformUser; onClose: () => v
     if (!form.firstName.trim() || !form.lastName.trim() || !form.email.trim() || !form.loginName.trim()) { setError('First name, last name, email, and login name are required.'); return; }
     if (emailExists) { setError('Email ID already exists.'); return; }
     if (loginExists) { setError('Login name already exists.'); return; }
+    if (form.resetPassword || form.resetPasswordConfirm) {
+      if (form.resetPassword !== form.resetPasswordConfirm) { setError('New password and re-entered password must match.'); return; }
+      const passwordErrors = passwordCriteriaErrors(form.resetPassword);
+      if (passwordErrors.length) { setError(`Reset password criteria missing: ${passwordErrors.join(' ')}`); return; }
+      const reused = (user.passwordHistoryHint ?? []).includes(passwordFingerprint(form.resetPassword));
+      if (reused) { setError('New password cannot match the last 3 passwords.'); return; }
+    }
     if (!form.roles.length) { setError('Assign at least one role.'); return; }
     if (!form.applications.length || !form.modules.length) { setError('Assign at least one application and one module.'); return; }
     if (!form.reason.trim()) { setError('A change reason is required.'); return; }
@@ -757,7 +779,11 @@ function UserEditModal({ user, onClose }: { user: PlatformUser; onClose: () => v
       assignedApplications: form.applications,
       assignedModules: form.modules,
       status: form.status,
+      ...(form.resetPassword ? { passwordExpiresAt: passwordExpiryDate(), passwordResetRequired: form.forceChangeOnLogin, passwordUpdatedAt: new Date().toISOString(), passwordHistoryHint: unique([passwordFingerprint(form.resetPassword), ...(user.passwordHistoryHint ?? [])]).slice(0, 3) } : {}),
     }, `Edited user: ${form.reason.trim()}`);
+    if (form.resetPassword) {
+      recordAudit({ clientId: client.clientId, clientName: client.clientName, userId: platformUser.userId, moduleName: 'Admin', action: 'Reset User Password', description: `Reset password for ${user.fullName}; force change on login: ${form.forceChangeOnLogin ? 'Yes' : 'No'}.`, status: 'Completed' });
+    }
     onClose();
   }
 
@@ -765,12 +791,82 @@ function UserEditModal({ user, onClose }: { user: PlatformUser; onClose: () => v
     <Drawer title="Edit User" description="Change client, role, status, and application/module access." onClose={onClose}>
       <Field label="User Unique ID"><input className="form-input mt-1 w-full" value={user.userId} disabled /></Field>
       <UserFormFields form={form} setForm={setForm} clients={state.clients} client={client} changeClient={changeClient} mode="edit" emailExists={emailExists} loginExists={loginExists} />
+      <PasswordSetupFields
+        title="Reset Password"
+        description={`Current expiry: ${user.passwordExpiresAt ? new Date(user.passwordExpiresAt).toLocaleDateString() : 'not set'}. Reset creates a new 90-day password cycle.`}
+        password={form.resetPassword}
+        confirmPassword={form.resetPasswordConfirm}
+        onPasswordChange={(resetPassword) => setForm({ ...form, resetPassword })}
+        onConfirmPasswordChange={(resetPasswordConfirm) => setForm({ ...form, resetPasswordConfirm })}
+      >
+        <label className="mt-3 flex items-center gap-2 text-sm text-slate-300">
+          <input type="checkbox" checked={form.forceChangeOnLogin} onChange={(event) => setForm({ ...form, forceChangeOnLogin: event.target.checked })} />
+          Force user to create a new password after next login
+        </label>
+      </PasswordSetupFields>
       <MultiSelectAccessGrid title="Assigned Roles" description="Add or remove role access for this user." items={platformRoles.filter((role) => role !== 'Super Admin' || user.roles.includes('Super Admin'))} selectedItems={form.roles} onChange={(roles) => setForm({ ...form, roles })} searchPlaceholder="Search roles..." columns={2} showSelectAll showClear showSelectedCount />
       <AccessSections applications={form.applications} modules={form.modules} appItems={client.enabledApplications} moduleItems={client.enabledModules} setApplications={(applications) => setForm({ ...form, applications })} setModules={(modules) => setForm({ ...form, modules })} />
       <Field label="Change Reason"><input className="form-input mt-1 w-full" placeholder="Required audit reason" value={form.reason} onChange={(event) => setForm({ ...form, reason: event.target.value })} /></Field>
       <DrawerActions error={error} cancel={onClose} submit={submit} submitLabel="Save User" />
     </Drawer>,
     document.body,
+  );
+}
+
+function PasswordSetupFields({ title = 'Manual Password Setup', description = 'Create a protected temporary password and share it with the user through a secure channel. Passwords expire every 90 days.', password, confirmPassword, onPasswordChange, onConfirmPasswordChange, children }: {
+  title?: string;
+  description?: string;
+  password: string;
+  confirmPassword: string;
+  onPasswordChange: (value: string) => void;
+  onConfirmPasswordChange: (value: string) => void;
+  children?: ReactNode;
+}) {
+  const [generated, setGenerated] = useState('');
+  const [generating, setGenerating] = useState(false);
+  const criteria = passwordCriteria(password);
+
+  async function generate() {
+    setGenerating(true);
+    try {
+      const response = await backend.generatePassword();
+      onPasswordChange(response.password);
+      onConfirmPasswordChange(response.password);
+      setGenerated(response.password);
+    } catch {
+      const fallback = generateClientPassword();
+      onPasswordChange(fallback);
+      onConfirmPasswordChange(fallback);
+      setGenerated(fallback);
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  return (
+    <fieldset className="rounded-2xl border border-cyan-300/15 bg-cyan-400/[0.04] p-4">
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div>
+          <h2 className="text-base font-semibold text-white">{title}</h2>
+          <p className="mt-1 text-sm text-slate-400">{description}</p>
+        </div>
+        <button type="button" className="form-button-subtle py-2 text-xs" onClick={generate} disabled={generating}>{generating ? 'Generating...' : 'Auto Generate'}</button>
+      </div>
+      <div className="mt-4 grid gap-3 md:grid-cols-2">
+        <Field label="New Password"><input className="form-input mt-1 w-full" type="password" value={password} onChange={(event) => onPasswordChange(event.target.value)} /></Field>
+        <Field label="Re-enter New Password"><input className="form-input mt-1 w-full" type="password" value={confirmPassword} onChange={(event) => onConfirmPasswordChange(event.target.value)} /></Field>
+      </div>
+      {generated && (
+        <div className="mt-3 rounded-xl border border-amber-300/20 bg-amber-400/10 p-3 text-sm text-amber-100">
+          Generated password: <span className="font-mono font-semibold">{generated}</span>. Copy it now and share only through your approved secure channel.
+        </div>
+      )}
+      <div className="mt-3 grid gap-2 text-xs text-slate-300 md:grid-cols-2">
+        {criteria.map((item) => <span key={item.label} className={item.met ? 'text-emerald-200' : 'text-slate-500'}>{item.met ? '[OK]' : '[ ]'} {item.label}</span>)}
+      </div>
+      <p className="mt-3 text-xs text-slate-500">Cannot reuse the last 3 passwords. Users see a change-password prompt 10 days before expiry and can skip until expiry policy requires action.</p>
+      {children}
+    </fieldset>
   );
 }
 
@@ -1311,6 +1407,51 @@ function clientPlants(client: PlatformClient) {
 
 function normalizeUserPlant(currentPlant: string | undefined, plants: NonNullable<PlatformClient['plants']>) {
   return plants.find((plant) => plant.plantName === currentPlant)?.plantName ?? plants[0]?.plantName ?? '';
+}
+
+function passwordExpiryDate() {
+  const date = new Date();
+  date.setDate(date.getDate() + 90);
+  return date.toISOString();
+}
+
+function passwordCriteria(password: string) {
+  return [
+    { label: 'At least 12 characters', met: password.length >= 12 },
+    { label: 'Uppercase letter', met: /[A-Z]/.test(password) },
+    { label: 'Lowercase letter', met: /[a-z]/.test(password) },
+    { label: 'Number', met: /\d/.test(password) },
+    { label: 'Special character', met: /[^A-Za-z0-9]/.test(password) },
+  ];
+}
+
+function passwordCriteriaErrors(password: string) {
+  return passwordCriteria(password).filter((item) => !item.met).map((item) => item.label);
+}
+
+function passwordFingerprint(password: string) {
+  let hash = 0;
+  for (let index = 0; index < password.length; index += 1) {
+    hash = ((hash << 5) - hash) + password.charCodeAt(index);
+    hash |= 0;
+  }
+  return `fp-${Math.abs(hash)}`;
+}
+
+function generateClientPassword() {
+  const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const lower = 'abcdefghijkmnopqrstuvwxyz';
+  const numbers = '23456789';
+  const special = '!@#$%^&*';
+  const all = upper + lower + numbers + special;
+  const chars = [
+    upper[Math.floor(Math.random() * upper.length)],
+    lower[Math.floor(Math.random() * lower.length)],
+    numbers[Math.floor(Math.random() * numbers.length)],
+    special[Math.floor(Math.random() * special.length)],
+  ];
+  while (chars.length < 16) chars.push(all[Math.floor(Math.random() * all.length)]);
+  return chars.sort(() => Math.random() - 0.5).join('');
 }
 
 function clientUserExportRows(users: PlatformUser[], client: PlatformClient) {

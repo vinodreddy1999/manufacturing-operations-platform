@@ -58,6 +58,12 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(200), index=True)
     name: Mapped[str] = mapped_column(String(200))
     password_hash: Mapped[str] = mapped_column(String(300))
+    password_history: Mapped[list[str]] = mapped_column(JSON, default=list)
+    password_changed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    password_expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    reset_token_hash: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    reset_token_expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    force_password_change: Mapped[bool] = mapped_column(Boolean, default=False)
     role: Mapped[str] = mapped_column(String(40), default="user")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 

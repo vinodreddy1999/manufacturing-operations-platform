@@ -29,6 +29,28 @@ class LoginPayload(BaseModel):
     password: str = Field(min_length=1)
 
 
+class ForgotPasswordPayload(BaseModel):
+    email: str
+
+
+class ResetPasswordPayload(BaseModel):
+    token: str = Field(min_length=16)
+    new_password: str = Field(min_length=1)
+    confirm_password: str = Field(min_length=1)
+
+
+class ChangePasswordPayload(BaseModel):
+    current_password: str = Field(min_length=1)
+    new_password: str = Field(min_length=1)
+    confirm_password: str = Field(min_length=1)
+
+
+class AdminResetPasswordPayload(BaseModel):
+    new_password: str = Field(min_length=1)
+    confirm_password: str = Field(min_length=1)
+    force_change_on_login: bool = True
+
+
 class SessionUser(BaseModel):
     id: str
     tenant_id: str
@@ -39,6 +61,10 @@ class SessionUser(BaseModel):
     role: RoleName
     is_active: bool
     permissions: list[str]
+    password_expires_at: str | None = None
+    password_days_to_expiry: int | None = None
+    password_expiry_warning: bool = False
+    force_password_change: bool = False
 
 
 class LoginResult(BaseModel):

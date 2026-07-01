@@ -68,6 +68,7 @@ const platformNavItems = [
 export function App() {
   const baseUrl = useMemo(() => apiConfig.baseUrl, []);
   const [sessionVersion, setSessionVersion] = useState(0);
+  const [passwordPromptSkippedFor, setPasswordPromptSkippedFor] = useState<string | null>(null);
   const session = useQuery({
     queryKey: ['runtime-session', sessionVersion],
     queryFn: backend.currentUser,
@@ -89,6 +90,19 @@ export function App() {
   }
 
   const user = session.data;
+  const shouldShowPasswordPrompt = (user.force_password_change || user.password_expiry_warning) && passwordPromptSkippedFor !== user.id;
+  if (shouldShowPasswordPrompt) {
+    return (
+      <PasswordChangeGate
+        user={user}
+        onChanged={() => {
+          setPasswordPromptSkippedFor(null);
+          setSessionVersion((value) => value + 1);
+        }}
+        onSkip={() => setPasswordPromptSkippedFor(user.id)}
+      />
+    );
+  }
   return <PlatformProvider runtimeUser={user}><AuthenticatedApp user={user} onLogout={() => setSessionVersion((value) => value + 1)} /></PlatformProvider>;
 }
 
@@ -283,10 +297,21 @@ function PlatformOnly({ user, children }: { user: RuntimeUser; children: ReactNo
 }
 
 function LoginScreen({ onLogin, baseUrl }: { onLogin: () => void; baseUrl: string }) {
+  const resetToken = new URLSearchParams(window.location.search).get('token');
+  const isResetPath = window.location.pathname.includes('reset-password');
   const [email, setEmail] = useState('super@metam.local');
   const [password, setPassword] = useState('SuperAdmin123!');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [forgotMode, setForgotMode] = useState(false);
+
+  if (isResetPath && resetToken) {
+    return <ResetPasswordScreen token={resetToken} onComplete={() => { window.history.replaceState({}, '', '/'); setForgotMode(false); }} />;
+  }
+
+  if (forgotMode) {
+    return <ForgotPasswordScreen onBack={() => setForgotMode(false)} />;
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -328,6 +353,9 @@ function LoginScreen({ onLogin, baseUrl }: { onLogin: () => void; baseUrl: strin
           <button className="focus-ring w-full rounded-2xl border border-cyan-300/20 bg-cyan-400/15 px-4 py-3 text-sm font-semibold text-cyan-50 shadow-[0_0_30px_rgba(34,211,238,0.2)] disabled:opacity-60" disabled={submitting}>
             {submitting ? 'Signing in...' : 'Sign in'}
           </button>
+          <button type="button" className="w-full text-center text-sm font-medium text-cyan-200 hover:text-cyan-100" onClick={() => setForgotMode(true)}>
+            Forgot password?
+          </button>
         </form>
 
         <div className="mt-5 rounded-2xl border border-white/10 bg-white/8 p-4 text-xs text-slate-300">
@@ -339,4 +367,167 @@ function LoginScreen({ onLogin, baseUrl }: { onLogin: () => void; baseUrl: strin
       </div>
     </div>
   );
+}
+
+function PasswordChangeGate({ user, onChanged, onSkip }: { user: RuntimeUser; onChanged: () => void; onSkip: () => void }) {
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [generated, setGenerated] = useState('');
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const criteria = loginPasswordCriteria(newPassword);
+  const force = Boolean(user.force_password_change);
+
+  async function generate() {
+    try {
+      const response = await backend.generatePassword();
+      setNewPassword(response.password);
+      setConfirmPassword(response.password);
+      setGenerated(response.password);
+    } catch {
+      const fallback = generateBrowserPassword();
+      setNewPassword(fallback);
+      setConfirmPassword(fallback);
+      setGenerated(fallback);
+    }
+  }
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true);
+    setError('');
+    setMessage('');
+    try {
+      await backend.changePassword({ current_password: currentPassword, new_password: newPassword, confirm_password: confirmPassword });
+      setMessage('Password updated successfully.');
+      onChanged();
+    } catch (changeError) {
+      setError(changeError instanceof Error ? changeError.message : 'Password update failed');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+      <div className="w-full max-w-lg rounded-[36px] border border-white/12 bg-white/8 p-7 shadow-[0_30px_90px_rgba(15,23,42,0.24)] backdrop-blur-2xl">
+        <h1 className="text-xl font-semibold text-white">{force ? 'Create a new password to continue' : 'Your password expires soon'}</h1>
+        <p className="mt-2 text-sm text-slate-300">
+          {force ? 'Your administrator requires a password change before entering the platform.' : `Your password expires in ${user.password_days_to_expiry ?? 'a few'} days. You can update it now or skip this reminder.`}
+        </p>
+        <form className="mt-5 space-y-4" onSubmit={submit}>
+          <input className="form-input w-full" type="password" placeholder="Current password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} />
+          <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+            <input className="form-input w-full" type="password" placeholder="New password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} />
+            <button type="button" className="form-button-subtle" onClick={generate}>Auto Generate</button>
+          </div>
+          <input className="form-input w-full" type="password" placeholder="Re-enter new password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} />
+          {generated ? <div className="rounded-2xl border border-amber-300/20 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">Generated password: <span className="font-mono font-semibold">{generated}</span></div> : null}
+          <div className="grid gap-2 text-xs text-slate-300 sm:grid-cols-2">{criteria.map((item) => <span key={item.label} className={item.met ? 'text-emerald-200' : 'text-slate-500'}>{item.met ? '[OK]' : '[ ]'} {item.label}</span>)}</div>
+          {error ? <div className="rounded-2xl border border-red-300/20 bg-red-400/10 px-4 py-3 text-sm text-red-100">{error}</div> : null}
+          {message ? <div className="rounded-2xl border border-emerald-300/20 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-100">{message}</div> : null}
+          <div className="flex flex-wrap justify-end gap-2">
+            {!force ? <button type="button" className="form-button-subtle" onClick={onSkip}>Skip for now</button> : null}
+            <button className="form-button-primary" disabled={saving}>{saving ? 'Updating...' : 'Update Password'}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function ForgotPasswordScreen({ onBack }: { onBack: () => void }) {
+  const [email, setEmail] = useState('');
+  const [result, setResult] = useState('');
+  const [error, setError] = useState('');
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError('');
+    try {
+      const response = await backend.forgotPassword(email);
+      setResult(response.reset_link ? `Demo reset link: ${window.location.origin}${response.reset_link}` : 'If this email exists, a reset link will be sent.');
+    } catch (forgotError) {
+      setError(forgotError instanceof Error ? forgotError.message : 'Unable to request password reset');
+    }
+  }
+
+  return (
+    <AuthCard title="Forgot Password" subtitle="Enter your email. A secure reset link is sent to the registered mailbox.">
+      <form className="space-y-4" onSubmit={submit}>
+        <input className="form-input w-full" type="email" placeholder="Email address" value={email} onChange={(event) => setEmail(event.target.value)} />
+        {result ? <div className="rounded-2xl border border-cyan-300/20 bg-cyan-400/10 px-4 py-3 text-sm text-cyan-100">{result}</div> : null}
+        {error ? <div className="rounded-2xl border border-red-300/20 bg-red-400/10 px-4 py-3 text-sm text-red-100">{error}</div> : null}
+        <button className="form-button-primary w-full">Send Reset Link</button>
+        <button type="button" className="form-button-subtle w-full" onClick={onBack}>Back to Sign In</button>
+      </form>
+    </AuthCard>
+  );
+}
+
+function ResetPasswordScreen({ token, onComplete }: { token: string; onComplete: () => void }) {
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError('');
+    try {
+      await backend.resetPassword({ token, new_password: newPassword, confirm_password: confirmPassword });
+      setMessage('Password updated. Return to sign in with your new password.');
+    } catch (resetError) {
+      setError(resetError instanceof Error ? resetError.message : 'Unable to reset password');
+    }
+  }
+
+  return (
+    <AuthCard title="Create New Password" subtitle="Use the reset link to create a protected password.">
+      <form className="space-y-4" onSubmit={submit}>
+        <input className="form-input w-full" type="password" placeholder="New password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} />
+        <input className="form-input w-full" type="password" placeholder="Re-enter new password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} />
+        <div className="grid gap-2 text-xs text-slate-300 sm:grid-cols-2">{loginPasswordCriteria(newPassword).map((item) => <span key={item.label} className={item.met ? 'text-emerald-200' : 'text-slate-500'}>{item.met ? '[OK]' : '[ ]'} {item.label}</span>)}</div>
+        {message ? <div className="rounded-2xl border border-emerald-300/20 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-100">{message}</div> : null}
+        {error ? <div className="rounded-2xl border border-red-300/20 bg-red-400/10 px-4 py-3 text-sm text-red-100">{error}</div> : null}
+        <button className="form-button-primary w-full">Update Password</button>
+        {message ? <button type="button" className="form-button-subtle w-full" onClick={onComplete}>Back to Sign In</button> : null}
+      </form>
+    </AuthCard>
+  );
+}
+
+function AuthCard({ title, subtitle, children }: { title: string; subtitle: string; children: ReactNode }) {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+      <div className="w-full max-w-md rounded-[36px] border border-white/12 bg-white/8 p-7 shadow-[0_30px_90px_rgba(15,23,42,0.24)] backdrop-blur-2xl">
+        <h1 className="text-xl font-semibold text-white">{title}</h1>
+        <p className="mt-2 text-sm text-slate-300">{subtitle}</p>
+        <div className="mt-5">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function loginPasswordCriteria(password: string) {
+  return [
+    { label: 'At least 12 characters', met: password.length >= 12 },
+    { label: 'Uppercase letter', met: /[A-Z]/.test(password) },
+    { label: 'Lowercase letter', met: /[a-z]/.test(password) },
+    { label: 'Number', met: /\d/.test(password) },
+    { label: 'Special character', met: /[^A-Za-z0-9]/.test(password) },
+  ];
+}
+
+function generateBrowserPassword() {
+  const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const lower = 'abcdefghijkmnopqrstuvwxyz';
+  const numbers = '23456789';
+  const special = '!@#$%^&*';
+  const all = upper + lower + numbers + special;
+  const chars = [upper, lower, numbers, special].map((set) => set[Math.floor(Math.random() * set.length)]);
+  while (chars.length < 16) chars.push(all[Math.floor(Math.random() * all.length)]);
+  return chars.sort(() => Math.random() - 0.5).join('');
 }

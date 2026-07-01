@@ -157,12 +157,27 @@ export type RuntimeUser = {
     | 'user';
   is_active: boolean;
   permissions: string[];
+  password_expires_at?: string | null;
+  password_days_to_expiry?: number | null;
+  password_expiry_warning?: boolean;
+  force_password_change?: boolean;
 };
 
 export type RuntimeLoginResult = {
   access_token: string;
   token_type: string;
   user: RuntimeUser;
+};
+
+export type PasswordPolicy = {
+  min_length: number;
+  requires_uppercase: boolean;
+  requires_lowercase: boolean;
+  requires_number: boolean;
+  requires_special: boolean;
+  expires_every_days: number;
+  expiry_warning_days: number;
+  last_password_reuse_blocked: number;
 };
 
 export type ModuleRecord = {

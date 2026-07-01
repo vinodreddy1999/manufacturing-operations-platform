@@ -48,6 +48,10 @@ export type PlatformUser = {
   assignedApplications: string[];
   assignedModules: string[];
   status: 'Active' | 'Disabled';
+  passwordExpiresAt?: string;
+  passwordResetRequired?: boolean;
+  passwordUpdatedAt?: string;
+  passwordHistoryHint?: string[];
   lastLogin: string;
   createdDate: string;
 };

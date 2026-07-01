@@ -1,4 +1,5 @@
-from datetime import datetime
+import secrets
+from datetime import datetime, timedelta
 from typing import Any
 from uuid import uuid4
 
@@ -12,14 +13,29 @@ from .platform_models import AuditLog, ModuleRecord, User
 from .runtime_schemas import (
     LoginPayload,
     LoginResult,
+    AdminResetPasswordPayload,
+    ChangePasswordPayload,
+    ForgotPasswordPayload,
     ModuleRecordCreate,
     ModuleRecordUpdate,
+    ResetPasswordPayload,
     RuntimeEnvelope,
     SessionUser,
     UserCreate,
     UserUpdate,
 )
-from .security import JWT_ALGORITHM, JWT_SECRET, create_token, hash_password, verify_password
+from .security import (
+    JWT_ALGORITHM,
+    JWT_SECRET,
+    PASSWORD_EXPIRY_DAYS,
+    PASSWORD_EXPIRY_WARNING_DAYS,
+    create_token,
+    generate_secure_password,
+    hash_password,
+    password_policy,
+    validate_password_strength,
+    verify_password,
+)
 
 router = APIRouter(prefix="/runtime", tags=["Runtime Application"])
 
@@ -50,6 +66,18 @@ def ensure_runtime_schema() -> None:
         if "role" not in user_columns:
             with engine.begin() as connection:
                 connection.execute(text("ALTER TABLE users ADD COLUMN role VARCHAR(40) DEFAULT 'user'"))
+        missing_columns = {
+            "password_history": "JSON DEFAULT '[]'",
+            "password_changed_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+            "password_expires_at": "TIMESTAMP",
+            "reset_token_hash": "VARCHAR(300)",
+            "reset_token_expires_at": "TIMESTAMP",
+            "force_password_change": "BOOLEAN DEFAULT FALSE",
+        }
+        with engine.begin() as connection:
+            for column, ddl in missing_columns.items():
+                if column not in user_columns:
+                    connection.execute(text(f"ALTER TABLE users ADD COLUMN {column} {ddl}"))
 
 
 def runtime_result(action: str, message: str, data: Any) -> RuntimeEnvelope:
@@ -66,6 +94,9 @@ def has_override_scope(user: User) -> bool:
 
 def serialize_user(user: User) -> dict[str, Any]:
     role = user.role or "user"
+    now = datetime.utcnow()
+    expires_at = user.password_expires_at or (user.password_changed_at + timedelta(days=PASSWORD_EXPIRY_DAYS) if user.password_changed_at else None)
+    days_to_expiry = (expires_at - now).days if expires_at else None
     return {
         "id": user.id,
         "tenant_id": user.tenant_id,
@@ -76,6 +107,10 @@ def serialize_user(user: User) -> dict[str, Any]:
         "role": role,
         "is_active": user.is_active,
         "permissions": permissions_for(role),
+        "password_expires_at": expires_at.isoformat() if expires_at else None,
+        "password_days_to_expiry": days_to_expiry,
+        "password_expiry_warning": days_to_expiry is not None and 0 <= days_to_expiry <= PASSWORD_EXPIRY_WARNING_DAYS,
+        "force_password_change": bool(user.force_password_change),
     }
 
 
@@ -138,6 +173,32 @@ def audit(db: Session, actor: User, action: str, entity_type: str, entity_id: st
     )
 
 
+def set_user_password(user: User, password: str, *, force_change_on_login: bool = False) -> None:
+    errors = validate_password_strength(password)
+    if errors:
+        raise HTTPException(status_code=422, detail={"message": "Password does not meet protection criteria", "criteria": password_policy(), "errors": errors})
+    history = list(user.password_history or [])
+    recent_hashes = [user.password_hash, *history][:3]
+    for stored_hash in recent_hashes:
+        if not stored_hash or stored_hash == "pending":
+            continue
+        try:
+            if verify_password(password, stored_hash):
+                raise HTTPException(status_code=409, detail="New password cannot match the last 3 passwords")
+        except ValueError:
+            continue
+    if user.password_hash:
+        history = [user.password_hash, *history][:3]
+    now = datetime.utcnow()
+    user.password_hash = hash_password(password)
+    user.password_history = history
+    user.password_changed_at = now
+    user.password_expires_at = now + timedelta(days=PASSWORD_EXPIRY_DAYS)
+    user.force_password_change = force_change_on_login
+    user.reset_token_hash = None
+    user.reset_token_expires_at = None
+
+
 @router.post("/auth/login", response_model=RuntimeEnvelope)
 def runtime_login(payload: LoginPayload, db: Session = Depends(get_db)) -> RuntimeEnvelope:
     ensure_runtime_schema()
@@ -146,12 +207,69 @@ def runtime_login(payload: LoginPayload, db: Session = Depends(get_db)) -> Runti
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User is disabled")
+    if user.password_expires_at is None:
+        user.password_expires_at = datetime.utcnow() + timedelta(days=PASSWORD_EXPIRY_DAYS)
+        db.commit()
     role = user.role or "user"
     result = LoginResult(
         access_token=create_token(user.id, user.tenant_id, permissions_for(role), minutes=8 * 60),
         user=SessionUser(**serialize_user(user)),
     )
     return runtime_result("login", "Authenticated user session.", result.model_dump())
+
+
+@router.get("/auth/password-policy", response_model=RuntimeEnvelope)
+def get_password_policy() -> RuntimeEnvelope:
+    return runtime_result("password_policy", "Password protection criteria.", password_policy())
+
+
+@router.post("/auth/generate-password", response_model=RuntimeEnvelope)
+def generate_password(_: User = Depends(current_user)) -> RuntimeEnvelope:
+    return runtime_result("generate_password", "Secure temporary password generated.", {"password": generate_secure_password(), "criteria": password_policy()})
+
+
+@router.post("/auth/forgot-password", response_model=RuntimeEnvelope)
+def forgot_password(payload: ForgotPasswordPayload, db: Session = Depends(get_db)) -> RuntimeEnvelope:
+    ensure_runtime_schema()
+    user = db.query(User).filter(User.email == payload.email, User.tenant_id == TENANT_ID).first()
+    if user:
+        token = secrets.token_urlsafe(32)
+        user.reset_token_hash = hash_password(token)
+        user.reset_token_expires_at = datetime.utcnow() + timedelta(minutes=30)
+        db.commit()
+        return runtime_result(
+            "forgot_password",
+            "Password reset email queued. Demo mode returns the secure link for testing.",
+            {"email": payload.email, "reset_link": f"/reset-password?token={token}", "expires_in_minutes": 30},
+        )
+    return runtime_result("forgot_password", "If the email exists, a password reset link will be sent.", {"email": payload.email})
+
+
+@router.post("/auth/reset-password", response_model=RuntimeEnvelope)
+def reset_password(payload: ResetPasswordPayload, db: Session = Depends(get_db)) -> RuntimeEnvelope:
+    ensure_runtime_schema()
+    if payload.new_password != payload.confirm_password:
+        raise HTTPException(status_code=422, detail="New password and re-entered password must match")
+    candidates = db.query(User).filter(User.reset_token_hash.isnot(None), User.tenant_id == TENANT_ID).all()
+    user = next((row for row in candidates if row.reset_token_hash and verify_password(payload.token, row.reset_token_hash)), None)
+    if not user or not user.reset_token_expires_at or user.reset_token_expires_at < datetime.utcnow():
+        raise HTTPException(status_code=400, detail="Reset link is invalid or expired")
+    set_user_password(user, payload.new_password)
+    db.commit()
+    return runtime_result("reset_password", "Password updated. User can now sign in.", {"email": user.email})
+
+
+@router.post("/auth/change-password", response_model=RuntimeEnvelope)
+def change_password(payload: ChangePasswordPayload, user: User = Depends(current_user), db: Session = Depends(get_db)) -> RuntimeEnvelope:
+    if not verify_password(payload.current_password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Current password is incorrect")
+    if payload.new_password != payload.confirm_password:
+        raise HTTPException(status_code=422, detail="New password and re-entered password must match")
+    old_value = serialize_user(user)
+    set_user_password(user, payload.new_password)
+    audit(db, user, "CHANGE_PASSWORD", "user", user.id, old_value, serialize_user(user))
+    db.commit()
+    return runtime_result("change_password", "Password changed successfully.", serialize_user(user))
 
 
 @router.get("/auth/me", response_model=RuntimeEnvelope)
@@ -186,10 +304,11 @@ def create_user(payload: UserCreate, actor: User = Depends(require_any("admin"))
         plant_id=payload.plant_id or PLANT_ID,
         email=payload.email,
         name=payload.name,
-        password_hash=hash_password(payload.password),
+        password_hash="pending",
         role=payload.role,
         is_active=payload.is_active,
     )
+    set_user_password(user, payload.password, force_change_on_login=True)
     db.add(user)
     audit(db, actor, "CREATE", "user", user.id, None, serialize_user(user))
     db.commit()
@@ -216,11 +335,27 @@ def update_user(user_id: str, payload: UserUpdate, actor: User = Depends(require
     if payload.is_active is not None:
         user.is_active = payload.is_active
     if payload.password:
-        user.password_hash = hash_password(payload.password)
+        set_user_password(user, payload.password, force_change_on_login=True)
     audit(db, actor, "UPDATE", "user", user.id, old_value, serialize_user(user))
     db.commit()
     db.refresh(user)
     return runtime_result("update_user", "User updated.", serialize_user(user))
+
+
+@router.post("/users/{user_id}/reset-password", response_model=RuntimeEnvelope)
+def admin_reset_user_password(user_id: str, payload: AdminResetPasswordPayload, actor: User = Depends(require_any("admin")), db: Session = Depends(get_db)) -> RuntimeEnvelope:
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if not has_override_scope(actor) and user.company_id != actor.company_id:
+        raise HTTPException(status_code=403, detail="Cannot reset users from another company")
+    if payload.new_password != payload.confirm_password:
+        raise HTTPException(status_code=422, detail="New password and re-entered password must match")
+    old_value = serialize_user(user)
+    set_user_password(user, payload.new_password, force_change_on_login=payload.force_change_on_login)
+    audit(db, actor, "RESET_PASSWORD", "user", user.id, old_value, serialize_user(user))
+    db.commit()
+    return runtime_result("reset_user_password", "Password reset. Share the temporary password securely with the user.", serialize_user(user))
 
 
 @router.get("/records", response_model=RuntimeEnvelope)

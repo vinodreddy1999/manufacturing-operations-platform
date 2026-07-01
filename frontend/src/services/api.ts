@@ -21,6 +21,7 @@ import type {
   OperationalFootprint,
   RuntimeAnalytics,
   DataHubUpload,
+  PasswordPolicy,
   RuntimeLoginResult,
   RuntimeUser,
 } from '../types';
@@ -182,6 +183,23 @@ export const backend = {
     window.localStorage.setItem(tokenStorageKey, response.data.data.access_token);
     return response.data.data;
   },
+  passwordPolicy: () => getEnvelope<PasswordPolicy>('/runtime/auth/password-policy'),
+  generatePassword: async () => {
+    const response = await api.post<ApiEnvelope<{ password: string; criteria: PasswordPolicy }>>('/runtime/auth/generate-password');
+    return response.data.data;
+  },
+  forgotPassword: async (email: string) => {
+    const response = await api.post<ApiEnvelope<{ email: string; reset_link?: string; expires_in_minutes?: number }>>('/runtime/auth/forgot-password', { email });
+    return response.data.data;
+  },
+  resetPassword: async (payload: { token: string; new_password: string; confirm_password: string }) => {
+    const response = await api.post<ApiEnvelope<{ email: string }>>('/runtime/auth/reset-password', payload);
+    return response.data.data;
+  },
+  changePassword: async (payload: { current_password: string; new_password: string; confirm_password: string }) => {
+    const response = await api.post<ApiEnvelope<RuntimeUser>>('/runtime/auth/change-password', payload);
+    return response.data.data;
+  },
   logout: () => {
     window.localStorage.removeItem(tokenStorageKey);
   },
@@ -201,6 +219,10 @@ export const backend = {
   },
   updateUser: async (id: string, payload: Partial<Pick<RuntimeUser, 'name' | 'role' | 'is_active'>>) => {
     const response = await api.put<ApiEnvelope<RuntimeUser>>(`/runtime/users/${id}`, payload);
+    return response.data.data;
+  },
+  resetUserPassword: async (id: string, payload: { new_password: string; confirm_password: string; force_change_on_login: boolean }) => {
+    const response = await api.post<ApiEnvelope<RuntimeUser>>(`/runtime/users/${id}/reset-password`, payload);
     return response.data.data;
   },
   records: (moduleKey?: string) => getEnvelope<ModuleRecord[]>(moduleKey ? `/runtime/records?module_key=${moduleKey}` : '/runtime/records'),
