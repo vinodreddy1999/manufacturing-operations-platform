@@ -4,6 +4,7 @@ import { Cable, Database, Gauge, RadioTower, Route, ShieldCheck, Trash2, UploadC
 
 import { DataTable } from '../components/DataTable';
 import { ErrorState } from '../components/ErrorState';
+import { LazyImpactSummary } from '../components/LazyImpactSummary';
 import { LoadingState } from '../components/LoadingState';
 import { PageHeader } from '../components/PageHeader';
 import { Panel } from '../components/Panel';
@@ -11,7 +12,6 @@ import { StatCard } from '../components/StatCard';
 import { StatusBadge } from '../components/StatusBadge';
 import { canManagePlatform, canUseDataHubUploads } from '../lib/rbac';
 import { backend } from '../services/api';
-import { ModuleImpactSummary } from '../impact/components/ModuleImpactSummary';
 import type { Company, ConnectedSystem, DataCatalogEntry, DataMappingRule, RuntimeUser } from '../types';
 
 const acceptedFormats = '.csv,.tsv,.xls,.xlsx,.xlsm,.json,.xml,.txt,.ods';
@@ -719,8 +719,8 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
           </div>
         </div>
       </div>
-      <ModuleImpactSummary moduleKey="integration-hub" />
-      <ModuleImpactSummary moduleKey="data-hub" />
+      <LazyImpactSummary moduleKey="integration-hub" />
+      <LazyImpactSummary moduleKey="data-hub" />
     </>
   );
 }

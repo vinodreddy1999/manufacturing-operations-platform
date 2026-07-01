@@ -1,8 +1,8 @@
 import { ArrowRightLeft, BarChart3, ClipboardCheck, FileText, History, PackageCheck, PackagePlus, Search, ShieldCheck, Truck, Users, Warehouse } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
+import { LazyBarChart, LazyLineChart } from '../components/LazyCharts';
 import { PageHeader } from '../components/PageHeader';
 import { Panel } from '../components/Panel';
 import { ScrollableTableFrame } from '../components/ScrollableTableFrame';
@@ -305,36 +305,11 @@ function WarehouseFormDrawer({ title, onClose }: { title: string; onClose: () =>
 }
 
 function WarehouseBarChart({ data, bars }: { data: Array<Record<string, string | number>>; bars: string[] }) {
-  const colors = ['#22d3ee', '#34d399', '#f59e0b', '#f43f5e'];
-  return (
-    <div className="h-72">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data}>
-          <CartesianGrid stroke="rgba(255,255,255,0.08)" />
-          <XAxis dataKey="name" stroke="#94a3b8" tick={{ fontSize: 11 }} />
-          <YAxis stroke="#94a3b8" />
-          <Tooltip cursor={{ fill: 'rgba(255,255,255,0.04)' }} contentStyle={{ background: '#0f172a', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12 }} />
-          {bars.map((bar, index) => <Bar key={bar} dataKey={bar} fill={colors[index % colors.length]} radius={[6, 6, 0, 0]} />)}
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
-  );
+  return <LazyBarChart data={data} bars={bars} />;
 }
 
 function WarehouseLineChart({ data }: { data: Array<Record<string, string | number>> }) {
-  return (
-    <div className="h-72">
-      <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data}>
-          <CartesianGrid stroke="rgba(255,255,255,0.08)" />
-          <XAxis dataKey="name" stroke="#94a3b8" />
-          <YAxis stroke="#94a3b8" />
-          <Tooltip contentStyle={{ background: '#0f172a', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12 }} />
-          <Line type="monotone" dataKey="value" stroke="#22d3ee" strokeWidth={3} dot={{ fill: '#22d3ee' }} />
-        </LineChart>
-      </ResponsiveContainer>
-    </div>
-  );
+  return <LazyLineChart data={data} />;
 }
 
 function WarehouseImpactGrid() {

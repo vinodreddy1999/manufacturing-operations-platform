@@ -1,10 +1,11 @@
 import { FormEvent, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Trash2 } from 'lucide-react';
 
 import { DataTable } from '../components/DataTable';
 import { ErrorState } from '../components/ErrorState';
+import { LazyBarChart } from '../components/LazyCharts';
+import { LazyImpactSummary } from '../components/LazyImpactSummary';
 import { LoadingState } from '../components/LoadingState';
 import { PageHeader } from '../components/PageHeader';
 import { Panel } from '../components/Panel';
@@ -13,7 +14,6 @@ import { StatusBadge } from '../components/StatusBadge';
 import { getModuleDefinition } from '../data/phase1';
 import { canWriteOperationalData } from '../lib/rbac';
 import { backend } from '../services/api';
-import { ModuleImpactSummary } from '../impact/components/ModuleImpactSummary';
 import type { ModuleRecord, RuntimeUser } from '../types';
 
 function statusIsOpen(status: string) {
@@ -209,19 +209,10 @@ export function ModuleWorkspacePage({ moduleKey, user }: { moduleKey: string; us
         </Panel>
 
         <Panel title="Backend Record Volume" description="Chart generated from the loaded module records.">
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartRows}>
-                <XAxis dataKey="name" stroke="#94a3b8" tick={{ fontSize: 11 }} />
-                <YAxis stroke="#94a3b8" allowDecimals={false} />
-                <Tooltip />
-                <Bar dataKey="quantity" fill="#22d3ee" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          <LazyBarChart data={chartRows} bars={['quantity']} showGrid={false} />
         </Panel>
       </div>
-      <ModuleImpactSummary moduleKey={moduleKey} />
+      <LazyImpactSummary moduleKey={moduleKey} />
     </>
   );
 }

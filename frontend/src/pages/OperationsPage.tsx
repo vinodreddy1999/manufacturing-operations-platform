@@ -1,11 +1,11 @@
 import { FormEvent, useMemo, useState } from 'react';
 import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Boxes, Factory, ShieldCheck, Trash2, Wrench } from 'lucide-react';
 
 import { DataTable } from '../components/DataTable';
 import { ErrorState } from '../components/ErrorState';
+import { LazyBarChart } from '../components/LazyCharts';
 import { LoadingState } from '../components/LoadingState';
 import { PageHeader } from '../components/PageHeader';
 import { Panel } from '../components/Panel';
@@ -182,17 +182,7 @@ export function OperationsPage({ user }: { user: RuntimeUser }) {
         </Panel>
 
         <Panel title="Live Module Record Counts" description="Visualization generated from /runtime/analytics/summary.">
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartRows}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="module" />
-                <YAxis allowDecimals={false} />
-                <Tooltip />
-                <Bar dataKey="count" fill="#2563eb" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          <LazyBarChart data={chartRows.map((item) => ({ name: item.module, count: item.count }))} bars={['count']} />
         </Panel>
       </div>
 

@@ -1582,10 +1582,6 @@ function exportRows(filename: string, rows: Array<Record<string, string | number
   URL.revokeObjectURL(url);
 }
 
-function userLabel(user: PlatformUser) {
-  return `${user.userId} | ${user.fullName} | ${user.email}`;
-}
-
 function clientLabel(client: PlatformClient) {
   return `${client.clientId} | ${client.clientName}`;
 }

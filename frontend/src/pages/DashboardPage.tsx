@@ -1,10 +1,10 @@
-import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Activity, Bell, Boxes, CheckCircle2, Link2, PackageCheck, ShoppingCart } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 
 import { DataTable } from '../components/DataTable';
 import { ErrorState } from '../components/ErrorState';
+import { LazyBarChart } from '../components/LazyCharts';
 import { LoadingState } from '../components/LoadingState';
 import { PageHeader } from '../components/PageHeader';
 import { Panel } from '../components/Panel';
@@ -181,16 +181,7 @@ export function DashboardPage({ user }: { user: RuntimeUser }) {
 
       <div className="mt-6 grid gap-4 xl:grid-cols-[1fr_0.9fr]">
         <Panel title="Operational Status" description="High-level operational health across core business functions.">
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={operationalStatus}>
-                <XAxis dataKey="area" stroke="#94a3b8" tick={{ fontSize: 11 }} />
-                <YAxis stroke="#94a3b8" domain={[0, 100]} />
-                <Tooltip />
-                <Bar dataKey="value" fill="#22d3ee" radius={[8, 8, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          <LazyBarChart data={operationalStatus.map((item) => ({ name: item.area, value: item.value }))} bars={['value']} height="h-80" showGrid={false} />
         </Panel>
 
         <Panel title="Open Notifications" description="Operational items that require review or action.">

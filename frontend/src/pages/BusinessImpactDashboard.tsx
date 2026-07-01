@@ -1,8 +1,8 @@
-import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Banknote, Clock3, Gauge, ShieldCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 import { PageHeader } from '../components/PageHeader';
+import { LazyBusinessImpactChart } from '../components/LazyCharts';
 import { Panel } from '../components/Panel';
 import { calculateImpactTotals, calculateModuleSavings, formatMetricValue, round } from '../impact/calculations';
 import { moduleImpacts } from '../impact/data';
@@ -38,7 +38,7 @@ export function BusinessImpactDashboard() {
       </div>
 
       <Panel title="Savings and improvement by module" description="Financial impact with completed improvements and current declines.">
-        <div className="h-[420px]"><ResponsiveContainer width="100%" height="100%"><BarChart data={moduleRows} margin={{ left: 10, right: 10, top: 15, bottom: 80 }}><CartesianGrid stroke="rgba(148,163,184,.1)" vertical={false} /><XAxis dataKey="module" stroke="#64748b" tick={{ fontSize: 10 }} angle={-35} textAnchor="end" interval={0} /><YAxis yAxisId="left" stroke="#64748b" tick={{ fontSize: 10 }} /><YAxis yAxisId="right" orientation="right" stroke="#64748b" tick={{ fontSize: 10 }} /><Tooltip contentStyle={{ background: '#0f172a', border: '1px solid rgba(255,255,255,.12)', borderRadius: 12 }} /><Legend /><Bar yAxisId="left" dataKey="savings" name={`Savings (${currency})`} fill="#22d3ee" radius={[6, 6, 0, 0]} /><Bar yAxisId="right" dataKey="improved" name="Improved" fill="#34d399" radius={[6, 6, 0, 0]} /><Bar yAxisId="right" dataKey="declined" name="Declined" fill="#fb7185" radius={[6, 6, 0, 0]} /></BarChart></ResponsiveContainer></div>
+        <LazyBusinessImpactChart data={moduleRows} currency={currency} />
       </Panel>
 
       <Panel title="Module impact register" description="Open any module to review its complete metric portfolio.">

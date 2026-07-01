@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 
 import { AccessDeniedState } from '../components/AccessDeniedState';
+import { LazyChunkBoundary } from '../components/LazyChunkBoundary';
 import { LoadingState } from '../components/LoadingState';
 import { canAccessSection } from '../lib/rbac';
 import { apiConfig, backend } from '../services/api';
@@ -212,8 +213,9 @@ function AuthenticatedApp({ user, onLogout }: { user: RuntimeUser; onLogout: () 
         </header>
 
         <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
-          <Suspense fallback={<LoadingState label="Loading workspace view" />}>
-            <Routes>
+          <LazyChunkBoundary label="Workspace view">
+            <Suspense fallback={<LoadingState label="Loading workspace view" />}>
+              <Routes>
               <Route path="/" element={isPlatformContext ? <PlatformDashboardPage /> : <DashboardPage user={user} />} />
               <Route path="/platform" element={<PlatformOnly user={user}>{isPlatformContext ? <PlatformDashboardPage /> : <DashboardPage user={user} />}</PlatformOnly>} />
               <Route path="/platform/modules/:moduleName" element={<PlatformOnly user={user}><PlatformModulePage /></PlatformOnly>} />
@@ -254,8 +256,9 @@ function AuthenticatedApp({ user, onLogout }: { user: RuntimeUser; onLogout: () 
               <Route path="/reports" element={<ProtectedRoute user={user} section="operations"><BusinessImpactDashboard /></ProtectedRoute>} />
               <Route path="/documents" element={<ProtectedRoute user={user} section="operations"><ModuleWorkspacePage moduleKey="documents" user={user} /></ProtectedRoute>} />
               <Route path="/impact/:module/:metric" element={<ProtectedRoute user={user} section="operations"><ImpactDrilldownPage /></ProtectedRoute>} />
-            </Routes>
-          </Suspense>
+              </Routes>
+            </Suspense>
+          </LazyChunkBoundary>
         </main>
       </div>
     </div>
