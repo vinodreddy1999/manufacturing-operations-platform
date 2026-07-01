@@ -24,18 +24,31 @@ const workspaceTabs: Array<[PlatformWorkspace, string]> = [
 
 const marketOptions = [
   { region: 'North America', market: 'United States', currency: 'USD', timezone: 'America/New_York' },
-  { region: 'North America', market: 'Canada', currency: 'USD', timezone: 'America/Toronto' },
-  { region: 'North America', market: 'Mexico', currency: 'USD', timezone: 'America/Mexico_City' },
+  { region: 'North America', market: 'Canada', currency: 'CAD', timezone: 'America/Toronto' },
+  { region: 'North America', market: 'Mexico', currency: 'MXN', timezone: 'America/Mexico_City' },
   { region: 'Asia', market: 'India', currency: 'INR', timezone: 'Asia/Kolkata' },
-  { region: 'Asia', market: 'Singapore', currency: 'USD', timezone: 'Asia/Singapore' },
-  { region: 'Asia', market: 'Japan', currency: 'USD', timezone: 'Asia/Tokyo' },
+  { region: 'Asia', market: 'Singapore', currency: 'SGD', timezone: 'Asia/Singapore' },
+  { region: 'Asia', market: 'Japan', currency: 'JPY', timezone: 'Asia/Tokyo' },
+  { region: 'Asia', market: 'Malaysia', currency: 'SGD', timezone: 'Asia/Kuala_Lumpur' },
+  { region: 'Asia', market: 'Thailand', currency: 'SGD', timezone: 'Asia/Bangkok' },
   { region: 'Europe', market: 'European Union', currency: 'EUR', timezone: 'Europe/Berlin' },
   { region: 'Europe', market: 'United Kingdom', currency: 'GBP', timezone: 'Europe/London' },
   { region: 'Europe', market: 'Germany', currency: 'EUR', timezone: 'Europe/Berlin' },
   { region: 'Europe', market: 'France', currency: 'EUR', timezone: 'Europe/Paris' },
+  { region: 'Europe', market: 'Netherlands', currency: 'EUR', timezone: 'Europe/Amsterdam' },
+  { region: 'Europe', market: 'Italy', currency: 'EUR', timezone: 'Europe/Rome' },
   { region: 'Middle East', market: 'United Arab Emirates', currency: 'AED', timezone: 'Asia/Dubai' },
-  { region: 'Middle East', market: 'Saudi Arabia', currency: 'AED', timezone: 'Asia/Riyadh' },
+  { region: 'Middle East', market: 'Saudi Arabia', currency: 'SAR', timezone: 'Asia/Riyadh' },
+  { region: 'Middle East', market: 'Qatar', currency: 'AED', timezone: 'Asia/Qatar' },
+  { region: 'Africa', market: 'South Africa', currency: 'ZAR', timezone: 'Africa/Johannesburg' },
+  { region: 'Africa', market: 'Nigeria', currency: 'USD', timezone: 'Africa/Lagos' },
+  { region: 'South America', market: 'Brazil', currency: 'BRL', timezone: 'America/Sao_Paulo' },
+  { region: 'South America', market: 'Chile', currency: 'USD', timezone: 'America/Santiago' },
+  { region: 'Oceania', market: 'Australia', currency: 'AUD', timezone: 'Australia/Sydney' },
+  { region: 'Oceania', market: 'New Zealand', currency: 'AUD', timezone: 'Pacific/Auckland' },
 ] as const;
+
+const currencyOptions: CurrencyCode[] = ['USD', 'INR', 'EUR', 'GBP', 'AED', 'CAD', 'MXN', 'SGD', 'JPY', 'SAR', 'ZAR', 'BRL', 'AUD'];
 
 const clientEditableModules = platformModules.filter((item) => item !== 'Admin');
 const clientEditableApplications = platformApplications.filter((item) => item !== 'Platform Management');
@@ -162,7 +175,6 @@ function ClientCreateDrawer({ onClose }: { onClose: () => void }) {
     reason: '',
   });
   const [error, setError] = useState('');
-  const markets = marketOptions.filter((item) => item.region === form.region);
 
   function submit() {
     const name = form.clientName.trim();
@@ -198,8 +210,8 @@ function ClientCreateDrawer({ onClose }: { onClose: () => void }) {
         <Field label="Client Name"><input className="form-input mt-1 w-full" value={form.clientName} onChange={(event) => setForm({ ...form, clientName: event.target.value })} /></Field>
         <Field label="Industry"><input className="form-input mt-1 w-full" value={form.industry} onChange={(event) => setForm({ ...form, industry: event.target.value })} /></Field>
         <Field label="Region"><select className="form-input mt-1 w-full" value={form.region} onChange={(event) => changeRegion(event.target.value)}>{unique(marketOptions.map((item) => item.region)).map((item) => <option key={item}>{item}</option>)}</select></Field>
-        <Field label="Market"><input className="form-input mt-1 w-full" list="create-client-markets" value={form.market} onChange={(event) => changeMarket(event.target.value)} /><datalist id="create-client-markets">{markets.map((item) => <option key={item.market} value={item.market} />)}</datalist></Field>
-        <Field label="Currency"><select className="form-input mt-1 w-full" value={form.currency} onChange={(event) => setForm({ ...form, currency: event.target.value as CurrencyCode })}>{['USD', 'INR', 'EUR', 'GBP', 'AED'].map((item) => <option key={item}>{item}</option>)}</select></Field>
+        <MarketPicker id="create-client-market" region={form.region} market={form.market} onMarketChange={changeMarket} />
+        <Field label="Currency"><select className="form-input mt-1 w-full" value={form.currency} onChange={(event) => setForm({ ...form, currency: event.target.value as CurrencyCode })}>{currencyOptions.map((item) => <option key={item}>{item}</option>)}</select></Field>
         <Field label="Status"><select className="form-input mt-1 w-full" value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as ClientStatus })}><option>Active</option><option>Trial</option><option>Suspended</option></select></Field>
       </div>
       <PlantEditor plants={form.plants} onChange={(plants) => setForm({ ...form, plants })} onAdd={addPlant} />
@@ -228,7 +240,6 @@ function ClientEditDrawer({ client, onClose }: { client: PlatformClient; onClose
     reason: '',
   });
   const [error, setError] = useState('');
-  const markets = marketOptions.filter((item) => item.region === form.region);
 
   function changeRegion(region: string) {
     const market = marketOptions.find((item) => item.region === region)!;
@@ -316,8 +327,8 @@ function ClientEditDrawer({ client, onClose }: { client: PlatformClient; onClose
         <Field label="Client Name"><input className="form-input mt-1 w-full" value={form.clientName} onChange={(event) => setForm({ ...form, clientName: event.target.value })} /></Field>
         <Field label="Industry"><input className="form-input mt-1 w-full" value={form.industry} onChange={(event) => setForm({ ...form, industry: event.target.value })} /></Field>
         <Field label="Region"><select className="form-input mt-1 w-full" value={form.region} onChange={(event) => changeRegion(event.target.value)}>{unique(marketOptions.map((item) => item.region)).map((item) => <option key={item}>{item}</option>)}</select></Field>
-        <Field label="Market"><input className="form-input mt-1 w-full" list={`edit-client-markets-${client.clientId}`} value={form.market} onChange={(event) => changeMarket(event.target.value)} /><datalist id={`edit-client-markets-${client.clientId}`}>{markets.map((item) => <option key={item.market} value={item.market} />)}</datalist></Field>
-        <Field label="Currency"><select className="form-input mt-1 w-full" value={form.currency} onChange={(event) => setForm({ ...form, currency: event.target.value as CurrencyCode })}>{['USD', 'INR', 'EUR', 'GBP', 'AED'].map((item) => <option key={item}>{item}</option>)}</select></Field>
+        <MarketPicker id={`edit-client-market-${client.clientId}`} region={form.region} market={form.market} onMarketChange={changeMarket} />
+        <Field label="Currency"><select className="form-input mt-1 w-full" value={form.currency} onChange={(event) => setForm({ ...form, currency: event.target.value as CurrencyCode })}>{currencyOptions.map((item) => <option key={item}>{item}</option>)}</select></Field>
         <Field label="Status"><select className="form-input mt-1 w-full" value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as ClientStatus })}><option>Active</option><option>Trial</option><option>Suspended</option></select></Field>
       </div>
       <PlantEditor plants={form.plants} onChange={(plants) => setForm({ ...form, plants })} onAdd={addPlant} />
@@ -480,13 +491,12 @@ function MarketEditDrawer({ market, onClose }: { market: MarketRow; onClose: () 
     onClose();
   }
 
-  const regionMarkets = marketOptions.filter((item) => item.region === form.region);
   return createPortal(
     <Drawer title={market.market ? `Edit ${market.market}` : 'Add Market'} description="Manage market defaults and assign clients manually with audit reason." onClose={onClose}>
       <div className="grid gap-3 md:grid-cols-2">
         <Field label="Region"><select className="form-input mt-1 w-full" value={form.region} onChange={(event) => changeRegion(event.target.value)}>{unique(marketOptions.map((item) => item.region)).map((item) => <option key={item}>{item}</option>)}</select></Field>
-        <Field label="Market"><input list="market-list" className="form-input mt-1 w-full" value={form.market} onChange={(event) => changeMarket(event.target.value)} /><datalist id="market-list">{regionMarkets.map((item) => <option key={item.market} value={item.market} />)}</datalist></Field>
-        <Field label="Currency"><select className="form-input mt-1 w-full" value={form.currency} onChange={(event) => setForm({ ...form, currency: event.target.value as CurrencyCode })}>{['USD', 'INR', 'EUR', 'GBP', 'AED'].map((item) => <option key={item}>{item}</option>)}</select></Field>
+        <MarketPicker id="market-management-market" region={form.region} market={form.market} onMarketChange={changeMarket} />
+        <Field label="Currency"><select className="form-input mt-1 w-full" value={form.currency} onChange={(event) => setForm({ ...form, currency: event.target.value as CurrencyCode })}>{currencyOptions.map((item) => <option key={item}>{item}</option>)}</select></Field>
         <Field label="Timezone"><input className="form-input mt-1 w-full" value={form.timezone} onChange={(event) => setForm({ ...form, timezone: event.target.value })} /></Field>
       </div>
       <MultiSelectAccessGrid title="Assigned Clients" description="Add or remove clients for this market." items={state.clients.map(clientLabel)} selectedItems={form.clients} onChange={(clients) => setForm({ ...form, clients })} searchPlaceholder="Search clients..." columns={2} showSelectAll showClear showSelectedCount />
@@ -1098,6 +1108,27 @@ function Cell({ children, accent, strong }: { children: ReactNode; accent?: bool
 
 function SearchField({ value, onChange, placeholder }: { value: string; onChange: (value: string) => void; placeholder: string }) {
   return <label className="relative block"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" /><input className="form-input w-full pl-10" type="search" placeholder={placeholder} value={value} onChange={(event) => onChange(event.target.value)} /></label>;
+}
+
+function MarketPicker({ id, region, market, onMarketChange }: { id: string; region: string; market: string; onMarketChange: (market: string) => void }) {
+  const [search, setSearch] = useState('');
+  const markets = marketOptions
+    .filter((item) => item.region === region)
+    .filter((item) => !search.trim() || item.market.toLowerCase().includes(search.trim().toLowerCase()));
+  return (
+    <div className="space-y-2">
+      <Field label="Search Country / Market">
+        <SearchField value={search} onChange={setSearch} placeholder="Search country in selected region..." />
+      </Field>
+      <Field label="Market">
+        <select id={id} className="form-input mt-1 w-full" value={market} onChange={(event) => onMarketChange(event.target.value)}>
+          {markets.map((item) => <option key={item.market} value={item.market}>{item.market}</option>)}
+          {!markets.some((item) => item.market === market) && market ? <option value={market}>{market}</option> : null}
+        </select>
+      </Field>
+      <p className="text-xs text-slate-500">{markets.length} markets available in {region}.</p>
+    </div>
+  );
 }
 
 function Select({ value, onChange, label, options, includeBlank = true }: { value: string; onChange: (value: string) => void; label: string; options: string[] | string[][]; includeBlank?: boolean }) {
