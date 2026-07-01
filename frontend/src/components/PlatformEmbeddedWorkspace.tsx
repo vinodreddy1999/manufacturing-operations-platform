@@ -1,14 +1,15 @@
 import { Download, Plus, Search } from 'lucide-react';
-import { useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
+import { Suspense, lazy, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
 import { createPortal } from 'react-dom';
 
 import { platformApplications, platformModules, platformRoles } from '../platform/data';
 import { usePlatform } from '../platform/PlatformContext';
 import { backend } from '../services/api';
 import type { ClientStatus, CurrencyCode, PlatformAuditLog, PlatformClient, PlatformState, PlatformUser } from '../platform/types';
-import { MultiSelectAccessGrid } from './MultiSelectAccessGrid';
 import { Panel } from './Panel';
 import { StatusBadge } from './StatusBadge';
+
+const LazyMultiSelectAccessGrid = lazy(() => import('./MultiSelectAccessGrid').then((module) => ({ default: module.MultiSelectAccessGrid })));
 
 export type PlatformWorkspace = 'clients' | 'markets' | 'users' | 'modules' | 'subscriptions' | 'integrations' | 'audit' | 'impact';
 
@@ -594,7 +595,7 @@ function MarketEditDrawer({ market, onClose }: { market: MarketRow; onClose: () 
         <Field label="Currency"><select className="form-input mt-1 w-full" value={form.currency} onChange={(event) => setForm({ ...form, currency: event.target.value as CurrencyCode })}>{currencyOptions.map((item) => <option key={item}>{item}</option>)}</select></Field>
         <Field label="Timezone"><input className="form-input mt-1 w-full" value={form.timezone} onChange={(event) => setForm({ ...form, timezone: event.target.value })} /></Field>
       </div>
-      <MultiSelectAccessGrid title="Assigned Clients" description="Add or remove clients for this market." items={state.clients.map(clientLabel)} selectedItems={form.clients} onChange={(clients) => setForm({ ...form, clients })} searchPlaceholder="Search clients..." columns={2} showSelectAll showClear showSelectedCount />
+      <AccessGrid title="Assigned Clients" description="Add or remove clients for this market." items={state.clients.map(clientLabel)} selectedItems={form.clients} onChange={(clients) => setForm({ ...form, clients })} searchPlaceholder="Search clients..." columns={2} showSelectAll showClear showSelectedCount />
       <Field label="Change Reason"><input className="form-input mt-1 w-full" placeholder="Required audit reason" value={form.reason} onChange={(event) => setForm({ ...form, reason: event.target.value })} /></Field>
       <DrawerActions error={error} cancel={onClose} submit={submit} submitLabel="Save Market" />
     </Drawer>,
@@ -719,13 +720,17 @@ function UserCreateModal({ onClose }: { onClose: () => void }) {
     <Drawer title="Create User" description="Identity, organization, role, application, and module access." onClose={onClose}>
       <Field label="User Unique ID"><input className="form-input mt-1 w-full" value={userIdPreview} disabled /></Field>
       <UserFormFields form={form} setForm={setForm} clients={state.clients} client={client} changeClient={changeClient} mode="create" emailExists={emailExists} loginExists={loginExists} />
-      <PasswordSetupFields
-        password={form.password}
-        confirmPassword={form.confirmPassword}
-        onPasswordChange={(password) => setForm({ ...form, password })}
-        onConfirmPasswordChange={(confirmPassword) => setForm({ ...form, confirmPassword })}
-      />
-      <AccessSections applications={form.applications} modules={form.modules} appItems={client.enabledApplications} moduleItems={client.enabledModules} setApplications={(applications) => setForm({ ...form, applications })} setModules={(modules) => setForm({ ...form, modules })} />
+      <DeferredSection title="Password Setup" description="Open only when you are ready to create or generate the temporary password." badge={form.password ? 'Configured' : 'Required'}>
+        <PasswordSetupFields
+          password={form.password}
+          confirmPassword={form.confirmPassword}
+          onPasswordChange={(password) => setForm({ ...form, password })}
+          onConfirmPasswordChange={(confirmPassword) => setForm({ ...form, confirmPassword })}
+        />
+      </DeferredSection>
+      <DeferredSection title="Application & Module Access" description="Load searchable application/module options only when assigning access." badge={`${form.applications.length + form.modules.length} selected`}>
+        <AccessSections applications={form.applications} modules={form.modules} appItems={client.enabledApplications} moduleItems={client.enabledModules} setApplications={(applications) => setForm({ ...form, applications })} setModules={(modules) => setForm({ ...form, modules })} />
+      </DeferredSection>
       <Field label="Assignment Reason"><select className="form-input mt-1 w-full" value={form.reason} onChange={(event) => setForm({ ...form, reason: event.target.value })}><option value="">Select required reason</option><option>Business Requirement</option><option>Client Request</option><option>New Employee</option><option>Role Change</option><option>Other</option></select></Field>
       <DrawerActions error={error} cancel={onClose} submit={submit} submitLabel="Create User" />
     </Drawer>,
@@ -817,21 +822,27 @@ function UserEditModal({ user, onClose }: { user: PlatformUser; onClose: () => v
     <Drawer title="Edit User" description="Change client, role, status, and application/module access." onClose={onClose}>
       <Field label="User Unique ID"><input className="form-input mt-1 w-full" value={user.userId} disabled /></Field>
       <UserFormFields form={form} setForm={setForm} clients={state.clients} client={client} changeClient={changeClient} mode="edit" emailExists={emailExists} loginExists={loginExists} />
-      <PasswordSetupFields
-        title="Reset Password"
-        description={`Current expiry: ${user.passwordExpiresAt ? new Date(user.passwordExpiresAt).toLocaleDateString() : 'not set'}. Reset creates a new 90-day password cycle.`}
-        password={form.resetPassword}
-        confirmPassword={form.resetPasswordConfirm}
-        onPasswordChange={(resetPassword) => setForm({ ...form, resetPassword })}
-        onConfirmPasswordChange={(resetPasswordConfirm) => setForm({ ...form, resetPasswordConfirm })}
-      >
-        <label className="mt-3 flex items-center gap-2 text-sm text-slate-300">
-          <input type="checkbox" checked={form.forceChangeOnLogin} onChange={(event) => setForm({ ...form, forceChangeOnLogin: event.target.checked })} />
-          Force user to create a new password after next login
-        </label>
-      </PasswordSetupFields>
-      <MultiSelectAccessGrid title="Assigned Roles" description="Add or remove role access for this user." items={platformRoles.filter((role) => role !== 'Super Admin' || user.roles.includes('Super Admin'))} selectedItems={form.roles} onChange={(roles) => setForm({ ...form, roles })} searchPlaceholder="Search roles..." columns={2} showSelectAll showClear showSelectedCount />
-      <AccessSections applications={form.applications} modules={form.modules} appItems={client.enabledApplications} moduleItems={client.enabledModules} setApplications={(applications) => setForm({ ...form, applications })} setModules={(modules) => setForm({ ...form, modules })} />
+      <DeferredSection title="Reset Password" description="Load reset controls only when password reset is needed." badge={form.resetPassword ? 'Pending reset' : 'Optional'}>
+        <PasswordSetupFields
+          title="Reset Password"
+          description={`Current expiry: ${user.passwordExpiresAt ? new Date(user.passwordExpiresAt).toLocaleDateString() : 'not set'}. Reset creates a new 90-day password cycle.`}
+          password={form.resetPassword}
+          confirmPassword={form.resetPasswordConfirm}
+          onPasswordChange={(resetPassword) => setForm({ ...form, resetPassword })}
+          onConfirmPasswordChange={(resetPasswordConfirm) => setForm({ ...form, resetPasswordConfirm })}
+        >
+          <label className="mt-3 flex items-center gap-2 text-sm text-slate-300">
+            <input type="checkbox" checked={form.forceChangeOnLogin} onChange={(event) => setForm({ ...form, forceChangeOnLogin: event.target.checked })} />
+            Force user to create a new password after next login
+          </label>
+        </PasswordSetupFields>
+      </DeferredSection>
+      <DeferredSection title="Role Access" description="Open only when you need to add or remove roles." badge={`${form.roles.length} selected`}>
+        <AccessGrid title="Assigned Roles" description="Add or remove role access for this user." items={platformRoles.filter((role) => role !== 'Super Admin' || user.roles.includes('Super Admin'))} selectedItems={form.roles} onChange={(roles) => setForm({ ...form, roles })} searchPlaceholder="Search roles..." columns={2} showSelectAll showClear showSelectedCount />
+      </DeferredSection>
+      <DeferredSection title="Application & Module Access" description="Load searchable application/module options only when changing access." badge={`${form.applications.length + form.modules.length} selected`}>
+        <AccessSections applications={form.applications} modules={form.modules} appItems={client.enabledApplications} moduleItems={client.enabledModules} setApplications={(applications) => setForm({ ...form, applications })} setModules={(modules) => setForm({ ...form, modules })} />
+      </DeferredSection>
       <Field label="Change Reason"><input className="form-input mt-1 w-full" placeholder="Required audit reason" value={form.reason} onChange={(event) => setForm({ ...form, reason: event.target.value })} /></Field>
       <DrawerActions error={error} cancel={onClose} submit={submit} submitLabel="Save User" />
     </Drawer>,
@@ -893,6 +904,25 @@ function PasswordSetupFields({ title = 'Manual Password Setup', description = 'C
       <p className="mt-3 text-xs text-slate-500">Cannot reuse the last 3 passwords. Users see a change-password prompt 10 days before expiry and can skip until expiry policy requires action.</p>
       {children}
     </fieldset>
+  );
+}
+
+function DeferredSection({ title, description, badge, defaultOpen = false, children }: { title: string; description: string; badge?: string; defaultOpen?: boolean; children: ReactNode }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <section className="rounded-2xl border border-white/10 bg-slate-950/20">
+      <button type="button" className="flex w-full items-center justify-between gap-4 p-4 text-left" onClick={() => setOpen((value) => !value)}>
+        <span>
+          <span className="block text-base font-semibold text-white">{title}</span>
+          <span className="mt-1 block text-sm text-slate-400">{description}</span>
+        </span>
+        <span className="flex shrink-0 items-center gap-2">
+          {badge ? <span className="rounded-full border border-cyan-300/20 bg-cyan-400/10 px-3 py-1 text-xs text-cyan-100">{badge}</span> : null}
+          <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs font-semibold text-slate-200">{open ? 'Hide' : 'Load'}</span>
+        </span>
+      </button>
+      {open ? <div className="border-t border-white/10 p-4">{children}</div> : null}
+    </section>
   );
 }
 
@@ -1019,7 +1049,7 @@ function ModuleEditDrawer({ moduleName, onClose }: { moduleName: string; onClose
 
   return createPortal(
     <Drawer title={`Edit ${moduleName} Module`} description="Add or remove clients and users assigned to this module." onClose={onClose}>
-      <MultiSelectAccessGrid title="Enabled Clients" description={adminModule ? 'Admin is a platform module and remains available to platform administration.' : 'Add or remove client access for this module.'} items={state.clients.map(clientLabel)} selectedItems={form.clients} onChange={(clients) => setForm({ ...form, clients })} searchPlaceholder="Search clients..." columns={2} showSelectAll showClear showSelectedCount />
+      <AccessGrid title="Enabled Clients" description={adminModule ? 'Admin is a platform module and remains available to platform administration.' : 'Add or remove client access for this module.'} items={state.clients.map(clientLabel)} selectedItems={form.clients} onChange={(clients) => setForm({ ...form, clients })} searchPlaceholder="Search clients..." columns={2} showSelectAll showClear showSelectedCount />
       <UserAssignmentPanel
         title="Assigned Users"
         users={state.users.filter((user) => !user.roles.includes('Super Admin') || moduleName === 'Admin')}
@@ -1190,9 +1220,30 @@ function AccessSections({ applications, modules, setApplications, setModules, ap
 }) {
   return (
     <div className="mt-4 space-y-4">
-      <MultiSelectAccessGrid title="Assigned Applications" items={appItems} selectedItems={applications} onChange={setApplications} searchPlaceholder="Search applications..." columns={2} showSelectAll showClear showSelectedCount />
-      <MultiSelectAccessGrid title="Assigned Modules" items={moduleItems} selectedItems={modules} onChange={setModules} searchPlaceholder="Search modules..." columns={2} showSelectAll showClear showSelectedCount />
+      <AccessGrid title="Assigned Applications" items={appItems} selectedItems={applications} onChange={setApplications} searchPlaceholder="Search applications..." columns={2} showSelectAll showClear showSelectedCount />
+      <AccessGrid title="Assigned Modules" items={moduleItems} selectedItems={modules} onChange={setModules} searchPlaceholder="Search modules..." columns={2} showSelectAll showClear showSelectedCount />
     </div>
+  );
+}
+
+type AccessGridProps = {
+  title: string;
+  description?: string;
+  items: string[];
+  selectedItems: string[];
+  onChange: (items: string[]) => void;
+  searchPlaceholder: string;
+  columns?: 1 | 2 | 3 | 4;
+  showSelectAll?: boolean;
+  showClear?: boolean;
+  showSelectedCount?: boolean;
+};
+
+function AccessGrid(props: AccessGridProps) {
+  return (
+    <Suspense fallback={<div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4 text-sm text-slate-400">Loading {props.title.toLowerCase()} options...</div>}>
+      <LazyMultiSelectAccessGrid {...props} />
+    </Suspense>
   );
 }
 

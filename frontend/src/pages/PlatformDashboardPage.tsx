@@ -1,14 +1,17 @@
 import { ChevronDown } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { Suspense, lazy } from 'react';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import { PageHeader } from '../components/PageHeader';
 import { Panel } from '../components/Panel';
-import { PlatformEmbeddedWorkspace, type PlatformWorkspace } from '../components/PlatformEmbeddedWorkspace';
+import type { PlatformWorkspace } from '../components/PlatformEmbeddedWorkspace';
 import { StatusBadge } from '../components/StatusBadge';
 import { platformModules } from '../platform/data';
 import { usePlatform } from '../platform/PlatformContext';
+
+const PlatformEmbeddedWorkspace = lazy(() => import('../components/PlatformEmbeddedWorkspace').then((module) => ({ default: module.PlatformEmbeddedWorkspace })));
 
 function ColumnFilter({ label, active, children, width = 'w-64' }: { label: string; active?: boolean; children: ReactNode; width?: string }) {
   return (
@@ -25,7 +28,7 @@ function ColumnFilter({ label, active, children, width = 'w-64' }: { label: stri
   );
 }
 
-const platformWorkspaces: PlatformWorkspace[] = ['clients', 'users', 'modules', 'subscriptions', 'integrations', 'audit', 'impact'];
+const platformWorkspaces: PlatformWorkspace[] = ['clients', 'markets', 'users', 'modules', 'subscriptions', 'integrations', 'audit', 'impact'];
 
 function isPlatformWorkspace(value: string | null): value is PlatformWorkspace {
   return Boolean(value && platformWorkspaces.includes(value as PlatformWorkspace));
@@ -100,7 +103,9 @@ export function PlatformDashboardPage() {
   return (
     <div className="space-y-6">
       <PageHeader eyebrow="Platform Context" title="Platform Management Services" description="A single embedded workspace for clients, users, modules, subscriptions, integrations, audit, and business impact." />
-      <PlatformEmbeddedWorkspace active={activeWorkspace} onChange={changeWorkspace} />
+      <Suspense fallback={<Panel title="Platform Management Services" description="Loading management workspace only when needed."><div className="rounded-2xl border border-white/10 bg-slate-950/30 p-6 text-sm text-slate-400">Loading platform workspace...</div></Panel>}>
+        <PlatformEmbeddedWorkspace active={activeWorkspace} onChange={changeWorkspace} />
+      </Suspense>
       <Panel title="Module Health" description={moduleHealthDescription}>
         <div className="overflow-x-auto">
           <div className="max-h-[321px] min-w-[980px] overflow-y-auto [scrollbar-color:rgba(34,211,238,0.45)_rgba(255,255,255,0.04)]" onScroll={(event) => setScrolledModulePosition(Math.min(Math.floor(event.currentTarget.scrollTop / 54) + 1, Math.max(visibleModuleRows.length, 1)))}>
