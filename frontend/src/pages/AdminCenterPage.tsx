@@ -75,7 +75,7 @@ function CompanyProfile({ user }: { user: RuntimeUser }) {
   const users = state.users.filter((item) => item.clientId === client.clientId);
   const fields = [
     ['Client Name', client.clientName], ['Client ID', client.clientId], ['Region', client.region], ['Market', client.market], ['Currency', client.currency],
-    ['Industry', client.industry ?? industryFor(client)], ['Status', client.status], ['Plants', client.plants ?? 2], ['Warehouses', client.warehouses ?? 3],
+    ['Industry', client.industry ?? industryFor(client)], ['Status', client.status], ['Plants', Array.isArray(client.plants) ? client.plants.length : 2], ['Warehouses', client.warehouses ?? 3],
     ['Total Users', users.length], ['Enabled Applications', client.enabledApplications.length], ['Enabled Modules', client.enabledModules.length],
     ['Created Date', client.createdDate], ['Last Updated', client.lastUpdated ?? '2026-06-21'],
   ];

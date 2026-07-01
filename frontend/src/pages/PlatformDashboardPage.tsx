@@ -7,7 +7,6 @@ import { PageHeader } from '../components/PageHeader';
 import { Panel } from '../components/Panel';
 import { PlatformEmbeddedWorkspace, type PlatformWorkspace } from '../components/PlatformEmbeddedWorkspace';
 import { StatusBadge } from '../components/StatusBadge';
-import { ScrollableTableFrame } from '../components/ScrollableTableFrame';
 import { platformModules } from '../platform/data';
 import { usePlatform } from '../platform/PlatformContext';
 
@@ -42,6 +41,7 @@ export function PlatformDashboardPage() {
   const [moduleUpdatedSearch, setModuleUpdatedSearch] = useState('');
   const [scrolledModulePosition, setScrolledModulePosition] = useState(1);
   const [hoveredModulePosition, setHoveredModulePosition] = useState<number | null>(null);
+  const [selectedModuleName, setSelectedModuleName] = useState<string | null>(null);
   const [activeWorkspace, setActiveWorkspace] = useState<PlatformWorkspace>(() => {
     const workspace = searchParams.get('workspace');
     return isPlatformWorkspace(workspace) ? workspace : 'clients';
@@ -87,6 +87,16 @@ export function PlatformDashboardPage() {
   const currentModulePosition = visibleModuleRows.length === 0
     ? 0
     : Math.min(hoveredModulePosition ?? scrolledModulePosition, visibleModuleRows.length);
+  const selectedModule = moduleRows.find((row) => row.moduleName === selectedModuleName) ?? null;
+  const selectedClientLabel = moduleHealthClient?.clientName ?? 'All Clients';
+  const selectedModuleLogs = selectedModule
+    ? state.auditLogs.filter((log) =>
+      log.moduleName === selectedModule.moduleName
+      && (!moduleHealthClient || log.clientId === moduleHealthClient.clientId || log.clientName === moduleHealthClient.clientName))
+    : [];
+  const impactedClients = selectedModule
+    ? state.clients.filter((client) => selectedModule.moduleName !== 'Admin' && !client.enabledModules.includes(selectedModule.moduleName))
+    : [];
   return (
     <div className="space-y-6">
       <PageHeader eyebrow="Platform Context" title="Platform Management Services" description="A single embedded workspace for clients, users, modules, subscriptions, integrations, audit, and business impact." />
@@ -103,16 +113,41 @@ export function PlatformDashboardPage() {
                 <th className="px-3 py-3"><ColumnFilter label="Last Updated" active={Boolean(moduleUpdatedSearch)}><input className="form-input w-full py-2 text-sm" type="search" placeholder="Search date or time..." value={moduleUpdatedSearch} onChange={(event) => { setModuleUpdatedSearch(event.target.value); setScrolledModulePosition(1); }} /></ColumnFilter></th>
                 <th className="w-24 px-3 py-3" />
               </tr></thead>
-              <tbody>{visibleModuleRows.map((row, index) => <tr key={row.moduleName} className="h-[54px] border-b border-white/10 hover:bg-white/[0.04]" onMouseEnter={() => setHoveredModulePosition(index + 1)} onMouseLeave={() => setHoveredModulePosition(null)}><td className="px-3 py-3 font-medium text-white">{row.moduleName}</td><td className="px-3 py-3">{row.disabledClients === 0 ? <span className="text-emerald-200">Enabled</span> : moduleHealthClient ? <span className="text-rose-200">Disabled</span> : <span className="text-amber-200">{row.enabledClients} enabled / {row.disabledClients} disabled</span>}</td><td className="px-3 py-3"><StatusBadge status={row.status} /></td><td className="px-3 py-3 text-slate-300">{moduleHealthClient?.clientName ?? 'All Clients'}</td><td className="px-3 py-3 text-slate-400">{row.lastUpdated}</td><td className="px-3 py-3 text-right"><button className="form-button-subtle py-1 text-xs" onClick={() => changeWorkspace('modules')}>View</button></td></tr>)}</tbody>
+              <tbody>{visibleModuleRows.map((row, index) => <tr key={row.moduleName} className="h-[54px] border-b border-white/10 hover:bg-white/[0.04]" onMouseEnter={() => setHoveredModulePosition(index + 1)} onMouseLeave={() => setHoveredModulePosition(null)}><td className="px-3 py-3 font-medium text-white">{row.moduleName}</td><td className="px-3 py-3">{row.disabledClients === 0 ? <span className="text-emerald-200">Enabled</span> : moduleHealthClient ? <span className="text-rose-200">Disabled</span> : <span className="text-amber-200">{row.enabledClients} enabled / {row.disabledClients} disabled</span>}</td><td className="px-3 py-3"><StatusBadge status={row.status} /></td><td className="px-3 py-3 text-slate-300">{moduleHealthClient?.clientName ?? 'All Clients'}</td><td className="px-3 py-3 text-slate-400">{row.lastUpdated}</td><td className="px-3 py-3 text-right"><button className="form-button-subtle py-1 text-xs" onClick={() => setSelectedModuleName(row.moduleName)}>View</button></td></tr>)}</tbody>
             </table>
             {visibleModuleRows.length === 0 && <div className="flex h-[270px] items-center justify-center text-sm text-slate-400">No modules match your search and filter.</div>}
           </div>
           <div className="sticky left-0 flex h-8 items-center border-t border-white/10 bg-[#0d1527] px-3 text-xs font-medium text-cyan-200" aria-live="polite">{currentModulePosition} of {visibleModuleRows.length}</div>
         </div>
       </Panel>
-      <Panel title="Client Health" description="Commercial context, module allocation, users, and current client health.">
-        <ScrollableTableFrame count={state.clients.length}><table className="min-w-[1050px] w-full text-sm"><thead><tr className="border-b border-white/10 text-left text-xs uppercase tracking-[0.1em] text-slate-500">{['Client ID','Client Name','Region','Market','Currency','Enabled','Disabled','Active Users','Health',''].map((item) => <th key={item} className="px-3 py-3">{item}</th>)}</tr></thead><tbody>{state.clients.map((client) => <tr key={client.clientId} className="border-b border-white/10 hover:bg-white/[0.04]"><td className="px-3 py-3 text-cyan-200">{client.clientId}</td><td className="px-3 py-3 font-medium text-white">{client.clientName}</td><td className="px-3 py-3">{client.region}</td><td className="px-3 py-3">{client.market}</td><td className="px-3 py-3">{client.currency}</td><td className="px-3 py-3 text-emerald-200">{client.enabledModules.length}</td><td className="px-3 py-3 text-rose-200">{client.disabledModules.length}</td><td className="px-3 py-3">{state.users.filter((user) => user.clientId === client.clientId && user.status === 'Active').length}</td><td className="px-3 py-3"><StatusBadge status={client.status === 'Active' ? client.disabledModules.length > 1 ? 'Attention Needed' : 'Healthy' : client.status} /></td><td className="px-3 py-3"><button className="form-button-subtle py-1 text-xs" onClick={() => changeWorkspace('clients')}>View</button></td></tr>)}</tbody></table></ScrollableTableFrame>
-      </Panel>
+      {selectedModule && (
+        <Panel title={`${selectedModule.moduleName} Health Diagnostics`} description={`Embedded issue details for ${selectedClientLabel}. No redirect needed.`}>
+          <div className="grid gap-4 lg:grid-cols-3">
+            <div className="rounded-xl border border-white/10 bg-slate-950/35 p-4">
+              <p className="text-xs uppercase tracking-[0.12em] text-slate-500">Current issue</p>
+              <p className="mt-2 text-lg font-semibold text-white">{selectedModule.status === 'Healthy' ? 'No active issue' : selectedModule.status}</p>
+              <p className="mt-2 text-sm text-slate-400">{selectedModule.disabledClients > 0 ? `${selectedModule.disabledClients} client allocation gap detected for this module.` : 'The module is enabled for the selected scope.'}</p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-slate-950/35 p-4">
+              <p className="text-xs uppercase tracking-[0.12em] text-slate-500">Client impact</p>
+              <p className="mt-2 text-lg font-semibold text-white">{moduleHealthClient ? moduleHealthClient.clientName : `${impactedClients.length} impacted clients`}</p>
+              <p className="mt-2 text-sm text-slate-400">{impactedClients.length ? impactedClients.map((client) => client.clientName).join(', ') : 'No impacted client found in the current filter.'}</p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-slate-950/35 p-4">
+              <p className="text-xs uppercase tracking-[0.12em] text-slate-500">Likely trigger</p>
+              <p className="mt-2 text-lg font-semibold text-white">{selectedModuleLogs[0]?.action ?? 'No recent change log'}</p>
+              <p className="mt-2 text-sm text-slate-400">{selectedModuleLogs[0]?.description ?? 'Use module/client audit logs to trace the exact change before the issue.'}</p>
+            </div>
+          </div>
+          <div className="mt-4 overflow-x-auto">
+            <table className="min-w-[920px] w-full text-sm">
+              <thead><tr className="border-b border-white/10 text-left text-xs uppercase tracking-[0.1em] text-slate-500">{['Timestamp','Client','Module','Change Before Issue','Actor','Status'].map((item) => <th key={item} className="px-3 py-3">{item}</th>)}</tr></thead>
+              <tbody>{selectedModuleLogs.map((log) => <tr key={log.logId} className="border-b border-white/10"><td className="px-3 py-3 text-slate-400">{log.timestamp}</td><td className="px-3 py-3 text-slate-300">{log.clientName}</td><td className="px-3 py-3 text-white">{log.moduleName}</td><td className="px-3 py-3 text-slate-300">{log.action}: {log.description ?? 'Platform change recorded'}</td><td className="px-3 py-3 text-cyan-200">{log.userId}</td><td className="px-3 py-3"><StatusBadge status={log.status ?? 'Completed'} /></td></tr>)}</tbody>
+            </table>
+            {selectedModuleLogs.length === 0 && <div className="rounded-xl border border-dashed border-white/10 p-6 text-center text-sm text-slate-400">No audit logs found for this module and client filter.</div>}
+          </div>
+        </Panel>
+      )}
     </div>
   );
 }

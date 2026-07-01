@@ -1,4 +1,4 @@
-import { Plus, Search } from 'lucide-react';
+import { Download, Plus, Search } from 'lucide-react';
 import { useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -24,10 +24,17 @@ const workspaceTabs: Array<[PlatformWorkspace, string]> = [
 
 const marketOptions = [
   { region: 'North America', market: 'United States', currency: 'USD', timezone: 'America/New_York' },
+  { region: 'North America', market: 'Canada', currency: 'USD', timezone: 'America/Toronto' },
+  { region: 'North America', market: 'Mexico', currency: 'USD', timezone: 'America/Mexico_City' },
   { region: 'Asia', market: 'India', currency: 'INR', timezone: 'Asia/Kolkata' },
+  { region: 'Asia', market: 'Singapore', currency: 'USD', timezone: 'Asia/Singapore' },
+  { region: 'Asia', market: 'Japan', currency: 'USD', timezone: 'Asia/Tokyo' },
   { region: 'Europe', market: 'European Union', currency: 'EUR', timezone: 'Europe/Berlin' },
   { region: 'Europe', market: 'United Kingdom', currency: 'GBP', timezone: 'Europe/London' },
+  { region: 'Europe', market: 'Germany', currency: 'EUR', timezone: 'Europe/Berlin' },
+  { region: 'Europe', market: 'France', currency: 'EUR', timezone: 'Europe/Paris' },
   { region: 'Middle East', market: 'United Arab Emirates', currency: 'AED', timezone: 'Asia/Dubai' },
+  { region: 'Middle East', market: 'Saudi Arabia', currency: 'AED', timezone: 'Asia/Riyadh' },
 ] as const;
 
 const clientEditableModules = platformModules.filter((item) => item !== 'Admin');
@@ -141,17 +148,17 @@ function ClientsWorkspace() {
 
 function ClientCreateDrawer({ onClose }: { onClose: () => void }) {
   const { state, createClient, platformUser, recordAudit } = usePlatform();
+  const clientIdPreview = nextClientId(state);
   const [form, setForm] = useState({
     clientName: '',
     industry: 'Manufacturing',
     region: 'North America',
     market: 'United States',
     currency: 'USD' as CurrencyCode,
-    timezone: 'America/New_York',
-    language: 'English',
     status: 'Trial' as ClientStatus,
-    applications: clientEditableApplications,
-    modules: clientEditableModules,
+    applications: [] as string[],
+    modules: [] as string[],
+    plants: [{ plantId: `${clientIdPreview}-PLT-001`, plantName: 'Plant A', status: 'Active' as 'Active' | 'Inactive' }],
     reason: '',
   });
   const [error, setError] = useState('');
@@ -163,33 +170,39 @@ function ClientCreateDrawer({ onClose }: { onClose: () => void }) {
     if (state.clients.some((client) => client.clientName.toLowerCase() === name.toLowerCase())) { setError('Client Name must be unique.'); return; }
     if (!form.reason.trim()) { setError('A business reason is required.'); return; }
     if (!form.applications.length || !form.modules.length) { setError('Assign at least one application and one module.'); return; }
-    const client = createClient({ clientName: name, industry: form.industry, region: form.region, market: form.market, currency: form.currency, status: form.status, enabledApplications: form.applications, enabledModules: form.modules });
-    recordAudit({ clientId: client.clientId, clientName: client.clientName, userId: platformUser.userId, moduleName: 'Admin', action: 'Client access assigned', description: `Reason: ${form.reason.trim()}. Timezone: ${form.timezone}. Language: ${form.language}.`, status: 'Completed' });
+    if (!form.plants.some((plant) => plant.plantName.trim())) { setError('Add at least one plant for the client.'); return; }
+    const client = createClient({ clientName: name, industry: form.industry, region: form.region, market: form.market, currency: form.currency, status: form.status, enabledApplications: form.applications, enabledModules: form.modules, plants: form.plants.map((plant) => ({ ...plant, plantName: plant.plantName.trim() })) });
+    recordAudit({ clientId: client.clientId, clientName: client.clientName, userId: platformUser.userId, moduleName: 'Admin', action: 'Client access assigned', description: `Reason: ${form.reason.trim()}. Client ID and plant IDs generated for database tracking.`, status: 'Completed' });
     onClose();
   }
 
   function changeRegion(region: string) {
     const market = marketOptions.find((item) => item.region === region)!;
-    setForm({ ...form, region, market: market.market, currency: market.currency as CurrencyCode, timezone: market.timezone });
+    setForm({ ...form, region, market: market.market, currency: market.currency as CurrencyCode });
   }
 
   function changeMarket(marketName: string) {
-    const market = marketOptions.find((item) => item.market === marketName)!;
-    setForm({ ...form, market: market.market, currency: market.currency as CurrencyCode, timezone: market.timezone });
+    const market = marketOptions.find((item) => item.market === marketName);
+    if (!market) { setForm({ ...form, market: marketName }); return; }
+    setForm({ ...form, market: market.market, currency: market.currency as CurrencyCode });
+  }
+
+  function addPlant() {
+    setForm({ ...form, plants: [...form.plants, { plantId: `${clientIdPreview}-PLT-${String(form.plants.length + 1).padStart(3, '0')}`, plantName: '', status: 'Active' }] });
   }
 
   return createPortal(
     <Drawer title="Create Client" description="Profile, regional defaults, access, and audit reason." onClose={onClose}>
       <div className="grid gap-3 md:grid-cols-2">
+        <Field label="Client Unique ID"><input className="form-input mt-1 w-full" value={clientIdPreview} disabled /></Field>
         <Field label="Client Name"><input className="form-input mt-1 w-full" value={form.clientName} onChange={(event) => setForm({ ...form, clientName: event.target.value })} /></Field>
         <Field label="Industry"><input className="form-input mt-1 w-full" value={form.industry} onChange={(event) => setForm({ ...form, industry: event.target.value })} /></Field>
         <Field label="Region"><select className="form-input mt-1 w-full" value={form.region} onChange={(event) => changeRegion(event.target.value)}>{unique(marketOptions.map((item) => item.region)).map((item) => <option key={item}>{item}</option>)}</select></Field>
-        <Field label="Market"><select className="form-input mt-1 w-full" value={form.market} onChange={(event) => changeMarket(event.target.value)}>{markets.map((item) => <option key={item.market}>{item.market}</option>)}</select></Field>
+        <Field label="Market"><input className="form-input mt-1 w-full" list="create-client-markets" value={form.market} onChange={(event) => changeMarket(event.target.value)} /><datalist id="create-client-markets">{markets.map((item) => <option key={item.market} value={item.market} />)}</datalist></Field>
         <Field label="Currency"><select className="form-input mt-1 w-full" value={form.currency} onChange={(event) => setForm({ ...form, currency: event.target.value as CurrencyCode })}>{['USD', 'INR', 'EUR', 'GBP', 'AED'].map((item) => <option key={item}>{item}</option>)}</select></Field>
-        <Field label="Timezone"><input className="form-input mt-1 w-full" value={form.timezone} onChange={(event) => setForm({ ...form, timezone: event.target.value })} /></Field>
-        <Field label="Language"><input className="form-input mt-1 w-full" value={form.language} onChange={(event) => setForm({ ...form, language: event.target.value })} /></Field>
         <Field label="Status"><select className="form-input mt-1 w-full" value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as ClientStatus })}><option>Active</option><option>Trial</option><option>Suspended</option></select></Field>
       </div>
+      <PlantEditor plants={form.plants} onChange={(plants) => setForm({ ...form, plants })} onAdd={addPlant} />
       <AccessSections applications={form.applications} modules={form.modules} setApplications={(applications) => setForm({ ...form, applications })} setModules={(modules) => setForm({ ...form, modules })} />
       <Field label="Assignment Reason"><select className="form-input mt-1 w-full" value={form.reason} onChange={(event) => setForm({ ...form, reason: event.target.value })}><option value="">Select required reason</option><option>Business Requirement</option><option>Client Request</option><option>Pilot</option><option>Subscription Upgrade</option><option>Other</option></select></Field>
       <DrawerActions error={error} cancel={onClose} submit={submit} submitLabel="Create Client" />
@@ -200,7 +213,7 @@ function ClientCreateDrawer({ onClose }: { onClose: () => void }) {
 
 function ClientEditDrawer({ client, onClose }: { client: PlatformClient; onClose: () => void }) {
   const { state, platformUser, replacePlatformState } = usePlatform();
-  const initialUserLabels = state.users.filter((user) => user.clientId === client.clientId).map(userLabel);
+  const initialUserIds = state.users.filter((user) => user.clientId === client.clientId).map((user) => user.userId);
   const [form, setForm] = useState({
     clientName: client.clientName,
     industry: client.industry ?? 'Manufacturing',
@@ -210,7 +223,8 @@ function ClientEditDrawer({ client, onClose }: { client: PlatformClient; onClose
     status: client.status,
     applications: [...client.enabledApplications],
     modules: [...client.enabledModules],
-    users: initialUserLabels,
+    userIds: initialUserIds,
+    plants: clientPlants(client),
     reason: '',
   });
   const [error, setError] = useState('');
@@ -222,8 +236,13 @@ function ClientEditDrawer({ client, onClose }: { client: PlatformClient; onClose
   }
 
   function changeMarket(marketName: string) {
-    const market = marketOptions.find((item) => item.market === marketName)!;
+    const market = marketOptions.find((item) => item.market === marketName);
+    if (!market) { setForm({ ...form, market: marketName }); return; }
     setForm({ ...form, market: market.market, currency: market.currency as CurrencyCode });
+  }
+
+  function addPlant() {
+    setForm({ ...form, plants: [...form.plants, { plantId: makePlantId(client.clientId, form.plants.length + 1), plantName: '', status: 'Active' }] });
   }
 
   function submit() {
@@ -233,7 +252,7 @@ function ClientEditDrawer({ client, onClose }: { client: PlatformClient; onClose
     if (!form.reason.trim()) { setError('A change reason is required.'); return; }
     if (!form.applications.length || !form.modules.length) { setError('Assign at least one application and one module.'); return; }
 
-    const selectedUserIds = new Set(form.users.map(parseOptionId));
+    const selectedUserIds = new Set(form.userIds);
     const updatedClient: PlatformClient = {
       ...client,
       clientName: name,
@@ -245,6 +264,7 @@ function ClientEditDrawer({ client, onClose }: { client: PlatformClient; onClose
       enabledApplications: form.applications,
       enabledModules: form.modules,
       disabledModules: clientEditableModules.filter((module) => !form.modules.includes(module)),
+      plants: form.plants.map((plant) => ({ ...plant, plantName: plant.plantName.trim() })).filter((plant) => plant.plantName),
       lastUpdated: new Date().toISOString(),
     };
 
@@ -258,6 +278,7 @@ function ClientEditDrawer({ client, onClose }: { client: PlatformClient; onClose
           clientName: name,
           region: form.region,
           market: form.market,
+          plant: normalizeUserPlant(user.plant, form.plants),
           assignedApplications: intersectOrDefault(user.assignedApplications, form.applications),
           assignedModules: intersectOrDefault(user.assignedModules, form.modules),
         };
@@ -291,15 +312,23 @@ function ClientEditDrawer({ client, onClose }: { client: PlatformClient; onClose
   return createPortal(
     <Drawer title="Edit Client" description="Change profile, market, modules, applications, and assigned users." onClose={onClose}>
       <div className="grid gap-3 md:grid-cols-2">
+        <Field label="Client Unique ID"><input className="form-input mt-1 w-full" value={client.clientId} disabled /></Field>
         <Field label="Client Name"><input className="form-input mt-1 w-full" value={form.clientName} onChange={(event) => setForm({ ...form, clientName: event.target.value })} /></Field>
         <Field label="Industry"><input className="form-input mt-1 w-full" value={form.industry} onChange={(event) => setForm({ ...form, industry: event.target.value })} /></Field>
         <Field label="Region"><select className="form-input mt-1 w-full" value={form.region} onChange={(event) => changeRegion(event.target.value)}>{unique(marketOptions.map((item) => item.region)).map((item) => <option key={item}>{item}</option>)}</select></Field>
-        <Field label="Market"><select className="form-input mt-1 w-full" value={form.market} onChange={(event) => changeMarket(event.target.value)}>{markets.map((item) => <option key={item.market}>{item.market}</option>)}</select></Field>
+        <Field label="Market"><input className="form-input mt-1 w-full" list={`edit-client-markets-${client.clientId}`} value={form.market} onChange={(event) => changeMarket(event.target.value)} /><datalist id={`edit-client-markets-${client.clientId}`}>{markets.map((item) => <option key={item.market} value={item.market} />)}</datalist></Field>
         <Field label="Currency"><select className="form-input mt-1 w-full" value={form.currency} onChange={(event) => setForm({ ...form, currency: event.target.value as CurrencyCode })}>{['USD', 'INR', 'EUR', 'GBP', 'AED'].map((item) => <option key={item}>{item}</option>)}</select></Field>
         <Field label="Status"><select className="form-input mt-1 w-full" value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as ClientStatus })}><option>Active</option><option>Trial</option><option>Suspended</option></select></Field>
       </div>
+      <PlantEditor plants={form.plants} onChange={(plants) => setForm({ ...form, plants })} onAdd={addPlant} />
       <AccessSections applications={form.applications} modules={form.modules} setApplications={(applications) => setForm({ ...form, applications })} setModules={(modules) => setForm({ ...form, modules })} />
-      <MultiSelectAccessGrid title="Assigned Users" description="Add or remove users for this client." items={state.users.filter((user) => !user.roles.includes('Super Admin')).map(userLabel)} selectedItems={form.users} onChange={(users) => setForm({ ...form, users })} searchPlaceholder="Search users..." columns={2} showSelectAll showClear showSelectedCount />
+      <UserAssignmentPanel
+        title="Assigned Users"
+        users={state.users.filter((user) => !user.roles.includes('Super Admin'))}
+        selectedUserIds={form.userIds}
+        onChange={(userIds) => setForm({ ...form, userIds })}
+        onExport={() => exportRows(`${client.clientName}-users.xls`, clientUserExportRows(state.users.filter((user) => user.clientId === client.clientId || form.userIds.includes(user.userId)), client))}
+      />
       <Field label="Change Reason"><input className="form-input mt-1 w-full" placeholder="Required audit reason" value={form.reason} onChange={(event) => setForm({ ...form, reason: event.target.value })} /></Field>
       <DrawerActions error={error} cancel={onClose} submit={submit} submitLabel="Save Client" />
     </Drawer>,
@@ -527,6 +556,7 @@ function UsersWorkspace() {
 function UserCreateModal({ onClose }: { onClose: () => void }) {
   const { state, createUser, platformUser, recordAudit } = usePlatform();
   const initialClient = state.clients[0];
+  const userIdPreview = nextUserId(state);
   const [form, setForm] = useState({
     firstName: '',
     lastName: '',
@@ -542,16 +572,18 @@ function UserCreateModal({ onClose }: { onClose: () => void }) {
   });
   const [error, setError] = useState('');
   const client = state.clients.find((item) => item.clientId === form.clientId) ?? initialClient;
+  const emailExists = Boolean(form.email.trim()) && state.users.some((user) => user.email.toLowerCase() === form.email.trim().toLowerCase());
+  const loginExists = Boolean(form.loginName.trim()) && state.users.some((user) => user.loginName.toLowerCase() === form.loginName.trim().toLowerCase());
 
   function changeClient(clientId: string) {
     const next = state.clients.find((item) => item.clientId === clientId)!;
-    setForm({ ...form, clientId, applications: [...next.enabledApplications], modules: [...next.enabledModules] });
+    setForm({ ...form, clientId, plant: clientPlants(next)[0]?.plantName ?? '', applications: [...next.enabledApplications], modules: [...next.enabledModules] });
   }
 
   function submit() {
     if (!form.firstName.trim() || !form.lastName.trim() || !form.email.trim() || !form.loginName.trim()) { setError('First name, last name, email, and login name are required.'); return; }
-    if (state.users.some((user) => user.email.toLowerCase() === form.email.trim().toLowerCase())) { setError('Email must be unique.'); return; }
-    if (state.users.some((user) => user.loginName.toLowerCase() === form.loginName.trim().toLowerCase())) { setError('Login Name must be unique.'); return; }
+    if (emailExists) { setError('Email ID already exists.'); return; }
+    if (loginExists) { setError('Login name already exists.'); return; }
     if (!form.applications.length || !form.modules.length) { setError('Assign at least one application and one module.'); return; }
     if (!form.reason) { setError('An access assignment reason is required.'); return; }
     const user = createUser({ firstName: form.firstName.trim(), lastName: form.lastName.trim(), email: form.email.trim(), loginName: form.loginName.trim(), clientId: client.clientId, region: client.region, market: client.market, department: form.department, plant: form.plant, warehouse: 'Warehouse A', roles: [form.role], assignedApplications: form.applications, assignedModules: form.modules, status: 'Active' });
@@ -561,7 +593,8 @@ function UserCreateModal({ onClose }: { onClose: () => void }) {
 
   return createPortal(
     <Drawer title="Create User" description="Identity, organization, role, application, and module access." onClose={onClose}>
-      <UserFormFields form={form} setForm={setForm} clients={state.clients} client={client} changeClient={changeClient} mode="create" />
+      <Field label="User Unique ID"><input className="form-input mt-1 w-full" value={userIdPreview} disabled /></Field>
+      <UserFormFields form={form} setForm={setForm} clients={state.clients} client={client} changeClient={changeClient} mode="create" emailExists={emailExists} loginExists={loginExists} />
       <AccessSections applications={form.applications} modules={form.modules} appItems={client.enabledApplications} moduleItems={client.enabledModules} setApplications={(applications) => setForm({ ...form, applications })} setModules={(modules) => setForm({ ...form, modules })} />
       <Field label="Assignment Reason"><select className="form-input mt-1 w-full" value={form.reason} onChange={(event) => setForm({ ...form, reason: event.target.value })}><option value="">Select required reason</option><option>Business Requirement</option><option>Client Request</option><option>New Employee</option><option>Role Change</option><option>Other</option></select></Field>
       <DrawerActions error={error} cancel={onClose} submit={submit} submitLabel="Create User" />
@@ -589,16 +622,18 @@ function UserEditModal({ user, onClose }: { user: PlatformUser; onClose: () => v
   });
   const [error, setError] = useState('');
   const client = state.clients.find((item) => item.clientId === form.clientId) ?? initialClient;
+  const emailExists = Boolean(form.email.trim()) && state.users.some((item) => item.userId !== user.userId && item.email.toLowerCase() === form.email.trim().toLowerCase());
+  const loginExists = Boolean(form.loginName.trim()) && state.users.some((item) => item.userId !== user.userId && item.loginName.toLowerCase() === form.loginName.trim().toLowerCase());
 
   function changeClient(clientId: string) {
     const next = state.clients.find((item) => item.clientId === clientId)!;
-    setForm({ ...form, clientId, applications: intersectOrDefault(form.applications, next.enabledApplications), modules: intersectOrDefault(form.modules, next.enabledModules) });
+    setForm({ ...form, clientId, plant: clientPlants(next)[0]?.plantName ?? '', applications: intersectOrDefault(form.applications, next.enabledApplications), modules: intersectOrDefault(form.modules, next.enabledModules) });
   }
 
   function submit() {
     if (!form.firstName.trim() || !form.lastName.trim() || !form.email.trim() || !form.loginName.trim()) { setError('First name, last name, email, and login name are required.'); return; }
-    if (state.users.some((item) => item.userId !== user.userId && item.email.toLowerCase() === form.email.trim().toLowerCase())) { setError('Email must be unique.'); return; }
-    if (state.users.some((item) => item.userId !== user.userId && item.loginName.toLowerCase() === form.loginName.trim().toLowerCase())) { setError('Login Name must be unique.'); return; }
+    if (emailExists) { setError('Email ID already exists.'); return; }
+    if (loginExists) { setError('Login name already exists.'); return; }
     if (!form.roles.length) { setError('Assign at least one role.'); return; }
     if (!form.applications.length || !form.modules.length) { setError('Assign at least one application and one module.'); return; }
     if (!form.reason.trim()) { setError('A change reason is required.'); return; }
@@ -624,7 +659,8 @@ function UserEditModal({ user, onClose }: { user: PlatformUser; onClose: () => v
 
   return createPortal(
     <Drawer title="Edit User" description="Change client, role, status, and application/module access." onClose={onClose}>
-      <UserFormFields form={form} setForm={setForm} clients={state.clients} client={client} changeClient={changeClient} mode="edit" />
+      <Field label="User Unique ID"><input className="form-input mt-1 w-full" value={user.userId} disabled /></Field>
+      <UserFormFields form={form} setForm={setForm} clients={state.clients} client={client} changeClient={changeClient} mode="edit" emailExists={emailExists} loginExists={loginExists} />
       <MultiSelectAccessGrid title="Assigned Roles" description="Add or remove role access for this user." items={platformRoles.filter((role) => role !== 'Super Admin' || user.roles.includes('Super Admin'))} selectedItems={form.roles} onChange={(roles) => setForm({ ...form, roles })} searchPlaceholder="Search roles..." columns={2} showSelectAll showClear showSelectedCount />
       <AccessSections applications={form.applications} modules={form.modules} appItems={client.enabledApplications} moduleItems={client.enabledModules} setApplications={(applications) => setForm({ ...form, applications })} setModules={(modules) => setForm({ ...form, modules })} />
       <Field label="Change Reason"><input className="form-input mt-1 w-full" placeholder="Required audit reason" value={form.reason} onChange={(event) => setForm({ ...form, reason: event.target.value })} /></Field>
@@ -646,24 +682,28 @@ type UserFormState = {
   status?: PlatformUser['status'];
 };
 
-function UserFormFields<T extends UserFormState>({ form, setForm, clients, client, changeClient, mode }: {
+function UserFormFields<T extends UserFormState>({ form, setForm, clients, client, changeClient, mode, emailExists = false, loginExists = false }: {
   form: T;
   setForm: Dispatch<SetStateAction<T>>;
   clients: PlatformClient[];
   client: PlatformClient;
   changeClient: (clientId: string) => void;
   mode: 'create' | 'edit';
+  emailExists?: boolean;
+  loginExists?: boolean;
 }) {
+  const plants = clientPlants(client);
   return (
     <div className="grid gap-3 md:grid-cols-2">
       <Field label="First Name"><input className="form-input mt-1 w-full" value={form.firstName} onChange={(event) => setForm({ ...form, firstName: event.target.value })} /></Field>
       <Field label="Last Name"><input className="form-input mt-1 w-full" value={form.lastName} onChange={(event) => setForm({ ...form, lastName: event.target.value })} /></Field>
-      <Field label="Email"><input className="form-input mt-1 w-full" type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} /></Field>
-      <Field label="Login Name"><input className="form-input mt-1 w-full" value={form.loginName} onChange={(event) => setForm({ ...form, loginName: event.target.value })} /></Field>
+      <Field label="Email"><input className="form-input mt-1 w-full" type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />{emailExists ? <span className="mt-1 block text-xs text-rose-300">Email ID already exists.</span> : null}</Field>
+      <Field label="Login Name"><input className="form-input mt-1 w-full" value={form.loginName} onChange={(event) => setForm({ ...form, loginName: event.target.value })} />{loginExists ? <span className="mt-1 block text-xs text-rose-300">Login name already exists.</span> : null}</Field>
       <Field label="Client"><select className="form-input mt-1 w-full" value={form.clientId} onChange={(event) => changeClient(event.target.value)}>{clients.map((item) => <option key={item.clientId} value={item.clientId}>{item.clientName}</option>)}</select></Field>
-      <Field label="Region / Market"><input className="form-input mt-1 w-full" value={`${client.region} / ${client.market}`} disabled /></Field>
+      <Field label="Region"><input className="form-input mt-1 w-full" value={client.region} disabled /></Field>
+      <Field label="Market"><input className="form-input mt-1 w-full" value={client.market} disabled /></Field>
       <Field label="Department"><input className="form-input mt-1 w-full" value={form.department} onChange={(event) => setForm({ ...form, department: event.target.value })} /></Field>
-      <Field label="Plant"><input className="form-input mt-1 w-full" value={form.plant} onChange={(event) => setForm({ ...form, plant: event.target.value })} /></Field>
+      <Field label="Plant"><select className="form-input mt-1 w-full" value={form.plant} onChange={(event) => setForm({ ...form, plant: event.target.value })}>{plants.map((plant) => <option key={plant.plantId} value={plant.plantName}>{plant.plantName}</option>)}</select></Field>
       {mode === 'create' && <Field label="Role"><select className="form-input mt-1 w-full" value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value })}>{platformRoles.filter((item) => item !== 'Super Admin').map((item) => <option key={item}>{item}</option>)}</select></Field>}
       {mode === 'edit' && <Field label="Status"><select className="form-input mt-1 w-full" value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as PlatformUser['status'] })}><option>Active</option><option>Disabled</option></select></Field>}
     </div>
@@ -713,7 +753,7 @@ function ModuleEditDrawer({ moduleName, onClose }: { moduleName: string; onClose
   const { state, platformUser, replacePlatformState } = usePlatform();
   const [form, setForm] = useState({
     clients: state.clients.filter((client) => moduleName === 'Admin' || client.enabledModules.includes(moduleName)).map(clientLabel),
-    users: state.users.filter((user) => user.assignedModules.includes(moduleName)).map(userLabel),
+    userIds: state.users.filter((user) => user.assignedModules.includes(moduleName)).map((user) => user.userId),
     reason: '',
   });
   const [error, setError] = useState('');
@@ -722,7 +762,7 @@ function ModuleEditDrawer({ moduleName, onClose }: { moduleName: string; onClose
   function submit() {
     if (!form.reason.trim()) { setError('A change reason is required.'); return; }
     const selectedClientIds = new Set(form.clients.map(parseOptionId));
-    const selectedUserIds = new Set(form.users.map(parseOptionId));
+    const selectedUserIds = new Set(form.userIds);
     state.users.forEach((user) => {
       if (selectedUserIds.has(user.userId) && user.clientId) selectedClientIds.add(user.clientId);
     });
@@ -754,7 +794,13 @@ function ModuleEditDrawer({ moduleName, onClose }: { moduleName: string; onClose
   return createPortal(
     <Drawer title={`Edit ${moduleName} Module`} description="Add or remove clients and users assigned to this module." onClose={onClose}>
       <MultiSelectAccessGrid title="Enabled Clients" description={adminModule ? 'Admin is a platform module and remains available to platform administration.' : 'Add or remove client access for this module.'} items={state.clients.map(clientLabel)} selectedItems={form.clients} onChange={(clients) => setForm({ ...form, clients })} searchPlaceholder="Search clients..." columns={2} showSelectAll showClear showSelectedCount />
-      <MultiSelectAccessGrid title="Assigned Users" description="Add or remove user access for this module." items={state.users.filter((user) => !user.roles.includes('Super Admin') || moduleName === 'Admin').map(userLabel)} selectedItems={form.users} onChange={(users) => setForm({ ...form, users })} searchPlaceholder="Search users..." columns={2} showSelectAll showClear showSelectedCount />
+      <UserAssignmentPanel
+        title="Assigned Users"
+        users={state.users.filter((user) => !user.roles.includes('Super Admin') || moduleName === 'Admin')}
+        selectedUserIds={form.userIds}
+        onChange={(userIds) => setForm({ ...form, userIds })}
+        onExport={() => exportRows(`${moduleName}-module-users.xls`, moduleUserExportRows(state.users, moduleName))}
+      />
       <Field label="Change Reason"><input className="form-input mt-1 w-full" placeholder="Required audit reason" value={form.reason} onChange={(event) => setForm({ ...form, reason: event.target.value })} /></Field>
       <DrawerActions error={error} cancel={onClose} submit={submit} submitLabel="Save Module Access" />
     </Drawer>,
@@ -924,6 +970,84 @@ function AccessSections({ applications, modules, setApplications, setModules, ap
   );
 }
 
+function PlantEditor({ plants, onChange, onAdd }: { plants: NonNullable<PlatformClient['plants']>; onChange: (plants: NonNullable<PlatformClient['plants']>) => void; onAdd: () => void }) {
+  return (
+    <fieldset className="rounded-2xl border border-white/10 bg-slate-950/20 p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold text-white">Plant Management</h2>
+          <p className="mt-1 text-sm text-slate-400">Plant IDs are generated and used for backend/log tracking.</p>
+        </div>
+        <button type="button" className="form-button-subtle py-2 text-xs" onClick={onAdd}>Add Plant</button>
+      </div>
+      <div className="mt-4 space-y-2">
+        {plants.map((plant, index) => (
+          <div key={plant.plantId} className="grid gap-2 md:grid-cols-[180px_1fr_150px]">
+            <input className="form-input w-full" value={plant.plantId} disabled />
+            <input className="form-input w-full" placeholder="Plant name" value={plant.plantName} onChange={(event) => onChange(plants.map((item, itemIndex) => itemIndex === index ? { ...item, plantName: event.target.value } : item))} />
+            <select className="form-input w-full" value={plant.status} onChange={(event) => onChange(plants.map((item, itemIndex) => itemIndex === index ? { ...item, status: event.target.value as 'Active' | 'Inactive' } : item))}><option>Active</option><option>Inactive</option></select>
+          </div>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
+function UserAssignmentPanel({ title, users, selectedUserIds, onChange, onExport }: { title: string; users: PlatformUser[]; selectedUserIds: string[]; onChange: (userIds: string[]) => void; onExport: () => void }) {
+  const [search, setSearch] = useState('');
+  const [pending, setPending] = useState<string[]>([]);
+  const selected = users.filter((user) => selectedUserIds.includes(user.userId));
+  const available = users
+    .filter((user) => !selectedUserIds.includes(user.userId))
+    .filter((user) => !search.trim() || `${user.firstName} ${user.lastName} ${user.email}`.toLowerCase().includes(search.trim().toLowerCase()));
+  const visibleAvailable = available.slice(0, 4);
+  function togglePending(userId: string) {
+    setPending((current) => current.includes(userId) ? current.filter((item) => item !== userId) : [...current, userId]);
+  }
+  function addUsers() {
+    onChange(unique([...selectedUserIds, ...pending]));
+    setPending([]);
+  }
+  return (
+    <fieldset className="rounded-2xl border border-white/10 bg-slate-950/20 p-4">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h2 className="text-base font-semibold text-white">{title}</h2>
+          <p className="mt-1 text-sm text-slate-400">Search by first name + space + last name or email. User IDs stay hidden for UI and remain backend identifiers.</p>
+        </div>
+        <button type="button" className="form-button-subtle inline-flex items-center gap-2 py-2 text-xs" onClick={onExport}><Download className="h-4 w-4" />Export Users</button>
+      </div>
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <div className="rounded-xl border border-white/10 bg-slate-950/30 p-3">
+          <SearchField value={search} onChange={setSearch} placeholder="Search first name last name or email..." />
+          <div className="mt-3 space-y-2">
+            {visibleAvailable.map((user) => (
+              <label key={user.userId} className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-sm text-slate-200">
+                <span><span className="font-medium text-white">{user.fullName}</span><span className="ml-2 text-slate-500">{user.email}</span></span>
+                <input type="checkbox" checked={pending.includes(user.userId)} onChange={() => togglePending(user.userId)} />
+              </label>
+            ))}
+            {!visibleAvailable.length && <div className="rounded-xl border border-dashed border-white/10 p-5 text-center text-sm text-slate-400">No unassigned users match this search.</div>}
+          </div>
+          <div className="mt-3 flex items-center justify-between text-xs text-slate-500"><span>{visibleAvailable.length} of {available.length} available shown</span><button type="button" className="form-button-primary py-2 text-xs disabled:opacity-40" disabled={!pending.length} onClick={addUsers}>Add Selected</button></div>
+        </div>
+        <div className="rounded-xl border border-white/10 bg-slate-950/30 p-3">
+          <div className="mb-3 flex items-center justify-between"><h3 className="text-sm font-semibold text-white">Assigned Users</h3><span className="rounded-full border border-cyan-300/20 bg-cyan-400/10 px-3 py-1 text-xs text-cyan-100">{selected.length} assigned</span></div>
+          <div className="max-h-72 space-y-2 overflow-y-auto">
+            {selected.map((user) => (
+              <div key={user.userId} className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-sm">
+                <span><span className="font-medium text-white">{user.fullName}</span><span className="ml-2 text-slate-500">{user.email}</span></span>
+                <button type="button" className="form-button-subtle py-1 text-xs" onClick={() => onChange(selectedUserIds.filter((item) => item !== user.userId))}>Remove</button>
+              </div>
+            ))}
+            {!selected.length && <div className="rounded-xl border border-dashed border-white/10 p-5 text-center text-sm text-slate-400">No assigned users yet.</div>}
+          </div>
+        </div>
+      </div>
+    </fieldset>
+  );
+}
+
 function Drawer({ title, description, onClose, children }: { title: string; description: string; onClose: () => void; children: ReactNode }) {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
@@ -1033,6 +1157,75 @@ function getSubscription(client: PlatformClient, index: number) {
     userLimit: client.userLimit ?? 100 + Math.max(0, index) * 50,
     storageLimitGb: client.storageLimitGb ?? 500 + Math.max(0, index) * 250,
   };
+}
+
+function nextClientId(state: PlatformState) {
+  return nextSequentialId('CLT', state.clients.map((client) => client.clientId));
+}
+
+function nextUserId(state: PlatformState) {
+  return nextSequentialId('USR', state.users.map((user) => user.userId));
+}
+
+function nextSequentialId(prefix: string, values: string[]) {
+  const next = Math.max(0, ...values.map((value) => Number(value.split('-').at(-1)) || 0)) + 1;
+  return `${prefix}-${String(next).padStart(6, '0')}`;
+}
+
+function makePlantId(clientId: string, index: number) {
+  return `${clientId}-PLT-${String(index).padStart(3, '0')}`;
+}
+
+function clientPlants(client: PlatformClient) {
+  if (Array.isArray(client.plants) && client.plants.length) return client.plants;
+  return [
+    { plantId: makePlantId(client.clientId, 1), plantName: 'Plant A', status: 'Active' as const },
+    { plantId: makePlantId(client.clientId, 2), plantName: 'Plant B', status: 'Active' as const },
+  ];
+}
+
+function normalizeUserPlant(currentPlant: string | undefined, plants: NonNullable<PlatformClient['plants']>) {
+  return plants.find((plant) => plant.plantName === currentPlant)?.plantName ?? plants[0]?.plantName ?? '';
+}
+
+function clientUserExportRows(users: PlatformUser[], client: PlatformClient) {
+  return users.map((user) => ({
+    Client: client.clientName,
+    'Client ID': client.clientId,
+    User: user.fullName,
+    Email: user.email,
+    Role: user.roles.join(', '),
+    Plant: user.plant ?? '',
+    Status: user.status,
+    Applications: user.assignedApplications.join(', '),
+    Modules: user.assignedModules.join(', '),
+  }));
+}
+
+function moduleUserExportRows(users: PlatformUser[], moduleName: string) {
+  return users
+    .filter((user) => user.assignedModules.includes(moduleName))
+    .map((user) => ({
+      Module: moduleName,
+      User: user.fullName,
+      Email: user.email,
+      Client: user.clientName,
+      Status: user.status,
+      Active: user.status === 'Active' ? 'Active' : 'Inactive',
+    }));
+}
+
+function exportRows(filename: string, rows: Array<Record<string, string | number>>) {
+  const headers = Object.keys(rows[0] ?? { Message: 'No records' });
+  const escape = (value: unknown) => String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+  const bodyRows = rows.length ? rows : [{ Message: 'No records' }];
+  const html = `<html><head><meta charset="utf-8" /></head><body><table><thead><tr>${headers.map((header) => `<th>${escape(header)}</th>`).join('')}</tr></thead><tbody>${bodyRows.map((row) => `<tr>${headers.map((header) => `<td>${escape(row[header])}</td>`).join('')}</tr>`).join('')}</tbody></table></body></html>`;
+  const url = URL.createObjectURL(new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 function userLabel(user: PlatformUser) {

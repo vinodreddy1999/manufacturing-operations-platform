@@ -1,6 +1,12 @@
 export type CurrencyCode = 'USD' | 'INR' | 'EUR' | 'GBP' | 'AED';
 export type ClientStatus = 'Active' | 'Trial' | 'Suspended';
 
+export type PlatformPlant = {
+  plantId: string;
+  plantName: string;
+  status: 'Active' | 'Inactive';
+};
+
 export type PlatformClient = {
   clientId: string;
   clientName: string;
@@ -13,7 +19,7 @@ export type PlatformClient = {
   status: ClientStatus;
   createdDate: string;
   industry?: string;
-  plants?: number;
+  plants?: PlatformPlant[];
   warehouses?: number;
   lastUpdated?: string;
   subscriptionPlan?: string;
