@@ -1,4 +1,4 @@
-export type CurrencyCode = 'USD' | 'INR' | 'EUR' | 'GBP' | 'AED' | 'CAD' | 'MXN' | 'SGD' | 'JPY' | 'SAR' | 'ZAR' | 'BRL' | 'AUD';
+export type CurrencyCode = string;
 export type ClientStatus = 'Active' | 'Trial' | 'Suspended';
 
 export type PlatformPlant = {
