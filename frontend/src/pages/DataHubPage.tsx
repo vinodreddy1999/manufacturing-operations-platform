@@ -301,11 +301,49 @@ function PowerBiGetDataExperience({
   moduleFilter: string;
   onCreateDraft: () => void;
 }) {
+  const [sourceSearch, setSourceSearch] = useState('');
   const visibleDestinations = destinationModules.filter((module) => !moduleFilter || module === moduleFilter);
   const detailFields = connectionFieldsFor(selectedSource);
+  const normalizedSearch = sourceSearch.trim().toLowerCase();
+  const matchingSourceGroups = powerBiSourceGroups
+    .map((group) => ({
+      ...group,
+      sources: group.sources.filter((source) =>
+        !normalizedSearch
+        || `${group.group} ${source.label} ${source.description} ${source.auth} ${source.connectorType}`.toLowerCase().includes(normalizedSearch)),
+    }))
+    .filter((group) => group.sources.length);
+  const stepLabel = guidedSteps[wizardStep - 1] ?? guidedSteps[0];
+  const completedCount = Math.max(0, wizardStep - 1);
   return (
     <div className="mt-4 space-y-4">
-      <Panel title="Power BI-style Get Data" description="Select a source, test it, preview rows, transform data, map fields, validate, then import or schedule refresh into a platform module.">
+      <Panel title="Start a Data Import" description="Follow this guided path. Nothing is posted into a module until you create a draft and send it for approval.">
+        <div className="mb-4 grid gap-3 md:grid-cols-3">
+          {[
+            ['1', 'Pick a source', 'Choose Excel, SAP, database, API, cloud app, machine data, or manual entry.'],
+            ['2', 'Check and shape data', 'Test the connection, preview rows, clean values, and map fields.'],
+            ['3', 'Create a safe draft', 'Select destination module and refresh mode. Critical imports require approval.'],
+          ].map(([number, title, body]) => (
+            <div key={title} className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+              <div className="flex items-center gap-3">
+                <span className="flex h-8 w-8 items-center justify-center rounded-xl border border-cyan-300/25 bg-cyan-400/12 text-sm font-bold text-cyan-100">{number}</span>
+                <p className="font-semibold text-white">{title}</p>
+              </div>
+              <p className="mt-2 text-sm leading-6 text-slate-400">{body}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-cyan-300/15 bg-cyan-400/[0.06] p-4">
+          <div>
+            <p className="text-xs uppercase tracking-[0.18em] text-cyan-100">Current step</p>
+            <p className="mt-1 text-lg font-semibold text-white">{wizardStep}. {stepLabel}</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <StatusBadge status={`${completedCount} completed`} />
+            <StatusBadge status={connectionTested ? 'Connection tested' : 'Connection not tested'} />
+            <StatusBadge status={selectedDestination} />
+          </div>
+        </div>
         <div className="grid gap-3 lg:grid-cols-10">
           {guidedSteps.map((step, index) => {
             const active = wizardStep === index + 1;
@@ -321,11 +359,39 @@ function PowerBiGetDataExperience({
       </Panel>
 
       <div className="grid gap-4 xl:grid-cols-[1fr_0.95fr]">
-        <Panel title="Select Data Source Type" description={`Target client: ${targetCompanyName}. Source groups mirror a simple Power BI Get Data experience.`}>
+        <Panel title="Select Data Source" description={`Target client: ${targetCompanyName}. Search by source name, system type, file type, or authentication method.`}>
+          <div className="mb-4 grid gap-3 md:grid-cols-[1fr_auto]">
+            <input
+              className={inputClass}
+              placeholder="Search sources: Excel, SAP, PostgreSQL, API, Google Drive..."
+              value={sourceSearch}
+              onChange={(event) => setSourceSearch(event.target.value)}
+            />
+            <button type="button" className="form-button-subtle" onClick={() => setSourceSearch('')}>
+              Clear Search
+            </button>
+          </div>
+          <div className="mb-4 grid gap-3 rounded-2xl border border-white/10 bg-slate-950/25 p-4 sm:grid-cols-3">
+            <div>
+              <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Selected source</p>
+              <p className="mt-1 font-semibold text-white">{selectedSource.label}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Source group</p>
+              <p className="mt-1 font-semibold text-white">{selectedSource.group}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Authentication</p>
+              <p className="mt-1 font-semibold text-white">{selectedSource.auth}</p>
+            </div>
+          </div>
           <div className="space-y-4">
-            {powerBiSourceGroups.map((group) => (
+            {matchingSourceGroups.map((group) => (
               <div key={group.group} className="rounded-2xl border border-white/10 bg-slate-950/25 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-100">{group.group}</p>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-100">{group.group}</p>
+                  <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-[11px] text-slate-400">{group.sources.length} options</span>
+                </div>
                 <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                   {group.sources.map((source) => {
                     const fullSource = { ...source, group: group.group };
@@ -341,14 +407,22 @@ function PowerBiGetDataExperience({
                 </div>
               </div>
             ))}
+            {!matchingSourceGroups.length ? (
+              <div className="rounded-2xl border border-amber-300/20 bg-amber-400/10 p-4 text-sm text-amber-100">
+                No sources matched your search. Try a broader term like file, database, API, SAP, or cloud.
+              </div>
+            ) : null}
           </div>
         </Panel>
 
         <div className="space-y-4">
-          <Panel title="Connection Details and Test" description={`${selectedSource.group} / ${selectedSource.label}. Credentials remain masked and critical imports are approval-first.`}>
+          <Panel title="Connection Details" description={`${selectedSource.group} / ${selectedSource.label}. Fill only the fields relevant to this source, then test before previewing data.`}>
             <div className="grid gap-3 md:grid-cols-2">
               {detailFields.map((field) => (
-                <input key={field} className={inputClass} type={/password|secret|token|key/i.test(field) ? 'password' : 'text'} placeholder={field} />
+                <label key={field} className="text-sm font-medium text-slate-300">
+                  {field}
+                  <input className={`${inputClass} mt-1 w-full`} type={/password|secret|token|key/i.test(field) ? 'password' : 'text'} placeholder={`Enter ${field.toLowerCase()}`} />
+                </label>
               ))}
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
@@ -360,7 +434,7 @@ function PowerBiGetDataExperience({
             </div>
           </Panel>
 
-          <Panel title="Select Table, File, or Endpoint" description="Choose what data to load from the tested connector.">
+          <Panel title="Select Data to Load" description="Choose one dataset to preview. These examples show how the selector will work for tables, files, or API endpoints.">
             <div className="grid gap-2">
               {['inventory_stock_balance', 'production_work_orders', 'maintenance_assets', 'supplier_lead_times'].map((entity) => (
                 <label key={entity} className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-slate-200">
@@ -374,7 +448,7 @@ function PowerBiGetDataExperience({
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
-        <Panel title="Data Preview" description="Preview sample rows before transform, validation, and approval.">
+        <Panel title="Preview Data" description="Check a small sample before you transform or map fields. This prevents wrong data entering a module.">
           <DataTable
             rows={previewRows}
             emptyTitle="No preview rows"
@@ -388,7 +462,7 @@ function PowerBiGetDataExperience({
           />
         </Panel>
 
-        <Panel title="Clean and Transform Data" description="Power Query-style transformations are drafted before import.">
+        <Panel title="Clean and Transform" description="Select transformations to apply to the import draft. You can change these before approval.">
           <div className="grid gap-2 sm:grid-cols-2">
             {transformOptions.map((option) => {
               const selected = selectedTransforms.includes(option);
@@ -404,7 +478,7 @@ function PowerBiGetDataExperience({
       </div>
 
       <div className="grid gap-4 xl:grid-cols-3">
-        <Panel title="Map Fields to Platform" description="Source fields are mapped to destination module fields.">
+        <Panel title="Map Fields" description="Tell the platform where each source column belongs.">
           <div className="space-y-2">
             {[
               ['item_code', 'Inventory.Item Code'],
@@ -421,7 +495,7 @@ function PowerBiGetDataExperience({
           </div>
         </Panel>
 
-        <Panel title="Validate Data" description="Validation issues are resolved before the import approval step.">
+        <Panel title="Validate Before Import" description="Warnings and approval requirements are shown before any module data changes.">
           <div className="space-y-2">
             {validationRows.map((row) => (
               <div key={row.rule} className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
@@ -435,14 +509,20 @@ function PowerBiGetDataExperience({
           </div>
         </Panel>
 
-        <Panel title="Import or Schedule Refresh" description="Choose destination module and refresh strategy.">
+        <Panel title="Create Import Draft" description="Choose destination and refresh behavior. This creates a draft, not an automatic production import.">
           <div className="space-y-3">
-            <select className={selectClass} value={selectedDestination} onChange={(event) => setSelectedDestination(event.target.value)}>
-              {visibleDestinations.map((module) => <option key={module}>{module}</option>)}
-            </select>
-            <select className={selectClass} value={selectedRefresh} onChange={(event) => setSelectedRefresh(event.target.value)}>
-              {refreshOptions.map((mode) => <option key={mode}>{mode}</option>)}
-            </select>
+            <label className="block text-sm font-medium text-slate-300">
+              Destination module
+              <select className={`${selectClass} mt-1 w-full`} value={selectedDestination} onChange={(event) => setSelectedDestination(event.target.value)}>
+                {visibleDestinations.map((module) => <option key={module}>{module}</option>)}
+              </select>
+            </label>
+            <label className="block text-sm font-medium text-slate-300">
+              Refresh mode
+              <select className={`${selectClass} mt-1 w-full`} value={selectedRefresh} onChange={(event) => setSelectedRefresh(event.target.value)}>
+                {refreshOptions.map((mode) => <option key={mode}>{mode}</option>)}
+              </select>
+            </label>
             <button className="form-button-primary w-full" onClick={onCreateDraft}>Create Import Draft</button>
             <button className="form-button-subtle w-full" onClick={() => setWizardStep(10)}>Send for Approval</button>
           </div>
@@ -707,8 +787,22 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
       <PageHeader
         eyebrow="Data Integration Hub"
         title="Get data, transform it, and send it to modules"
-        description={`Target client: ${targetCompany?.name ?? targetCompanyId}. Choose a Power BI-style source, preview and transform data, then import to a platform module with approval and audit trail.`}
+        description={`Target client: ${targetCompany?.name ?? targetCompanyId}. Use one guided flow to connect, preview, clean, map, validate, and create an approval-safe import draft.`}
       />
+
+      <div className="mb-5 grid gap-3 md:grid-cols-4">
+        {[
+          ['Choose client', targetCompany?.name ?? targetCompanyId],
+          ['Pick source', selectedPowerSource.label],
+          ['Route to module', selectedDestination],
+          ['Approval safety', connectionTested ? 'Ready for draft' : 'Test connection first'],
+        ].map(([label, value]) => (
+          <div key={label} className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+            <p className="text-xs uppercase tracking-[0.16em] text-slate-500">{label}</p>
+            <p className="mt-2 truncate font-semibold text-white">{value}</p>
+          </div>
+        ))}
+      </div>
 
       <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
         <CompanySelector companies={companyRows} selectedCompanyId={targetCompanyId} user={user} onChange={changeTargetCompany} />
@@ -724,10 +818,13 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
           <KeyRound className="mr-2 inline h-4 w-4 text-cyan-200" />
           Credentials are masked in the UI, stored as connection metadata only, and critical imports remain approval-first. Database connections are presented as read-only.
         </div>
-        <select className={selectClass} value={selectedModuleFilter} onChange={(event) => setSelectedModuleFilter(event.target.value)}>
-          <option value="">All destination modules</option>
-          {destinationModules.map((module) => <option key={module}>{module}</option>)}
-        </select>
+        <label className="rounded-2xl border border-white/10 bg-white/6 p-3 text-sm font-medium text-slate-300">
+          Destination filter
+          <select className={`${selectClass} mt-2 w-full`} value={selectedModuleFilter} onChange={(event) => setSelectedModuleFilter(event.target.value)}>
+            <option value="">All destination modules</option>
+            {destinationModules.map((module) => <option key={module}>{module}</option>)}
+          </select>
+        </label>
       </div>
 
       <div className="mt-6 flex flex-wrap gap-2 rounded-2xl border border-white/10 bg-slate-900/45 p-2">
