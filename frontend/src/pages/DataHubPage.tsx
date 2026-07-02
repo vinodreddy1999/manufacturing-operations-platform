@@ -1,6 +1,6 @@
 import { FormEvent, useMemo, useRef, useState } from 'react';
 import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query';
-import { Cable, Database, Gauge, RadioTower, Route, ShieldCheck, Trash2, UploadCloud } from 'lucide-react';
+import { Cable, CheckCircle2, Database, Gauge, KeyRound, RadioTower, Route, ShieldCheck, Trash2, UploadCloud } from 'lucide-react';
 
 import { DataTable } from '../components/DataTable';
 import { ErrorState } from '../components/ErrorState';
@@ -24,6 +24,15 @@ type SourceConfig = {
   formats: string[];
   authMethods: string[];
   fields: Array<{ key: string; label: string; type?: string; placeholder: string; required?: boolean }>;
+};
+
+type DataSourceOption = {
+  value: string;
+  label: string;
+  group: string;
+  description: string;
+  auth: string;
+  connectorType: string;
 };
 
 const sourceTypes: SourceConfig[] = [
@@ -111,6 +120,98 @@ const dataDomains = [
   { value: 'Finance / Costing', route: 'Costing and reporting module', description: 'Inventory valuation, wastage, expiry loss and operational cost.' },
 ];
 
+const powerBiSourceGroups: Array<{ group: string; sources: Omit<DataSourceOption, 'group'>[] }> = [
+  {
+    group: 'Files',
+    sources: [
+      { value: 'excel', label: 'Excel', description: 'Workbook, sheet, named table, and multi-sheet imports.', auth: 'File upload or cloud link', connectorType: 'FILE' },
+      { value: 'csv', label: 'CSV', description: 'Delimited files with encoding, header, and schema detection.', auth: 'File upload or folder path', connectorType: 'FILE' },
+      { value: 'json', label: 'JSON', description: 'Nested JSON documents with flattening and array expansion.', auth: 'File upload, URL, or API key', connectorType: 'FILE' },
+      { value: 'xml', label: 'XML', description: 'XML feeds and exported ERP document structures.', auth: 'File upload or URL', connectorType: 'FILE' },
+      { value: 'pdf', label: 'PDF table extraction', description: 'Extract tabular data from invoices, statements, and reports.', auth: 'File upload', connectorType: 'DOCUMENT' },
+      { value: 'folder', label: 'Folder import', description: 'Combine files from a local, network, or cloud folder.', auth: 'Folder permission', connectorType: 'FOLDER' },
+    ],
+  },
+  {
+    group: 'Databases',
+    sources: [
+      { value: 'sql_server', label: 'SQL Server', description: 'Read-only SQL Server tables, views, or queries.', auth: 'Database credentials / AD', connectorType: 'DATABASE' },
+      { value: 'mysql', label: 'MySQL', description: 'MySQL operational tables and reporting views.', auth: 'Database credentials', connectorType: 'DATABASE' },
+      { value: 'postgresql', label: 'PostgreSQL', description: 'PostgreSQL schemas, tables, views, and warehouse marts.', auth: 'Database credentials', connectorType: 'DATABASE' },
+      { value: 'oracle', label: 'Oracle', description: 'Oracle ERP and operational data schemas.', auth: 'Database credentials / wallet', connectorType: 'DATABASE' },
+      { value: 'mongodb', label: 'MongoDB', description: 'Document collections with flattening and schema inference.', auth: 'Connection string', connectorType: 'DATABASE' },
+      { value: 'sqlite', label: 'SQLite', description: 'Embedded database files for local exports and edge stores.', auth: 'File permission', connectorType: 'DATABASE' },
+      { value: 'warehouse', label: 'Data warehouse connection', description: 'Cloud warehouse views and curated analytics datasets.', auth: 'OAuth / key / IAM', connectorType: 'WAREHOUSE' },
+    ],
+  },
+  {
+    group: 'APIs and Web',
+    sources: [
+      { value: 'rest_api', label: 'REST API', description: 'JSON/XML endpoints with headers, params, and pagination.', auth: 'API key / OAuth2 / Basic', connectorType: 'API' },
+      { value: 'graphql', label: 'GraphQL API', description: 'GraphQL queries and variables for business entities.', auth: 'Bearer token / OAuth2', connectorType: 'API' },
+      { value: 'web_url', label: 'Web URL', description: 'Web table import from a public or internal URL.', auth: 'No auth / header auth', connectorType: 'WEB' },
+      { value: 'portal_login', label: 'Web portal login-based import', description: 'Portal-driven downloads requiring credentials and approval.', auth: 'Username/password / MFA handoff', connectorType: 'WEB' },
+      { value: 'odata', label: 'OData feed', description: 'SAP, Dynamics, and service feeds with entity selection.', auth: 'OAuth2 / Basic / API key', connectorType: 'API' },
+      { value: 'webhook', label: 'Webhook receiver', description: 'Real-time inbound events for machine or business updates.', auth: 'Signed webhook secret', connectorType: 'WEBHOOK' },
+    ],
+  },
+  {
+    group: 'Cloud Apps',
+    sources: [
+      { value: 'google_sheets', label: 'Google Sheets', description: 'Sheets, ranges, and shared spreadsheets.', auth: 'OAuth2 / service account', connectorType: 'CLOUD_APP' },
+      { value: 'sharepoint', label: 'SharePoint', description: 'SharePoint lists, libraries, and Excel files.', auth: 'Microsoft OAuth2', connectorType: 'CLOUD_APP' },
+      { value: 'onedrive', label: 'OneDrive', description: 'OneDrive files and folders.', auth: 'Microsoft OAuth2', connectorType: 'CLOUD_APP' },
+      { value: 'google_drive', label: 'Google Drive', description: 'Drive files, folders, and exported Sheets.', auth: 'Google OAuth2', connectorType: 'CLOUD_APP' },
+      { value: 'salesforce', label: 'Salesforce', description: 'CRM accounts, orders, service, and custom objects.', auth: 'OAuth2', connectorType: 'CLOUD_APP' },
+      { value: 'sap', label: 'SAP', description: 'SAP S/4HANA, ECC, OData, IDoc, and exported files.', auth: 'OAuth2 / Basic / SAP client', connectorType: 'ERP' },
+      { value: 'zoho', label: 'Zoho', description: 'Zoho CRM, inventory, books, and custom modules.', auth: 'OAuth2', connectorType: 'CLOUD_APP' },
+      { value: 'servicenow', label: 'ServiceNow', description: 'Tickets, assets, workflow, and service records.', auth: 'OAuth2 / Basic', connectorType: 'CLOUD_APP' },
+    ],
+  },
+  {
+    group: 'Manufacturing / Operations Sources',
+    sources: [
+      { value: 'erp', label: 'ERP', description: 'Master data, purchasing, inventory, finance, and orders.', auth: 'API / database / file export', connectorType: 'ERP' },
+      { value: 'mes', label: 'MES', description: 'Production execution, work orders, line status, and OEE.', auth: 'API / database / OPC bridge', connectorType: 'MES' },
+      { value: 'wms', label: 'WMS', description: 'Warehouse receiving, bin, picking, packing, and dispatch.', auth: 'API / database / file export', connectorType: 'WMS' },
+      { value: 'scm', label: 'SCM', description: 'Supply chain plans, shipment, suppliers, and lead times.', auth: 'API / file / EDI', connectorType: 'SCM' },
+      { value: 'iot_machine', label: 'IoT machine data', description: 'Machine telemetry, runtime, temperature, and throughput.', auth: 'Token / certificate', connectorType: 'IOT' },
+      { value: 'plc', label: 'PLC/device data', description: 'PLC values through gateway, OPC-UA, or edge bridge.', auth: 'Certificate / gateway token', connectorType: 'DEVICE' },
+      { value: 'barcode_rfid', label: 'Barcode/RFID data', description: 'Scan events, goods movement, pallet, and bin tracking.', auth: 'Device key / file feed', connectorType: 'EVENT' },
+      { value: 'sensor', label: 'Sensor data', description: 'Environmental, quality, safety, and condition monitoring.', auth: 'Token / MQTT cert', connectorType: 'IOT' },
+    ],
+  },
+  {
+    group: 'Manual Data',
+    sources: [
+      { value: 'manual_entry', label: 'Manual entry form', description: 'Controlled entry for small master-data or correction sets.', auth: 'Platform RBAC', connectorType: 'MANUAL' },
+      { value: 'bulk_paste', label: 'Bulk copy-paste table', description: 'Paste tabular rows and validate before import.', auth: 'Platform RBAC', connectorType: 'MANUAL' },
+      { value: 'template_upload', label: 'Template-based upload', description: 'Download template, fill data, upload and validate.', auth: 'Platform RBAC', connectorType: 'MANUAL' },
+    ],
+  },
+];
+
+const flatPowerBiSources = powerBiSourceGroups.flatMap((group) => group.sources.map((source) => ({ ...source, group: group.group })));
+const guidedSteps = ['Select source', 'Connection details', 'Test connection', 'Select data', 'Preview', 'Transform', 'Map fields', 'Validate', 'Destination', 'Import or refresh'];
+const transformOptions = ['Rename columns', 'Remove columns', 'Change data type', 'Filter rows', 'Remove duplicates', 'Replace values', 'Split columns', 'Merge columns', 'Trim/clean text', 'Date formatting', 'Currency formatting', 'Join/merge datasets', 'Append datasets', 'Create calculated columns'];
+const refreshOptions = ['One-time import', 'Manual refresh', 'Scheduled refresh', 'Incremental refresh', 'Real-time webhook update', 'Retry failed refresh'];
+const destinationModules = ['Inventory', 'Planning', 'Production', 'Maintenance', 'Finance', 'Reports', 'Admin master data'];
+const previewRows = [
+  { item_code: 'RM-STEEL-001', item_name: 'Steel Coil', quantity: '680', plant: 'Plant 01', status: 'Available' },
+  { item_code: 'FG-PUMP-041', item_name: 'Pump Assembly', quantity: '94', plant: 'Plant 01', status: 'Reserved' },
+  { item_code: 'SP-BEAR-009', item_name: 'Bearing Kit', quantity: '12', plant: 'Plant 02', status: 'Low Stock' },
+];
+const validationRows = [
+  { rule: 'Required destination fields mapped', result: 'Passed', severity: 'Info' },
+  { rule: 'Duplicate item code check', result: '2 warnings', severity: 'Warning' },
+  { rule: 'Critical import approval', result: 'Required before posting', severity: 'Approval' },
+];
+const refreshHistoryRows = [
+  { time: '2026-06-22 09:00', source: 'SAP S/4HANA Inventory', mode: 'Scheduled refresh', status: 'Completed', rows: '12,480' },
+  { time: '2026-06-22 08:15', source: 'WMS Barcode Events', mode: 'Incremental refresh', status: 'Completed', rows: '3,128' },
+  { time: '2026-06-21 23:45', source: 'Supplier REST API', mode: 'Retry failed refresh', status: 'Attention Needed', rows: '0' },
+];
+
 const inputClass = 'rounded-2xl border border-white/10 bg-white/10 px-3 py-2 text-sm text-white outline-none placeholder:text-slate-500 focus:border-cyan-300/60 focus:shadow-[0_0_18px_rgba(79,172,254,0.25)]';
 const selectClass = `${inputClass} appearance-none`;
 
@@ -165,12 +266,214 @@ function CompanySelector({
   );
 }
 
+function PowerBiGetDataExperience({
+  selectedSource,
+  selectedSourceValue,
+  onSelectSource,
+  wizardStep,
+  setWizardStep,
+  selectedTransforms,
+  setSelectedTransforms,
+  selectedDestination,
+  setSelectedDestination,
+  selectedRefresh,
+  setSelectedRefresh,
+  connectionTested,
+  setConnectionTested,
+  targetCompanyName,
+  moduleFilter,
+  onCreateDraft,
+}: {
+  selectedSource: DataSourceOption;
+  selectedSourceValue: string;
+  onSelectSource: (source: DataSourceOption) => void;
+  wizardStep: number;
+  setWizardStep: (step: number) => void;
+  selectedTransforms: string[];
+  setSelectedTransforms: (items: string[]) => void;
+  selectedDestination: string;
+  setSelectedDestination: (module: string) => void;
+  selectedRefresh: string;
+  setSelectedRefresh: (refresh: string) => void;
+  connectionTested: boolean;
+  setConnectionTested: (tested: boolean) => void;
+  targetCompanyName: string;
+  moduleFilter: string;
+  onCreateDraft: () => void;
+}) {
+  const visibleDestinations = destinationModules.filter((module) => !moduleFilter || module === moduleFilter);
+  const detailFields = connectionFieldsFor(selectedSource);
+  return (
+    <div className="mt-4 space-y-4">
+      <Panel title="Power BI-style Get Data" description="Select a source, test it, preview rows, transform data, map fields, validate, then import or schedule refresh into a platform module.">
+        <div className="grid gap-3 lg:grid-cols-10">
+          {guidedSteps.map((step, index) => {
+            const active = wizardStep === index + 1;
+            const complete = wizardStep > index + 1;
+            return (
+              <button key={step} className={`rounded-2xl border p-3 text-left text-xs transition ${active ? 'border-cyan-300/40 bg-cyan-400/15 text-white' : complete ? 'border-emerald-300/30 bg-emerald-400/10 text-emerald-100' : 'border-white/10 bg-white/[0.04] text-slate-400'}`} onClick={() => setWizardStep(index + 1)}>
+                <span className="block text-[10px] uppercase tracking-[0.16em] text-slate-500">Step {index + 1}</span>
+                <span className="mt-1 block font-semibold">{step}</span>
+              </button>
+            );
+          })}
+        </div>
+      </Panel>
+
+      <div className="grid gap-4 xl:grid-cols-[1fr_0.95fr]">
+        <Panel title="Select Data Source Type" description={`Target client: ${targetCompanyName}. Source groups mirror a simple Power BI Get Data experience.`}>
+          <div className="space-y-4">
+            {powerBiSourceGroups.map((group) => (
+              <div key={group.group} className="rounded-2xl border border-white/10 bg-slate-950/25 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-100">{group.group}</p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                  {group.sources.map((source) => {
+                    const fullSource = { ...source, group: group.group };
+                    const active = selectedSourceValue === source.value;
+                    return (
+                      <button key={source.value} type="button" className={`rounded-2xl border p-3 text-left transition ${active ? 'border-cyan-300/40 bg-cyan-400/15 shadow-[0_0_24px_rgba(34,211,238,0.12)]' : 'border-white/10 bg-white/[0.04] hover:border-cyan-300/25 hover:bg-white/8'}`} onClick={() => onSelectSource(fullSource)}>
+                        <span className="block font-semibold text-white">{source.label}</span>
+                        <span className="mt-1 block text-xs leading-5 text-slate-400">{source.description}</span>
+                        <span className="mt-2 inline-flex rounded-full border border-white/10 bg-slate-950/40 px-2 py-1 text-[11px] text-slate-300">{source.auth}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Panel>
+
+        <div className="space-y-4">
+          <Panel title="Connection Details and Test" description={`${selectedSource.group} / ${selectedSource.label}. Credentials remain masked and critical imports are approval-first.`}>
+            <div className="grid gap-3 md:grid-cols-2">
+              {detailFields.map((field) => (
+                <input key={field} className={inputClass} type={/password|secret|token|key/i.test(field) ? 'password' : 'text'} placeholder={field} />
+              ))}
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button className="form-button-primary" onClick={() => { setConnectionTested(true); setWizardStep(Math.max(wizardStep, 4)); }}>
+                Test Connection
+              </button>
+              <StatusBadge status={connectionTested ? 'Connection Tested' : 'Not Tested'} />
+              <StatusBadge status="Read-only mode" />
+            </div>
+          </Panel>
+
+          <Panel title="Select Table, File, or Endpoint" description="Choose what data to load from the tested connector.">
+            <div className="grid gap-2">
+              {['inventory_stock_balance', 'production_work_orders', 'maintenance_assets', 'supplier_lead_times'].map((entity) => (
+                <label key={entity} className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-slate-200">
+                  <span>{entity}</span>
+                  <input type="radio" name="source-entity" defaultChecked={entity === 'inventory_stock_balance'} onChange={() => setWizardStep(Math.max(wizardStep, 5))} />
+                </label>
+              ))}
+            </div>
+          </Panel>
+        </div>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
+        <Panel title="Data Preview" description="Preview sample rows before transform, validation, and approval.">
+          <DataTable
+            rows={previewRows}
+            emptyTitle="No preview rows"
+            columns={[
+              { key: 'item_code', label: 'Item Code' },
+              { key: 'item_name', label: 'Item Name' },
+              { key: 'quantity', label: 'Quantity' },
+              { key: 'plant', label: 'Plant' },
+              { key: 'status', label: 'Status', render: (value) => <StatusBadge status={String(value)} /> },
+            ]}
+          />
+        </Panel>
+
+        <Panel title="Clean and Transform Data" description="Power Query-style transformations are drafted before import.">
+          <div className="grid gap-2 sm:grid-cols-2">
+            {transformOptions.map((option) => {
+              const selected = selectedTransforms.includes(option);
+              return (
+                <button key={option} type="button" className={`rounded-2xl border px-3 py-2 text-left text-sm transition ${selected ? 'border-cyan-300/35 bg-cyan-400/12 text-cyan-50' : 'border-white/10 bg-white/[0.04] text-slate-400 hover:text-white'}`} onClick={() => setSelectedTransforms(selected ? selectedTransforms.filter((item) => item !== option) : [...selectedTransforms, option])}>
+                  {selected ? <CheckCircle2 className="mr-2 inline h-4 w-4 text-cyan-200" /> : null}
+                  {option}
+                </button>
+              );
+            })}
+          </div>
+        </Panel>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-3">
+        <Panel title="Map Fields to Platform" description="Source fields are mapped to destination module fields.">
+          <div className="space-y-2">
+            {[
+              ['item_code', 'Inventory.Item Code'],
+              ['quantity', 'Inventory.On Hand Quantity'],
+              ['plant', 'Admin Plant ID'],
+              ['status', 'Inventory Status'],
+            ].map(([source, target]) => (
+              <div key={source} className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-2xl border border-white/10 bg-slate-950/25 p-3 text-sm">
+                <span className="text-slate-200">{source}</span>
+                <span className="text-cyan-200">to</span>
+                <span className="text-white">{target}</span>
+              </div>
+            ))}
+          </div>
+        </Panel>
+
+        <Panel title="Validate Data" description="Validation issues are resolved before the import approval step.">
+          <div className="space-y-2">
+            {validationRows.map((row) => (
+              <div key={row.rule} className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-sm font-semibold text-white">{row.rule}</p>
+                  <StatusBadge status={row.severity} />
+                </div>
+                <p className="mt-1 text-sm text-slate-400">{row.result}</p>
+              </div>
+            ))}
+          </div>
+        </Panel>
+
+        <Panel title="Import or Schedule Refresh" description="Choose destination module and refresh strategy.">
+          <div className="space-y-3">
+            <select className={selectClass} value={selectedDestination} onChange={(event) => setSelectedDestination(event.target.value)}>
+              {visibleDestinations.map((module) => <option key={module}>{module}</option>)}
+            </select>
+            <select className={selectClass} value={selectedRefresh} onChange={(event) => setSelectedRefresh(event.target.value)}>
+              {refreshOptions.map((mode) => <option key={mode}>{mode}</option>)}
+            </select>
+            <button className="form-button-primary w-full" onClick={onCreateDraft}>Create Import Draft</button>
+            <button className="form-button-subtle w-full" onClick={() => setWizardStep(10)}>Send for Approval</button>
+          </div>
+        </Panel>
+      </div>
+    </div>
+  );
+}
+
+function connectionFieldsFor(source: DataSourceOption) {
+  if (source.connectorType === 'DATABASE' || source.connectorType === 'WAREHOUSE') return ['Server / Host', 'Port', 'Database', 'Schema or query', 'Read-only username', 'Password'];
+  if (source.connectorType === 'API' || source.connectorType === 'WEBHOOK') return ['Endpoint URL', 'Auth method', 'API key / token', 'Headers', 'Pagination rule', 'Retry policy'];
+  if (source.connectorType === 'CLOUD_APP' || source.connectorType === 'ERP') return ['Tenant / Client ID', 'Resource URL', 'OAuth client id', 'Client secret', 'Scope', 'Refresh policy'];
+  if (source.connectorType === 'IOT' || source.connectorType === 'DEVICE' || source.connectorType === 'EVENT') return ['Gateway endpoint', 'Topic / tag path', 'Certificate alias', 'Token', 'Sampling interval', 'Device group'];
+  if (source.connectorType === 'MANUAL') return ['Template name', 'Owner', 'Approval group', 'Data notes'];
+  return ['File, folder, or URL', 'Sheet/table name', 'Delimiter or format', 'Encoding', 'Password if protected'];
+}
+
 export function DataHubPage({ user }: { user: RuntimeUser }) {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const canUpload = canUseDataHubUploads(user);
   const [isDragging, setIsDragging] = useState(false);
-  const [activeView, setActiveView] = useState<'sources' | 'catalog' | 'mapping'>('sources');
+  const [activeView, setActiveView] = useState<'get-data' | 'sources' | 'catalog' | 'mapping' | 'refresh'>('get-data');
+  const [selectedSourceValue, setSelectedSourceValue] = useState('excel');
+  const [wizardStep, setWizardStep] = useState(1);
+  const [selectedTransforms, setSelectedTransforms] = useState<string[]>(['Trim/clean text', 'Change data type', 'Remove duplicates']);
+  const [selectedDestination, setSelectedDestination] = useState('Inventory');
+  const [selectedRefresh, setSelectedRefresh] = useState('One-time import');
+  const [connectionTested, setConnectionTested] = useState(false);
+  const [selectedModuleFilter, setSelectedModuleFilter] = useState('');
   const [selectedCompanyId, setSelectedCompanyId] = useState(user.company_id ?? '');
   const [sourceCategory, setSourceCategory] = useState('erp');
   const [catalogSourceCategory, setCatalogSourceCategory] = useState('erp');
@@ -233,6 +536,7 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
   const activeSource = getSourceConfig(sourceCategory);
   const activeCatalogSource = getSourceConfig(catalogSourceCategory);
   const activeDomain = getDomain(newCatalogEntry.data_type);
+  const selectedPowerSource = flatPowerBiSources.find((source) => source.value === selectedSourceValue) ?? flatPowerBiSources[0];
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['connected-systems'] });
@@ -401,9 +705,9 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
   return (
     <>
       <PageHeader
-        eyebrow="Manufacturing Data Hub"
-        title="Connect data, catalog it, and map it"
-        description={`Target company: ${targetCompany?.name ?? targetCompanyId}. Pick a company, choose a source type, then move through sources, catalog, and mapping one step at a time.`}
+        eyebrow="Data Integration Hub"
+        title="Get data, transform it, and send it to modules"
+        description={`Target client: ${targetCompany?.name ?? targetCompanyId}. Choose a Power BI-style source, preview and transform data, then import to a platform module with approval and audit trail.`}
       />
 
       <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
@@ -415,11 +719,24 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
         </div>
       </div>
 
+      <div className="mt-4 grid gap-3 md:grid-cols-[1fr_260px]">
+        <div className="rounded-2xl border border-white/10 bg-white/6 p-4 text-sm text-slate-300">
+          <KeyRound className="mr-2 inline h-4 w-4 text-cyan-200" />
+          Credentials are masked in the UI, stored as connection metadata only, and critical imports remain approval-first. Database connections are presented as read-only.
+        </div>
+        <select className={selectClass} value={selectedModuleFilter} onChange={(event) => setSelectedModuleFilter(event.target.value)}>
+          <option value="">All destination modules</option>
+          {destinationModules.map((module) => <option key={module}>{module}</option>)}
+        </select>
+      </div>
+
       <div className="mt-6 flex flex-wrap gap-2 rounded-2xl border border-white/10 bg-slate-900/45 p-2">
         {[
-          { key: 'sources', label: '1. Sources' },
-          { key: 'catalog', label: '2. Catalog & Uploads' },
-          { key: 'mapping', label: '3. Mapping' },
+          { key: 'get-data', label: 'Get Data' },
+          { key: 'sources', label: 'Source Connectors' },
+          { key: 'catalog', label: 'Catalog & Uploads' },
+          { key: 'mapping', label: 'Field Mapping' },
+          { key: 'refresh', label: 'Refresh / Logs' },
         ].map((item) => (
           <button
             key={item.key}
@@ -433,6 +750,58 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
           </button>
         ))}
       </div>
+
+      {activeView === 'get-data' ? (
+        <PowerBiGetDataExperience
+          selectedSource={selectedPowerSource}
+          selectedSourceValue={selectedSourceValue}
+          onSelectSource={(source) => {
+            setSelectedSourceValue(source.value);
+            setConnectionTested(false);
+            setWizardStep(2);
+            setNewConnection((current) => ({
+              ...current,
+              company_id: targetCompanyId,
+              system_name: current.system_name || `${source.label} connector`,
+              system_type: source.connectorType,
+              source_category: source.group,
+              auth_method: source.auth,
+            }));
+          }}
+          wizardStep={wizardStep}
+          setWizardStep={setWizardStep}
+          selectedTransforms={selectedTransforms}
+          setSelectedTransforms={setSelectedTransforms}
+          selectedDestination={selectedDestination}
+          setSelectedDestination={setSelectedDestination}
+          selectedRefresh={selectedRefresh}
+          setSelectedRefresh={setSelectedRefresh}
+          connectionTested={connectionTested}
+          setConnectionTested={setConnectionTested}
+          targetCompanyName={targetCompany?.name ?? targetCompanyId}
+          moduleFilter={selectedModuleFilter}
+          onCreateDraft={() => {
+            createConnection.mutate({
+              ...newConnection,
+              company_id: targetCompanyId,
+              system_name: newConnection.system_name || `${selectedPowerSource.label} connector`,
+              system_type: selectedPowerSource.connectorType,
+              source_category: selectedPowerSource.group,
+              auth_method: selectedPowerSource.auth,
+              connection_status: connectionTested ? 'Tested - Draft' : 'Draft',
+              connection_details: {
+                selected_source: selectedPowerSource.label,
+                selected_group: selectedPowerSource.group,
+                destination_module: selectedDestination,
+                refresh_mode: selectedRefresh,
+                transformations: selectedTransforms.join(', '),
+                credentials: 'masked',
+                import_policy: 'approval_required',
+              },
+            });
+          }}
+        />
+      ) : null}
 
       {activeView === 'sources' ? (
       <div className="mt-4 grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
@@ -704,6 +1073,39 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
           />
         </Panel>
       </div>
+      ) : null}
+
+      {activeView === 'refresh' ? (
+        <div className="mt-4 grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+          <Panel title="Refresh History" description="One-time, scheduled, incremental, webhook, and retry refresh outcomes.">
+            <DataTable
+              rows={refreshHistoryRows.filter((row) => !selectedModuleFilter || row.source.toLowerCase().includes(selectedModuleFilter.toLowerCase()) || selectedModuleFilter === 'Reports')}
+              emptyTitle="No refresh runs"
+              columns={[
+                { key: 'time', label: 'Time' },
+                { key: 'source', label: 'Source' },
+                { key: 'mode', label: 'Refresh Mode' },
+                { key: 'rows', label: 'Rows' },
+                { key: 'status', label: 'Status', render: (value) => <StatusBadge status={String(value)} /> },
+              ]}
+            />
+          </Panel>
+          <Panel title="Error Logs and Audit Trail" description="Every import decision is tracked before data reaches a module.">
+            <div className="space-y-3">
+              {[
+                ['Credential policy', 'API keys masked, OAuth tokens stored outside visible forms, no hardcoded secrets.'],
+                ['Read-only database mode', 'Database connectors request SELECT/read-only access by default.'],
+                ['Approval gate', 'Critical imports and master-data overwrites require approval before execution.'],
+                ['Audit log', 'Connector, client, module, mapping, validation, approver, and result are recorded.'],
+              ].map(([title, body]) => (
+                <div key={title} className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
+                  <p className="font-semibold text-white">{title}</p>
+                  <p className="mt-1 text-sm text-slate-400">{body}</p>
+                </div>
+              ))}
+            </div>
+          </Panel>
+        </div>
       ) : null}
 
       <div className="mt-4 rounded-2xl border border-white/10 bg-slate-900/45 p-4">

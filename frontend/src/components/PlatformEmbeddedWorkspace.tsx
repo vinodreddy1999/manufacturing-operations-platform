@@ -1153,14 +1153,61 @@ function SubscriptionEditDrawer({ client, onClose }: { client: PlatformClient; o
 
 function IntegrationsWorkspace() {
   const { state } = usePlatform();
+  const [search, setSearch] = useState('');
+  const [client, setClient] = useState('');
+  const [module, setModule] = useState('');
+  const moduleNames = [
+    'Inventory',
+    'Planning',
+    'Production',
+    'Maintenance',
+    'Finance',
+    'Reports',
+    'Admin master data',
+  ];
+  const sourceNames = ['SAP S/4HANA', 'PostgreSQL Warehouse', 'WMS Barcode Events', 'MES Line Feed', 'Supplier REST API', 'SharePoint Folder', 'Manual Template Upload'];
+  const rows = state.clients.flatMap((clientItem, clientIndex) =>
+    moduleNames.map((moduleName, moduleIndex) => ({
+      clientId: clientItem.clientId,
+      clientName: clientItem.clientName,
+      moduleName,
+      source: sourceNames[(clientIndex + moduleIndex) % sourceNames.length],
+      connector: moduleIndex % 3 === 0 ? 'API + scheduled refresh' : moduleIndex % 3 === 1 ? 'Read-only database' : 'File / cloud import',
+      refresh: moduleIndex % 4 === 0 ? 'Real-time webhook' : moduleIndex % 4 === 1 ? 'Incremental refresh' : moduleIndex % 4 === 2 ? 'Scheduled refresh' : 'Manual refresh',
+      quality: `${96 - ((clientIndex + moduleIndex) % 9)}%`,
+      lastSync: `22 Jun 2026 ${String(8 + ((clientIndex + moduleIndex) % 8)).padStart(2, '0')}:15`,
+      status: (clientIndex + moduleIndex) % 11 === 0 ? 'Attention Needed' : 'Healthy',
+    })),
+  ).filter((row) =>
+    (!search || `${row.clientName} ${row.moduleName} ${row.source} ${row.connector} ${row.refresh}`.toLowerCase().includes(search.toLowerCase()))
+    && (!client || row.clientId === client)
+    && (!module || row.moduleName === module));
+  const summary = `${rows.length} integration records${client ? ` for ${state.clients.find((item) => item.clientId === client)?.clientName ?? 'selected client'}` : ' across all clients'}${module ? ` / ${module}` : ''}`;
+
   return (
-    <Table headers={['Client', 'ERP / Source', 'Connection', 'Last Sync', 'Data Quality', 'Status']} count={state.clients.length}>
-      {state.clients.map((client, index) => (
-        <tr key={client.clientId} className="border-b border-white/10">
-          <Cell strong>{client.clientName}</Cell><Cell>{index % 2 ? 'Microsoft Dynamics 365' : 'SAP S/4HANA'}</Cell><Cell>{index % 3 ? 'API + SFTP' : 'Private Link'}</Cell><Cell>{`22 Jun 2026 0${8 + index}:15`}</Cell><Cell>{`${96 - index}%`}</Cell><Cell><StatusBadge status={index === 4 ? 'Attention Needed' : 'Healthy'} /></Cell>
-        </tr>
-      ))}
-    </Table>
+    <div className="space-y-4">
+      <div className="grid gap-3 lg:grid-cols-[1fr_260px_260px]">
+        <SearchField value={search} onChange={setSearch} placeholder="Search client, module, source, connector..." />
+        <Select value={client} onChange={setClient} label="All clients" options={state.clients.map((item) => [item.clientId, item.clientName])} />
+        <Select value={module} onChange={setModule} label="All modules" options={moduleNames} />
+      </div>
+      <Notice>{summary}. Open DataHub for Power BI-style Get Data, transformation, mapping, validation, approval, refresh history, error logs, and audit logs.</Notice>
+      <Table headers={['Client', 'Module', 'Source', 'Connector', 'Refresh', 'Data Quality', 'Last Sync', 'Status', 'Action']} minWidth="min-w-[1250px]" count={rows.length}>
+        {rows.map((row) => (
+          <tr key={`${row.clientId}-${row.moduleName}-${row.source}`} className="border-b border-white/10 hover:bg-white/[0.04]">
+            <Cell strong>{row.clientName}</Cell>
+            <Cell>{row.moduleName}</Cell>
+            <Cell accent>{row.source}</Cell>
+            <Cell>{row.connector}</Cell>
+            <Cell>{row.refresh}</Cell>
+            <Cell>{row.quality}</Cell>
+            <Cell>{row.lastSync}</Cell>
+            <Cell><StatusBadge status={row.status} /></Cell>
+            <Cell><a className="form-button-subtle inline-flex py-1 text-xs" href="/data-hub">Open DataHub</a></Cell>
+          </tr>
+        ))}
+      </Table>
+    </div>
   );
 }
 
