@@ -64,6 +64,7 @@ const navItems = [
 const platformNavItems = [
   { to: '/platform', label: 'Platform', icon: LayoutDashboard },
   { to: '/admin', label: 'Admin', icon: ShieldCheck },
+  { to: '/data-hub', label: 'Data Hub', icon: DatabaseZap },
 ];
 
 export function App() {
