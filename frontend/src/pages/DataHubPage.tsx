@@ -356,6 +356,11 @@ function PowerBiGetDataExperience({
     .filter((group) => group.sources.length);
   const stepLabel = guidedSteps[wizardStep - 1] ?? guidedSteps[0];
   const completedCount = Math.max(0, wizardStep - 1);
+  function chooseSource(source: DataSourceOption, nextStep = 2) {
+    onSelectSource(source);
+    setSourceMenuOpen(false);
+    setWizardStep(Math.max(wizardStep, nextStep));
+  }
   return (
     <div className="mt-4 space-y-4">
       <Panel title="Home" description="Power BI-style ribbon for choosing sources, entering data, transforming data, and creating import drafts.">
@@ -398,10 +403,7 @@ function PowerBiGetDataExperience({
                   type="button"
                   className="min-w-[92px] rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-3 text-center text-sm text-slate-300 transition hover:bg-white/8 hover:text-white"
                   onClick={() => {
-                    if (source) {
-                      onSelectSource(source);
-                      setSourceMenuOpen(false);
-                    }
+                    if (source) chooseSource(source);
                   }}
                 >
                   <Database className="mx-auto mb-1 h-5 w-5 text-slate-300" />
@@ -410,7 +412,7 @@ function PowerBiGetDataExperience({
               );
             })}
             {sourceMenuOpen ? (
-              <div className="absolute left-3 top-[96px] z-20 w-full max-w-[360px] rounded-2xl border border-white/10 bg-slate-950/95 p-3 shadow-[0_28px_80px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+              <div className="absolute left-3 top-[96px] z-20 max-h-[420px] w-full max-w-[360px] overflow-auto rounded-2xl border border-white/10 bg-slate-950/95 p-3 shadow-[0_28px_80px_rgba(0,0,0,0.45)] backdrop-blur-xl [scrollbar-color:rgba(34,211,238,0.45)_rgba(255,255,255,0.04)]">
                 <p className="px-3 py-2 text-sm font-semibold text-white">Common data sources</p>
                 <div className="space-y-1">
                   {commonSources.map((source) => (
@@ -419,8 +421,7 @@ function PowerBiGetDataExperience({
                       type="button"
                       className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm transition ${selectedSourceValue === source.value ? 'bg-cyan-400/14 text-cyan-50' : 'text-slate-300 hover:bg-white/8 hover:text-white'}`}
                       onClick={() => {
-                        onSelectSource(source);
-                        setSourceMenuOpen(false);
+                        chooseSource(source);
                       }}
                     >
                       <Database className="h-4 w-4 text-cyan-200" />
@@ -446,17 +447,23 @@ function PowerBiGetDataExperience({
               </div>
             ) : null}
           </div>
-          <div className="grid min-h-[320px] place-items-center bg-[radial-gradient(circle_at_50%_0%,rgba(34,211,238,0.14),transparent_42%),rgba(15,23,42,0.18)] p-8 text-center">
+          <div className="grid min-h-[320px] place-items-center bg-[radial-gradient(circle_at_50%_0%,rgba(34,211,238,0.14),transparent_42%),rgba(15,23,42,0.18)] p-8 text-center" onClick={() => setSourceMenuOpen(false)}>
             <div className="w-full max-w-5xl">
               <h2 className="text-3xl font-semibold tracking-tight text-white">Add data to your platform</h2>
               <p className="mt-3 text-lg text-slate-300">Once loaded, your data can be previewed, transformed, mapped, validated, and routed to the selected module.</p>
+              <div className="mx-auto mt-4 inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-400/10 px-4 py-2 text-sm font-semibold text-cyan-50">
+                Selected: {selectedSource.label}
+              </div>
               <div className="mt-8 grid gap-4 md:grid-cols-4">
                 {quickCards.map(({ title, source }) => (
                   <button
                     key={title}
                     type="button"
                     className={`rounded-[24px] border p-5 text-left transition hover:-translate-y-0.5 ${selectedSourceValue === source.value ? 'border-cyan-300/45 bg-cyan-400/14 shadow-[0_0_34px_rgba(34,211,238,0.14)]' : 'border-white/10 bg-white/[0.05] hover:bg-white/8'}`}
-                    onClick={() => onSelectSource(source)}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      chooseSource(source);
+                    }}
                   >
                     <Database className="h-8 w-8 text-cyan-200" />
                     <p className="mt-5 font-semibold text-white">{title}</p>
@@ -467,7 +474,8 @@ function PowerBiGetDataExperience({
               <button
                 type="button"
                 className="mt-6 text-sm font-semibold text-cyan-200 hover:text-cyan-100"
-                onClick={() => {
+                onClick={(event) => {
+                  event.stopPropagation();
                   setSourceMenuOpen(true);
                   setSourceSearch('');
                 }}
