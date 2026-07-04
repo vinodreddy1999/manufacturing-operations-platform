@@ -302,8 +302,19 @@ function PowerBiGetDataExperience({
   onCreateDraft: () => void;
 }) {
   const [sourceSearch, setSourceSearch] = useState('');
+  const [sourceMenuOpen, setSourceMenuOpen] = useState(false);
   const visibleDestinations = destinationModules.filter((module) => !moduleFilter || module === moduleFilter);
   const detailFields = connectionFieldsFor(selectedSource);
+  const commonSourceValues = ['excel', 'sql_server', 'csv', 'web_url', 'odata', 'postgresql', 'google_sheets', 'manual_entry'];
+  const commonSources = commonSourceValues
+    .map((value) => flatPowerBiSources.find((source) => source.value === value))
+    .filter(Boolean) as DataSourceOption[];
+  const quickCards = [
+    { title: 'Import from Excel', source: flatPowerBiSources.find((source) => source.value === 'excel') },
+    { title: 'Import from SQL Server', source: flatPowerBiSources.find((source) => source.value === 'sql_server') },
+    { title: 'Paste data into table', source: flatPowerBiSources.find((source) => source.value === 'bulk_paste') },
+    { title: 'Connect web or API', source: flatPowerBiSources.find((source) => source.value === 'rest_api') },
+  ].filter((item): item is { title: string; source: DataSourceOption } => Boolean(item.source));
   const normalizedSearch = sourceSearch.trim().toLowerCase();
   const matchingSourceGroups = powerBiSourceGroups
     .map((group) => ({
@@ -317,6 +328,127 @@ function PowerBiGetDataExperience({
   const completedCount = Math.max(0, wizardStep - 1);
   return (
     <div className="mt-4 space-y-4">
+      <Panel title="Home" description="Power BI-style ribbon for choosing sources, entering data, transforming data, and creating import drafts.">
+        <div className="overflow-hidden rounded-[24px] border border-white/10 bg-slate-950/40">
+          <div className="flex flex-wrap gap-1 border-b border-white/10 bg-white/[0.03] px-4 pt-3">
+            {['File', 'Home', 'Insert', 'Modeling', 'View', 'Optimize', 'Help'].map((tab) => (
+              <button
+                key={tab}
+                className={`rounded-t-xl px-4 py-2 text-sm font-semibold transition ${tab === 'Home' ? 'border-b-2 border-cyan-300 text-white' : 'text-slate-400 hover:text-white'}`}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+          <div className="relative flex flex-wrap gap-2 border-b border-white/10 bg-white/[0.04] p-3">
+            <button
+              type="button"
+              className={`min-w-[92px] rounded-2xl border px-3 py-3 text-center text-sm transition ${sourceMenuOpen ? 'border-cyan-300/35 bg-cyan-400/14 text-white' : 'border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/8'}`}
+              onClick={() => setSourceMenuOpen((value) => !value)}
+            >
+              <Database className="mx-auto mb-1 h-5 w-5 text-cyan-200" />
+              Get data
+              <span className="ml-1 text-slate-500">v</span>
+            </button>
+            {[
+              ['Excel workbook', 'excel'],
+              ['SQL Server', 'sql_server'],
+              ['Enter data', 'manual_entry'],
+              ['Recent sources', 'folder'],
+              ['Transform data', 'csv'],
+              ['Refresh', 'webhook'],
+              ['New visual', 'reports'],
+              ['Text box', 'bulk_paste'],
+              ['More visuals', 'template_upload'],
+            ].map(([label, value]) => {
+              const source = flatPowerBiSources.find((item) => item.value === value);
+              return (
+                <button
+                  key={label}
+                  type="button"
+                  className="min-w-[92px] rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-3 text-center text-sm text-slate-300 transition hover:bg-white/8 hover:text-white"
+                  onClick={() => {
+                    if (source) {
+                      onSelectSource(source);
+                      setSourceMenuOpen(false);
+                    }
+                  }}
+                >
+                  <Database className="mx-auto mb-1 h-5 w-5 text-slate-300" />
+                  {label}
+                </button>
+              );
+            })}
+            {sourceMenuOpen ? (
+              <div className="absolute left-3 top-[96px] z-20 w-full max-w-[360px] rounded-2xl border border-white/10 bg-slate-950/95 p-3 shadow-[0_28px_80px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+                <p className="px-3 py-2 text-sm font-semibold text-white">Common data sources</p>
+                <div className="space-y-1">
+                  {commonSources.map((source) => (
+                    <button
+                      key={source.value}
+                      type="button"
+                      className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm transition ${selectedSourceValue === source.value ? 'bg-cyan-400/14 text-cyan-50' : 'text-slate-300 hover:bg-white/8 hover:text-white'}`}
+                      onClick={() => {
+                        onSelectSource(source);
+                        setSourceMenuOpen(false);
+                      }}
+                    >
+                      <Database className="h-4 w-4 text-cyan-200" />
+                      <span>
+                        <span className="block font-medium">{source.label}</span>
+                        <span className="block text-xs text-slate-500">{source.group}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-2 border-t border-white/10 pt-2">
+                  <button
+                    type="button"
+                    className="w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-cyan-100 hover:bg-cyan-400/10"
+                    onClick={() => {
+                      setSourceMenuOpen(false);
+                      setSourceSearch('');
+                    }}
+                  >
+                    More...
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </div>
+          <div className="grid min-h-[320px] place-items-center bg-[radial-gradient(circle_at_50%_0%,rgba(34,211,238,0.14),transparent_42%),rgba(15,23,42,0.18)] p-8 text-center">
+            <div className="w-full max-w-5xl">
+              <h2 className="text-3xl font-semibold tracking-tight text-white">Add data to your platform</h2>
+              <p className="mt-3 text-lg text-slate-300">Once loaded, your data can be previewed, transformed, mapped, validated, and routed to the selected module.</p>
+              <div className="mt-8 grid gap-4 md:grid-cols-4">
+                {quickCards.map(({ title, source }) => (
+                  <button
+                    key={title}
+                    type="button"
+                    className={`rounded-[24px] border p-5 text-left transition hover:-translate-y-0.5 ${selectedSourceValue === source.value ? 'border-cyan-300/45 bg-cyan-400/14 shadow-[0_0_34px_rgba(34,211,238,0.14)]' : 'border-white/10 bg-white/[0.05] hover:bg-white/8'}`}
+                    onClick={() => onSelectSource(source)}
+                  >
+                    <Database className="h-8 w-8 text-cyan-200" />
+                    <p className="mt-5 font-semibold text-white">{title}</p>
+                    <p className="mt-2 text-sm leading-5 text-slate-400">{source.description}</p>
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                className="mt-6 text-sm font-semibold text-cyan-200 hover:text-cyan-100"
+                onClick={() => {
+                  setSourceMenuOpen(true);
+                  setSourceSearch('');
+                }}
+              >
+                Get data from another source -&gt;
+              </button>
+            </div>
+          </div>
+        </div>
+      </Panel>
+
       <Panel title="Start a Data Import" description="Follow this guided path. Nothing is posted into a module until you create a draft and send it for approval.">
         <div className="mb-4 grid gap-3 md:grid-cols-3">
           {[
