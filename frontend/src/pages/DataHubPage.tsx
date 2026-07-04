@@ -329,12 +329,13 @@ function PowerBiGetDataExperience({
 }) {
   const [sourceSearch, setSourceSearch] = useState('');
   const [sourceMenuOpen, setSourceMenuOpen] = useState(false);
+  const connectionPanelRef = useRef<HTMLDivElement | null>(null);
   const visibleDestinations = destinationModules.filter((module) => !moduleFilter || module === moduleFilter);
   const liveConnectorGroups = backendCatalog?.groups ?? [];
   const liveConnectorCount = liveConnectorGroups.reduce((total, group) => total + group.connectors.length, 0);
   const liveTransformOptions = backendCatalog?.transform_operations ?? transformOptions;
   const liveRefreshOptions = backendCatalog?.refresh_modes ?? refreshOptions;
-  const detailFields = connectionFieldsFor(selectedSource);
+  const connectionProfile = connectionProfileFor(selectedSource);
   const commonSourceValues = ['excel', 'sql_server', 'csv', 'web_url', 'odata', 'postgresql', 'google_sheets', 'manual_entry'];
   const commonSources = commonSourceValues
     .map((value) => flatPowerBiSources.find((source) => source.value === value))
@@ -360,6 +361,9 @@ function PowerBiGetDataExperience({
     onSelectSource(source);
     setSourceMenuOpen(false);
     setWizardStep(Math.max(wizardStep, nextStep));
+    window.setTimeout(() => {
+      connectionPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 80);
   }
   return (
     <div className="mt-4 space-y-4">
@@ -628,7 +632,7 @@ function PowerBiGetDataExperience({
                     const fullSource = { ...source, group: group.group };
                     const active = selectedSourceValue === source.value;
                     return (
-                      <button key={source.value} type="button" className={`rounded-2xl border p-3 text-left transition ${active ? 'border-cyan-300/40 bg-cyan-400/15 shadow-[0_0_24px_rgba(34,211,238,0.12)]' : 'border-white/10 bg-white/[0.04] hover:border-cyan-300/25 hover:bg-white/8'}`} onClick={() => onSelectSource(fullSource)}>
+                      <button key={source.value} type="button" className={`rounded-2xl border p-3 text-left transition ${active ? 'border-cyan-300/40 bg-cyan-400/15 shadow-[0_0_24px_rgba(34,211,238,0.12)]' : 'border-white/10 bg-white/[0.04] hover:border-cyan-300/25 hover:bg-white/8'}`} onClick={() => chooseSource(fullSource)}>
                         <span className="block font-semibold text-white">{source.label}</span>
                         <span className="mt-1 block text-xs leading-5 text-slate-400">{source.description}</span>
                         <span className="mt-2 inline-flex rounded-full border border-white/10 bg-slate-950/40 px-2 py-1 text-[11px] text-slate-300">{source.auth}</span>
@@ -646,31 +650,55 @@ function PowerBiGetDataExperience({
           </div>
         </Panel>
 
-        <div className="space-y-4">
-          <Panel title="Connection Details" description={`${selectedSource.group} / ${selectedSource.label}. Fill only the fields relevant to this source, then test before previewing data.`}>
+        <div className="space-y-4" ref={connectionPanelRef}>
+          <Panel title={connectionProfile.title} description={connectionProfile.description}>
+            <div className="mb-4 grid gap-3 rounded-2xl border border-cyan-300/15 bg-cyan-400/[0.06] p-4 sm:grid-cols-3">
+              <div>
+                <p className="text-xs uppercase tracking-[0.16em] text-cyan-100">Source</p>
+                <p className="mt-1 font-semibold text-white">{selectedSource.label}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-[0.16em] text-cyan-100">Connector type</p>
+                <p className="mt-1 font-semibold text-white">{selectedSource.connectorType}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-[0.16em] text-cyan-100">Next action</p>
+                <p className="mt-1 font-semibold text-white">{connectionProfile.primaryAction}</p>
+              </div>
+            </div>
             <div className="grid gap-3 md:grid-cols-2">
-              {detailFields.map((field) => (
-                <label key={field} className="text-sm font-medium text-slate-300">
-                  {field}
-                  <input className={`${inputClass} mt-1 w-full`} type={/password|secret|token|key/i.test(field) ? 'password' : 'text'} placeholder={`Enter ${field.toLowerCase()}`} />
+              {connectionProfile.fields.map((field) => (
+                <label key={field.key} className={field.fullWidth ? 'text-sm font-medium text-slate-300 md:col-span-2' : 'text-sm font-medium text-slate-300'}>
+                  {field.label}
+                  {field.kind === 'select' ? (
+                    <select className={`${selectClass} mt-1 w-full`} defaultValue={field.options?.[0]}>
+                      {field.options?.map((option) => <option key={option}>{option}</option>)}
+                    </select>
+                  ) : (
+                    <input
+                      className={`${inputClass} mt-1 w-full`}
+                      type={field.kind === 'password' ? 'password' : field.kind === 'file' ? 'file' : 'text'}
+                      placeholder={field.placeholder}
+                    />
+                  )}
                 </label>
               ))}
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
               <button className="form-button-primary" onClick={() => { onTestConnection(); setConnectionTested(true); setWizardStep(Math.max(wizardStep, 4)); }}>
-                Test Connection
+                {connectionProfile.primaryAction}
               </button>
               <StatusBadge status={connectionTested ? 'Connection Tested' : 'Not Tested'} />
               <StatusBadge status="Read-only mode" />
             </div>
           </Panel>
 
-          <Panel title="Select Data to Load" description="Choose one dataset to preview. These examples show how the selector will work for tables, files, or API endpoints.">
+          <Panel title={`Select ${connectionProfile.assetLabel} to Load`} description={connectionProfile.assetDescription}>
             <div className="grid gap-2">
-              {['inventory_stock_balance', 'production_work_orders', 'maintenance_assets', 'supplier_lead_times'].map((entity) => (
+              {connectionProfile.assets.map((entity) => (
                 <label key={entity} className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-slate-200">
                   <span>{entity}</span>
-                  <input type="radio" name="source-entity" defaultChecked={entity === 'inventory_stock_balance'} onChange={() => setWizardStep(Math.max(wizardStep, 5))} />
+                  <input type="radio" name="source-entity" defaultChecked={entity === connectionProfile.assets[0]} onChange={() => setWizardStep(Math.max(wizardStep, 5))} />
                 </label>
               ))}
             </div>
@@ -846,13 +874,174 @@ function PowerBiGetDataExperience({
   );
 }
 
-function connectionFieldsFor(source: DataSourceOption) {
-  if (source.connectorType === 'DATABASE' || source.connectorType === 'WAREHOUSE') return ['Server / Host', 'Port', 'Database', 'Schema or query', 'Read-only username', 'Password'];
-  if (source.connectorType === 'API' || source.connectorType === 'WEBHOOK') return ['Endpoint URL', 'Auth method', 'API key / token', 'Headers', 'Pagination rule', 'Retry policy'];
-  if (source.connectorType === 'CLOUD_APP' || source.connectorType === 'ERP') return ['Tenant / Client ID', 'Resource URL', 'OAuth client id', 'Client secret', 'Scope', 'Refresh policy'];
-  if (source.connectorType === 'IOT' || source.connectorType === 'DEVICE' || source.connectorType === 'EVENT') return ['Gateway endpoint', 'Topic / tag path', 'Certificate alias', 'Token', 'Sampling interval', 'Device group'];
-  if (source.connectorType === 'MANUAL') return ['Template name', 'Owner', 'Approval group', 'Data notes'];
-  return ['File, folder, or URL', 'Sheet/table name', 'Delimiter or format', 'Encoding', 'Password if protected'];
+type ConnectionProfile = {
+  title: string;
+  description: string;
+  primaryAction: string;
+  assetLabel: string;
+  assetDescription: string;
+  fields: Array<{
+    key: string;
+    label: string;
+    placeholder?: string;
+    kind?: 'text' | 'password' | 'select' | 'file';
+    options?: string[];
+    fullWidth?: boolean;
+  }>;
+  assets: string[];
+};
+
+function connectionProfileFor(source: DataSourceOption): ConnectionProfile {
+  if (source.value === 'excel') {
+    return {
+      title: 'Excel Workbook',
+      description: 'Choose an Excel workbook, then select sheets or named tables before previewing rows.',
+      primaryAction: 'Open Workbook',
+      assetLabel: 'Sheet / Table',
+      assetDescription: 'Power BI-style sheet and named table selection for the selected workbook.',
+      fields: [
+        { key: 'workbook', label: 'Workbook file', kind: 'file', fullWidth: true },
+        { key: 'cloudLink', label: 'Cloud workbook link', placeholder: 'https://onedrive/sharepoint/google-drive/workbook.xlsx', fullWidth: true },
+        { key: 'password', label: 'Password if protected', placeholder: 'Optional workbook password', kind: 'password' },
+        { key: 'mode', label: 'Data connectivity mode', kind: 'select', options: ['Import', 'Refresh from cloud link'] },
+      ],
+      assets: ['Inventory Export', 'Stock Balance', 'Batch Ledger', 'Supplier Lead Time', 'Sheet1'],
+    };
+  }
+  if (source.value === 'csv') {
+    return {
+      title: 'Text/CSV',
+      description: 'Connect to a delimited file and detect delimiter, encoding, headers, and column types.',
+      primaryAction: 'Preview CSV',
+      assetLabel: 'CSV file',
+      assetDescription: 'Choose the file and detected table before transform.',
+      fields: [
+        { key: 'csvFile', label: 'CSV file', kind: 'file', fullWidth: true },
+        { key: 'delimiter', label: 'Delimiter', kind: 'select', options: ['Auto detect', 'Comma', 'Semicolon', 'Tab', 'Pipe'] },
+        { key: 'encoding', label: 'Encoding', kind: 'select', options: ['UTF-8', 'UTF-16', 'Windows-1252'] },
+        { key: 'headers', label: 'First row as headers', kind: 'select', options: ['Yes', 'No'] },
+      ],
+      assets: ['Detected CSV table', 'Header row', 'Rejected rows'],
+    };
+  }
+  if (source.value === 'sql_server') {
+    return {
+      title: 'SQL Server Database',
+      description: 'Enter server and database details, choose Import or DirectQuery-style read-only mode, then discover tables.',
+      primaryAction: 'Connect to SQL Server',
+      assetLabel: 'Table / View',
+      assetDescription: 'Select SQL Server tables, views, or stored read-only query outputs.',
+      fields: [
+        { key: 'server', label: 'Server', placeholder: 'sql-server.company.local,1433', fullWidth: true },
+        { key: 'database', label: 'Database (optional)', placeholder: 'manufacturing_ops', fullWidth: true },
+        { key: 'connectivity', label: 'Data connectivity mode', kind: 'select', options: ['Import', 'DirectQuery'] },
+        { key: 'auth', label: 'Authentication', kind: 'select', options: ['Database credentials', 'Windows / AD', 'Azure AD'] },
+        { key: 'username', label: 'Read-only username', placeholder: 'readonly_user' },
+        { key: 'password', label: 'Password', placeholder: 'Stored securely', kind: 'password' },
+        { key: 'advanced', label: 'Advanced SQL statement', placeholder: 'Optional SELECT query', fullWidth: true },
+      ],
+      assets: ['dbo.InventoryBalance', 'dbo.ProductionOrders', 'dbo.MaintenanceAssets', 'dbo.SupplierLeadTimes'],
+    };
+  }
+  if (source.connectorType === 'DATABASE' || source.connectorType === 'WAREHOUSE') {
+    return {
+      title: `${source.label} Database`,
+      description: 'Connect read-only to schemas, tables, views, or warehouse marts.',
+      primaryAction: `Connect to ${source.label}`,
+      assetLabel: 'Schema object',
+      assetDescription: 'Select available tables, views, collections, or warehouse datasets.',
+      fields: [
+        { key: 'host', label: 'Host / Server', placeholder: `${source.value}.company.local` },
+        { key: 'port', label: 'Port', placeholder: source.value === 'postgresql' ? '5432' : '3306' },
+        { key: 'database', label: 'Database', placeholder: 'manufacturing_ops' },
+        { key: 'schema', label: 'Schema / Collection', placeholder: 'public / dbo / collection' },
+        { key: 'auth', label: 'Authentication', kind: 'select', options: source.auth.split('/').map((item) => item.trim()) },
+        { key: 'password', label: 'Password / Secret', placeholder: 'Stored securely', kind: 'password' },
+      ],
+      assets: ['inventory_stock_balance', 'production_work_orders', 'maintenance_assets', 'supplier_lead_times'],
+    };
+  }
+  if (source.connectorType === 'API' || source.connectorType === 'WEB' || source.connectorType === 'WEBHOOK') {
+    return {
+      title: source.value === 'web_url' ? 'Web URL' : `${source.label} Connector`,
+      description: 'Enter endpoint, authentication, headers, pagination, and response options before preview.',
+      primaryAction: source.value === 'web_url' ? 'Connect to Web' : 'Test API Connection',
+      assetLabel: 'Endpoint / Entity',
+      assetDescription: 'Select discovered endpoints, web tables, OData entities, or webhook payload samples.',
+      fields: [
+        { key: 'url', label: 'URL / Endpoint', placeholder: 'https://api.company.com/v1/inventory', fullWidth: true },
+        { key: 'auth', label: 'Authentication', kind: 'select', options: ['No Auth', 'API key', 'Bearer token', 'OAuth2', 'Basic Auth'] },
+        { key: 'secret', label: 'API key / token', placeholder: 'Masked after save', kind: 'password' },
+        { key: 'headers', label: 'Headers', placeholder: '{"Accept":"application/json"}', fullWidth: true },
+        { key: 'pagination', label: 'Pagination rule', kind: 'select', options: ['None', 'Page number', 'Next link', 'Offset / limit'] },
+      ],
+      assets: ['GET /inventory/items', 'GET /production/orders', 'GET /maintenance/assets', 'Web table 1'],
+    };
+  }
+  if (source.connectorType === 'CLOUD_APP' || source.connectorType === 'ERP' || source.connectorType === 'MES' || source.connectorType === 'WMS' || source.connectorType === 'SCM') {
+    return {
+      title: `${source.label} Source`,
+      description: 'Connect to a cloud or enterprise application using OAuth, API credentials, database read-only access, or exports.',
+      primaryAction: `Connect to ${source.label}`,
+      assetLabel: 'Business object',
+      assetDescription: 'Select application objects, entities, exports, or reports to bring into platform modules.',
+      fields: [
+        { key: 'tenant', label: 'Tenant / Client ID', placeholder: 'Company tenant or SAP client' },
+        { key: 'url', label: 'Resource URL', placeholder: 'https://system.company.com', fullWidth: true },
+        { key: 'auth', label: 'Authentication', kind: 'select', options: source.auth.split('/').map((item) => item.trim()) },
+        { key: 'clientId', label: 'OAuth client ID', placeholder: 'client-id' },
+        { key: 'secret', label: 'Client secret / API key', placeholder: 'Masked after save', kind: 'password' },
+        { key: 'scope', label: 'Scope / Object filter', placeholder: 'Inventory, production, maintenance' },
+      ],
+      assets: ['Material Master', 'Inventory Balance', 'Production Orders', 'Purchase Orders', 'Asset Register'],
+    };
+  }
+  if (source.connectorType === 'IOT' || source.connectorType === 'DEVICE' || source.connectorType === 'EVENT') {
+    return {
+      title: `${source.label} Stream`,
+      description: 'Connect machine, PLC, scan, or sensor data through a gateway, signed topic, or device token.',
+      primaryAction: 'Test Device Stream',
+      assetLabel: 'Topic / Tag',
+      assetDescription: 'Select machine tags, topics, scan event streams, or sensor payloads.',
+      fields: [
+        { key: 'gateway', label: 'Gateway endpoint', placeholder: 'opc.tcp://edge.local:4840', fullWidth: true },
+        { key: 'topic', label: 'Topic / Tag path', placeholder: 'factory/line1/machine5/#' },
+        { key: 'certificate', label: 'Certificate alias', placeholder: 'edge-cert-prod' },
+        { key: 'token', label: 'Token', placeholder: 'Masked after save', kind: 'password' },
+        { key: 'interval', label: 'Sampling interval', kind: 'select', options: ['Real time', '5 seconds', '1 minute', '5 minutes'] },
+      ],
+      assets: ['line1/machine5/runtime', 'line1/machine5/temperature', 'barcode/goods-movement', 'sensor/quality-check'],
+    };
+  }
+  if (source.connectorType === 'MANUAL') {
+    return {
+      title: `${source.label}`,
+      description: 'Enter, paste, or upload controlled manual data with validation and approval.',
+      primaryAction: 'Create Manual Table',
+      assetLabel: 'Manual dataset',
+      assetDescription: 'Select a manual template or pasted table before mapping fields.',
+      fields: [
+        { key: 'template', label: 'Template', kind: 'select', options: ['Inventory template', 'Planning template', 'Maintenance template', 'Admin master data'] },
+        { key: 'owner', label: 'Owner', placeholder: 'data.owner@company.com' },
+        { key: 'approval', label: 'Approval group', kind: 'select', options: ['Data Steward', 'Admin', 'Module Manager'] },
+        { key: 'notes', label: 'Data notes', placeholder: 'Reason for manual import', fullWidth: true },
+      ],
+      assets: ['Manual entry table', 'Bulk pasted rows', 'Template upload'],
+    };
+  }
+  return {
+    title: `${source.label} Source`,
+    description: 'Connect this source, preview data, transform it, and create an import draft.',
+    primaryAction: `Connect to ${source.label}`,
+    assetLabel: 'Data',
+    assetDescription: 'Select available data from this source.',
+    fields: [
+      { key: 'resource', label: 'File, folder, or URL', placeholder: 'Source path or URL', fullWidth: true },
+      { key: 'name', label: 'Sheet/table name', placeholder: 'Optional' },
+      { key: 'password', label: 'Password if protected', placeholder: 'Optional', kind: 'password' },
+    ],
+    assets: ['Inventory data', 'Production data', 'Maintenance data'],
+  };
 }
 
 export function DataHubPage({ user }: { user: RuntimeUser }) {
