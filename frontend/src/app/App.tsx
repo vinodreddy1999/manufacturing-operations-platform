@@ -40,6 +40,7 @@ const BusinessImpactDashboard = lazy(() => import('../pages/BusinessImpactDashbo
 const ImpactDrilldownPage = lazy(() => import('../pages/ImpactDrilldownPage').then((module) => ({ default: module.ImpactDrilldownPage })));
 const PlatformDashboardPage = lazy(() => import('../pages/PlatformDashboardPage').then((module) => ({ default: module.PlatformDashboardPage })));
 const PlatformModulePage = lazy(() => import('../pages/PlatformModulePage').then((module) => ({ default: module.PlatformModulePage })));
+const PerformancePage = lazy(() => import('../pages/PerformancePage').then((module) => ({ default: module.PerformancePage })));
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, section: 'dashboard' as const },
@@ -65,6 +66,7 @@ const platformNavItems = [
   { to: '/platform', label: 'Platform', icon: LayoutDashboard },
   { to: '/admin', label: 'Admin', icon: ShieldCheck },
   { to: '/data-hub', label: 'Data Hub', icon: DatabaseZap },
+  { to: '/admin/performance', label: 'Performance', icon: Activity },
 ];
 
 export function App() {
@@ -254,6 +256,7 @@ function AuthenticatedApp({ user, onLogout }: { user: RuntimeUser; onLogout: () 
               <Route path="/admin/business-impact" element={<ProtectedRoute user={user} section="admin"><AdminCenterPage section="business-impact" user={user} /></ProtectedRoute>} />
               <Route path="/admin/recommendations" element={<ProtectedRoute user={user} section="admin"><AdminCenterPage section="recommendations" user={user} /></ProtectedRoute>} />
               <Route path="/admin/settings" element={<ProtectedRoute user={user} section="admin"><AdminCenterPage section="settings" user={user} /></ProtectedRoute>} />
+              <Route path="/admin/performance" element={<ProtectedRoute user={user} section="admin"><PerformancePage /></ProtectedRoute>} />
               <Route path="/data-hub" element={<ProtectedRoute user={user} section="data-hub"><DataHubPage user={user} /></ProtectedRoute>} />
               <Route path="/operations" element={<ProtectedRoute user={user} section="operations"><OperationsPage user={user} /></ProtectedRoute>} />
               <Route path="/intelligence" element={<ProtectedRoute user={user} section="intelligence"><IntelligencePage /></ProtectedRoute>} />

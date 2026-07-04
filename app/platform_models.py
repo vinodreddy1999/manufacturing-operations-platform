@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, JSON, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, JSON, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
@@ -66,6 +66,11 @@ class User(Base):
     force_password_change: Mapped[bool] = mapped_column(Boolean, default=False)
     role: Mapped[str] = mapped_column(String(40), default="user")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    __table_args__ = (
+        Index("ix_users_tenant_company_email", "tenant_id", "company_id", "email"),
+        Index("ix_users_tenant_company_role", "tenant_id", "company_id", "role"),
+    )
 
 
 class Role(Base):
@@ -155,6 +160,11 @@ class AuditLog(Base, TenantScopedMixin):
     new_value: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
+    __table_args__ = (
+        Index("ix_audit_logs_tenant_company_created", "tenant_id", "company_id", "created_at"),
+        Index("ix_audit_logs_entity", "entity_type", "entity_id"),
+    )
+
 
 class CustomField(Base, TenantScopedMixin):
     __tablename__ = "custom_fields"
@@ -188,6 +198,12 @@ class ModuleRecord(Base, TenantScopedMixin):
     quantity: Mapped[float | None] = mapped_column(Float, nullable=True)
     payload: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index("ix_module_records_tenant_company_module", "tenant_id", "company_id", "module_key"),
+        Index("ix_module_records_module_status", "module_key", "status"),
+        Index("ix_module_records_company_module_code", "company_id", "module_key", "record_code"),
+    )
 
 
 class AppMetadata(Base, TenantScopedMixin):

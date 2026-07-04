@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from typing import Any
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from jose import JWTError, jwt
 from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session
@@ -278,13 +278,23 @@ def me(user: User = Depends(current_user)) -> RuntimeEnvelope:
 
 
 @router.get("/users", response_model=RuntimeEnvelope)
-def list_users(_: User = Depends(require_any("admin")), db: Session = Depends(get_db)) -> RuntimeEnvelope:
+def list_users(
+    _: User = Depends(require_any("admin")),
+    db: Session = Depends(get_db),
+    limit: int = Query(100, ge=1, le=250),
+    offset: int = Query(0, ge=0),
+    search: str | None = None,
+    fields: str | None = None,
+) -> RuntimeEnvelope:
     actor = _
     query = db.query(User).filter(User.tenant_id == TENANT_ID)
     if not has_override_scope(actor):
         query = query.filter(User.company_id == actor.company_id)
-    users = query.order_by(User.email).all()
-    return runtime_result("list_users", "Users with access status and roles.", [serialize_user(user) for user in users])
+    if search:
+        pattern = f"%{search.lower()}%"
+        query = query.filter((User.email.ilike(pattern)) | (User.name.ilike(pattern)) | (User.role.ilike(pattern)))
+    users = query.order_by(User.email).offset(offset).limit(clamp_limit(limit)).all()
+    return runtime_result("list_users", "Users with access status and roles.", [apply_projection(serialize_user(user), fields) for user in users])
 
 
 @router.post("/users", response_model=RuntimeEnvelope)
@@ -363,6 +373,10 @@ def list_records(
     module_key: str | None = None,
     company_id: str | None = None,
     plant_id: str | None = None,
+    limit: int = Query(100, ge=1, le=250),
+    offset: int = Query(0, ge=0),
+    search: str | None = None,
+    fields: str | None = None,
     actor: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> RuntimeEnvelope:
@@ -375,8 +389,11 @@ def list_records(
         query = query.filter(ModuleRecord.company_id == company_id)
     if plant_id:
         query = query.filter(ModuleRecord.plant_id == plant_id)
-    records = query.order_by(ModuleRecord.module_key, ModuleRecord.record_code).all()
-    return runtime_result("list_records", "Database-backed module records.", [serialize_record(record) for record in records])
+    if search:
+        pattern = f"%{search.lower()}%"
+        query = query.filter((ModuleRecord.record_code.ilike(pattern)) | (ModuleRecord.name.ilike(pattern)) | (ModuleRecord.record_type.ilike(pattern)) | (ModuleRecord.status.ilike(pattern)))
+    records = query.order_by(ModuleRecord.module_key, ModuleRecord.record_code).offset(offset).limit(clamp_limit(limit)).all()
+    return runtime_result("list_records", "Database-backed module records.", [apply_projection(serialize_record(record), fields) for record in records])
 
 
 @router.post("/records", response_model=RuntimeEnvelope)
@@ -438,7 +455,7 @@ def delete_record(record_id: str, actor: User = Depends(require_any("admin")), d
 
 @router.get("/inventory/items", response_model=RuntimeEnvelope)
 def inventory_items(user: User = Depends(current_user), db: Session = Depends(get_db)) -> RuntimeEnvelope:
-    return list_records("inventory", None, None, user, db)
+    return list_records(module_key="inventory", actor=user, db=db)
 
 
 @router.get("/analytics/summary", response_model=RuntimeEnvelope)
@@ -481,14 +498,24 @@ def analytics_summary(_: User = Depends(current_user), db: Session = Depends(get
 
 
 @router.get("/audit-logs", response_model=RuntimeEnvelope)
-def audit_logs(_: User = Depends(require_any("admin")), db: Session = Depends(get_db)) -> RuntimeEnvelope:
+def audit_logs(
+    _: User = Depends(require_any("admin")),
+    db: Session = Depends(get_db),
+    limit: int = Query(50, ge=1, le=250),
+    offset: int = Query(0, ge=0),
+    search: str | None = None,
+    fields: str | None = None,
+) -> RuntimeEnvelope:
     actor = _
     query = db.query(AuditLog)
     if not has_override_scope(actor):
         query = query.filter(AuditLog.company_id == actor.company_id)
-    logs = query.order_by(AuditLog.created_at.desc()).limit(50).all()
+    if search:
+        pattern = f"%{search.lower()}%"
+        query = query.filter((AuditLog.action.ilike(pattern)) | (AuditLog.entity_type.ilike(pattern)) | (AuditLog.entity_id.ilike(pattern)))
+    logs = query.order_by(AuditLog.created_at.desc()).offset(offset).limit(clamp_limit(limit)).all()
     data = [
-        {
+        apply_projection({
             "id": log.id,
             "actor_id": log.actor_id,
             "action": log.action,
@@ -497,7 +524,18 @@ def audit_logs(_: User = Depends(require_any("admin")), db: Session = Depends(ge
             "old_value": log.old_value,
             "new_value": log.new_value,
             "created_at": log.created_at.isoformat() if log.created_at else None,
-        }
+        }, fields)
         for log in logs
     ]
     return runtime_result("audit_logs", "Latest database write audit trail.", data)
+def apply_projection(row: dict[str, Any], fields: str | None) -> dict[str, Any]:
+    if not fields:
+        return row
+    allowed = {field.strip() for field in fields.split(",") if field.strip()}
+    if not allowed:
+        return row
+    return {key: value for key, value in row.items() if key in allowed}
+
+
+def clamp_limit(limit: int) -> int:
+    return max(1, min(limit, 250))

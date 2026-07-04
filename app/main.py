@@ -4,6 +4,7 @@ from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from jose import jwt
@@ -59,6 +60,8 @@ app = FastAPI(
     description="Python/FastAPI implementation of the Metam Services backend modules.",
 )
 configure_enterprise(app)
+
+app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 app.add_middleware(
     CORSMiddleware,

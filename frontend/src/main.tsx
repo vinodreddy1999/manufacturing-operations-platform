@@ -10,8 +10,14 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 1,
+      gcTime: 10 * 60_000,
+      networkMode: 'online',
       refetchOnWindowFocus: false,
-      staleTime: 30_000,
+      refetchOnReconnect: 'always',
+      staleTime: 60_000,
+    },
+    mutations: {
+      networkMode: 'online',
     },
   },
 });

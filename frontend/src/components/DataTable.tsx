@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
 
 import { EmptyState } from './EmptyState';
+import { useVirtualRows } from '../lib/performance';
 
 type DataTableProps<T extends Record<string, unknown>> = {
   rows: T[];
@@ -15,13 +16,24 @@ type DataTableProps<T extends Record<string, unknown>> = {
 export function DataTable<T extends Record<string, unknown>>({ rows, columns, emptyTitle }: DataTableProps<T>) {
   const [scrollPosition, setScrollPosition] = useState(1);
   const [hoverPosition, setHoverPosition] = useState<number | null>(null);
+  const shouldVirtualize = rows.length > 80;
+  const virtual = useVirtualRows(rows);
   if (!rows.length) {
     return <EmptyState title={emptyTitle} description="The backend returned an empty collection for this view." />;
   }
 
+  const visibleRows = shouldVirtualize ? virtual.visibleRows : rows;
+  const startIndex = shouldVirtualize ? virtual.startIndex : 0;
+
   return (
     <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-950/25 backdrop-blur">
-      <div className="max-h-[321px] overflow-auto [scrollbar-color:rgba(34,211,238,0.45)_rgba(255,255,255,0.04)]" onScroll={(event) => setScrollPosition(Math.floor(event.currentTarget.scrollTop / 54) + 1)}>
+      <div
+        className="max-h-[321px] overflow-auto [scrollbar-color:rgba(34,211,238,0.45)_rgba(255,255,255,0.04)]"
+        onScroll={(event) => {
+          setScrollPosition(Math.floor(event.currentTarget.scrollTop / 54) + 1);
+          if (shouldVirtualize) virtual.onScroll(event);
+        }}
+      >
         <table className="min-w-full divide-y divide-border text-sm">
           <thead className="sticky top-0 z-10 bg-[#0d1527]">
             <tr>
@@ -32,9 +44,15 @@ export function DataTable<T extends Record<string, unknown>>({ rows, columns, em
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-white/10">
-            {rows.map((row, rowIndex) => (
-              <tr key={rowIndex} className="h-[54px] transition hover:bg-white/[0.04]" onMouseEnter={() => setHoverPosition(rowIndex + 1)} onMouseLeave={() => setHoverPosition(null)}>
+          <tbody className="divide-y divide-white/10" style={shouldVirtualize ? { display: 'block', height: virtual.totalHeight, position: 'relative' } : undefined}>
+            {visibleRows.map((row, rowIndex) => (
+              <tr
+                key={startIndex + rowIndex}
+                className="h-[54px] transition hover:bg-white/[0.04]"
+                onMouseEnter={() => setHoverPosition(startIndex + rowIndex + 1)}
+                onMouseLeave={() => setHoverPosition(null)}
+                style={shouldVirtualize ? { display: 'table', tableLayout: 'fixed', transform: `translateY(${virtual.translateY}px)`, width: '100%' } : undefined}
+              >
                 {columns.map((column) => (
                   <td key={String(column.key)} className="whitespace-nowrap px-4 py-3 text-slate-200">
                     {column.render ? column.render(row[column.key], row) : String(row[column.key] ?? '')}

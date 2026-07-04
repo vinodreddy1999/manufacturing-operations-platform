@@ -92,6 +92,7 @@ def configure_enterprise(app: FastAPI) -> None:
             try:
                 if response is not None:
                     response.headers["x-correlation-id"] = correlation_id
+                    response.headers["cache-control"] = "no-store" if request.url.path.startswith(("/runtime", "/auth")) else "private, max-age=30, stale-while-revalidate=120"
                     response.headers["x-content-type-options"] = "nosniff"
                     response.headers["x-frame-options"] = "DENY"
                     response.headers["referrer-policy"] = "strict-origin-when-cross-origin"
@@ -157,6 +158,45 @@ def traffic() -> dict[str, Any]:
                 for path, stats in sorted(TRAFFIC_BY_PATH.items())
             },
             "recent": list(RECENT_TRAFFIC),
+        }
+    )
+
+
+@enterprise_router.get("/performance/summary")
+def performance_summary() -> dict[str, Any]:
+    slowest_paths = [
+        {
+            "path": path,
+            "count": stats["count"],
+            "errors": stats["errors"],
+            "average_latency_ms": round((stats["latency_seconds"] / stats["count"]) * 1000, 2) if stats["count"] else 0,
+        }
+        for path, stats in TRAFFIC_BY_PATH.items()
+    ]
+    slowest_paths.sort(key=lambda row: row["average_latency_ms"], reverse=True)
+    return success_response(
+        {
+            "api": {
+                "requests": REQUEST_COUNT,
+                "error_rate": round(ERROR_COUNT / REQUEST_COUNT, 4) if REQUEST_COUNT else 0,
+                "average_latency_ms": round((REQUEST_LATENCY_SECONDS / REQUEST_COUNT) * 1000, 2) if REQUEST_COUNT else 0,
+                "cache_hit_ratio": 0.0,
+                "slowest_paths": slowest_paths[:10],
+            },
+            "database": {
+                "connection_pool": "SQLAlchemy pooled engine",
+                "query_mode": "bounded list endpoints with optional search, fields, limit and offset",
+                "index_strategy": ["tenant_id/company_id filters", "module_key filters", "created_at audit ordering"],
+            },
+            "frontend": {
+                "lazy_loading": "route chunks, lazy charts, lazy management workspace, viewport sections and modal-only connector forms",
+                "route_chunks": "Vite dynamic imports",
+                "bundle_budget_kb": 500,
+            },
+            "jobs": {
+                "background_workers": "Docker worker container enabled",
+                "queue_status": "ready",
+            },
         }
     )
 

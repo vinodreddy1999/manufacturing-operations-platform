@@ -63,11 +63,56 @@ async function getEnvelope<T>(url: string): Promise<T> {
   return response.data.data;
 }
 
+export type ListQuery = {
+  cursor?: string;
+  fields?: string[];
+  limit?: number;
+  offset?: number;
+  search?: string;
+  sort?: string;
+};
+
+function withListQuery(url: string, query?: ListQuery) {
+  if (!query) return url;
+  const params = new URLSearchParams();
+  if (query.cursor) params.set('cursor', query.cursor);
+  if (query.limit) params.set('limit', String(query.limit));
+  if (query.offset) params.set('offset', String(query.offset));
+  if (query.search) params.set('search', query.search);
+  if (query.sort) params.set('sort', query.sort);
+  if (query.fields?.length) params.set('fields', query.fields.join(','));
+  const serialized = params.toString();
+  return serialized ? `${url}?${serialized}` : url;
+}
+
 export const backend = {
   health: async () => {
     const response = await api.get<HealthResponse>('/health');
     return response.data;
   },
+  performanceSummary: () => getEnvelope<{
+    api: {
+      average_latency_ms: number;
+      cache_hit_ratio: number;
+      error_rate: number;
+      requests: number;
+      slowest_paths: Array<{ path: string; count: number; average_latency_ms: number; errors: number }>;
+    };
+    frontend: {
+      bundle_budget_kb: number;
+      lazy_loading: string;
+      route_chunks: string;
+    };
+    database: {
+      connection_pool: string;
+      index_strategy: string[];
+      query_mode: string;
+    };
+    jobs: {
+      background_workers: string;
+      queue_status: string;
+    };
+  }>('/performance/summary'),
   modules: async () => {
     const response = await api.get<ModuleInfo[]>('/modules');
     return response.data;
@@ -270,7 +315,7 @@ export const backend = {
     window.localStorage.removeItem(tokenStorageKey);
   },
   currentUser: () => getEnvelope<RuntimeUser>('/runtime/auth/me'),
-  users: () => getEnvelope<RuntimeUser[]>('/runtime/users'),
+  users: (query?: ListQuery) => getEnvelope<RuntimeUser[]>(withListQuery('/runtime/users', query)),
   createUser: async (payload: {
     email: string;
     name: string;
@@ -291,7 +336,10 @@ export const backend = {
     const response = await api.post<ApiEnvelope<RuntimeUser>>(`/runtime/users/${id}/reset-password`, payload);
     return response.data.data;
   },
-  records: (moduleKey?: string) => getEnvelope<ModuleRecord[]>(moduleKey ? `/runtime/records?module_key=${moduleKey}` : '/runtime/records'),
+  records: (moduleKey?: string, query?: ListQuery) => {
+    const url = moduleKey ? withListQuery('/runtime/records', { ...query, search: query?.search }) : withListQuery('/runtime/records', query);
+    return getEnvelope<ModuleRecord[]>(moduleKey ? `${url}${url.includes('?') ? '&' : '?'}module_key=${moduleKey}` : url);
+  },
   createRecord: async (payload: Omit<ModuleRecord, 'id' | 'created_at'>) => {
     const response = await api.post<ApiEnvelope<ModuleRecord>>('/runtime/records', payload);
     return response.data.data;
@@ -305,5 +353,5 @@ export const backend = {
     return response.data.data;
   },
   analytics: () => getEnvelope<RuntimeAnalytics>('/runtime/analytics/summary'),
-  auditLogs: () => getEnvelope<AuditLog[]>('/runtime/audit-logs'),
+  auditLogs: (query?: ListQuery) => getEnvelope<AuditLog[]>(withListQuery('/runtime/audit-logs', query)),
 };
