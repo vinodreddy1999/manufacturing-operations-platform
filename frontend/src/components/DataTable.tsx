@@ -26,7 +26,7 @@ export function DataTable<T extends Record<string, unknown>>({ rows, columns, em
   const startIndex = shouldVirtualize ? virtual.startIndex : 0;
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-950/25 backdrop-blur">
+    <div className="enterprise-table-frame">
       <div
         className="max-h-[321px] overflow-auto [scrollbar-color:rgba(34,211,238,0.45)_rgba(255,255,255,0.04)]"
         onScroll={(event) => {
@@ -34,11 +34,11 @@ export function DataTable<T extends Record<string, unknown>>({ rows, columns, em
           if (shouldVirtualize) virtual.onScroll(event);
         }}
       >
-        <table className="min-w-full divide-y divide-border text-sm">
-          <thead className="sticky top-0 z-10 bg-[#0d1527]">
+        <table className="min-w-full divide-y divide-border text-body-sm">
+          <thead className="enterprise-sticky-header">
             <tr>
               {columns.map((column) => (
-                <th key={String(column.key)} className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+                <th key={String(column.key)} className="whitespace-nowrap px-4 py-3 text-left text-body-sm uppercase text-slate-400">
                   {column.label}
                 </th>
               ))}
@@ -54,7 +54,7 @@ export function DataTable<T extends Record<string, unknown>>({ rows, columns, em
                 style={shouldVirtualize ? { display: 'table', tableLayout: 'fixed', transform: `translateY(${virtual.translateY}px)`, width: '100%' } : undefined}
               >
                 {columns.map((column) => (
-                  <td key={String(column.key)} className="whitespace-nowrap px-4 py-3 text-slate-200">
+                  <td key={String(column.key)} className="whitespace-nowrap px-4 py-3 text-body-sm text-slate-200">
                     {column.render ? column.render(row[column.key], row) : String(row[column.key] ?? '')}
                   </td>
                 ))}
@@ -63,7 +63,7 @@ export function DataTable<T extends Record<string, unknown>>({ rows, columns, em
           </tbody>
         </table>
       </div>
-      <div className="flex h-8 items-center border-t border-white/10 bg-[#0d1527] px-3 text-xs font-medium text-cyan-200" aria-live="polite">{Math.min(hoverPosition ?? scrollPosition, rows.length)} of {rows.length}</div>
+      <div className="flex h-8 items-center border-t border-white/10 bg-[#0d1527] px-3 text-caption font-medium text-cyan-200" aria-live="polite">{Math.min(hoverPosition ?? scrollPosition, rows.length)} of {rows.length}</div>
     </div>
   );
 }
