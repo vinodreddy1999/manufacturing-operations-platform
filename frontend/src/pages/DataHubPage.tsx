@@ -651,47 +651,16 @@ function PowerBiGetDataExperience({
         </Panel>
 
         <div className="space-y-4" ref={connectionPanelRef}>
-          <Panel title={connectionProfile.title} description={connectionProfile.description}>
-            <div className="mb-4 grid gap-3 rounded-2xl border border-cyan-300/15 bg-cyan-400/[0.06] p-4 sm:grid-cols-3">
-              <div>
-                <p className="text-xs uppercase tracking-[0.16em] text-cyan-100">Source</p>
-                <p className="mt-1 font-semibold text-white">{selectedSource.label}</p>
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-[0.16em] text-cyan-100">Connector type</p>
-                <p className="mt-1 font-semibold text-white">{selectedSource.connectorType}</p>
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-[0.16em] text-cyan-100">Next action</p>
-                <p className="mt-1 font-semibold text-white">{connectionProfile.primaryAction}</p>
-              </div>
-            </div>
-            <div className="grid gap-3 md:grid-cols-2">
-              {connectionProfile.fields.map((field) => (
-                <label key={field.key} className={field.fullWidth ? 'text-sm font-medium text-slate-300 md:col-span-2' : 'text-sm font-medium text-slate-300'}>
-                  {field.label}
-                  {field.kind === 'select' ? (
-                    <select className={`${selectClass} mt-1 w-full`} defaultValue={field.options?.[0]}>
-                      {field.options?.map((option) => <option key={option}>{option}</option>)}
-                    </select>
-                  ) : (
-                    <input
-                      className={`${inputClass} mt-1 w-full`}
-                      type={field.kind === 'password' ? 'password' : field.kind === 'file' ? 'file' : 'text'}
-                      placeholder={field.placeholder}
-                    />
-                  )}
-                </label>
-              ))}
-            </div>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <button className="form-button-primary" onClick={() => { onTestConnection(); setConnectionTested(true); setWizardStep(Math.max(wizardStep, 4)); }}>
-                {connectionProfile.primaryAction}
-              </button>
-              <StatusBadge status={connectionTested ? 'Connection Tested' : 'Not Tested'} />
-              <StatusBadge status="Read-only mode" />
-            </div>
-          </Panel>
+          <SourceSpecificConnectorPanel
+            source={selectedSource}
+            profile={connectionProfile}
+            connectionTested={connectionTested}
+            onTestConnection={() => {
+              onTestConnection();
+              setConnectionTested(true);
+              setWizardStep(Math.max(wizardStep, 4));
+            }}
+          />
 
           <Panel title={`Select ${connectionProfile.assetLabel} to Load`} description={connectionProfile.assetDescription}>
             <div className="grid gap-2">
@@ -869,6 +838,460 @@ function PowerBiGetDataExperience({
             ]}
           />
         </Panel>
+      </div>
+    </div>
+  );
+}
+
+function SourceSpecificConnectorPanel({
+  source,
+  profile,
+  connectionTested,
+  onTestConnection,
+}: {
+  source: DataSourceOption;
+  profile: ConnectionProfile;
+  connectionTested: boolean;
+  onTestConnection: () => void;
+}) {
+  const commonFooter = (
+    <ConnectorActionFooter
+      primaryAction={profile.primaryAction}
+      connectionTested={connectionTested}
+      onTestConnection={onTestConnection}
+      readOnly={source.connectorType !== 'MANUAL'}
+    />
+  );
+
+  if (source.value === 'excel') {
+    return (
+      <Panel title="Excel Workbook" description="Power BI-style workbook import. Choose a file or cloud link first, then discover sheets and named tables.">
+        <ConnectorHeader source={source} nextAction="Open workbook navigator" />
+        <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+          <div className="rounded-2xl border border-cyan-300/20 bg-cyan-400/[0.07] p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-100">Workbook source</p>
+            <label className="mt-4 block text-sm font-medium text-slate-300">
+              Upload Excel workbook
+              <input className={`${inputClass} mt-1 w-full`} type="file" accept=".xlsx,.xls,.xlsm,.xlsb,.ods" />
+            </label>
+            <div className="my-4 flex items-center gap-3 text-xs uppercase tracking-[0.16em] text-slate-500">
+              <span className="h-px flex-1 bg-white/10" /> or <span className="h-px flex-1 bg-white/10" />
+            </div>
+            <label className="block text-sm font-medium text-slate-300">
+              OneDrive / SharePoint / Google Drive link
+              <input className={`${inputClass} mt-1 w-full`} placeholder="https://sharepoint.company.com/sites/ops/inventory.xlsx" />
+            </label>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <label className="text-sm font-medium text-slate-300">
+                Password if protected
+                <input className={`${inputClass} mt-1 w-full`} type="password" placeholder="Optional workbook password" />
+              </label>
+              <label className="text-sm font-medium text-slate-300">
+                Import mode
+                <select className={`${selectClass} mt-1 w-full`} defaultValue="Import">
+                  <option>Import</option>
+                  <option>Refresh from cloud link</option>
+                </select>
+              </label>
+            </div>
+          </div>
+          <ConnectorNavigator
+            title="Workbook navigator"
+            items={['Stock Balance sheet', 'Batch Ledger named table', 'Supplier Lead Time sheet', 'Hidden rows ignored', 'First row headers detected']}
+          />
+        </div>
+        {commonFooter}
+      </Panel>
+    );
+  }
+
+  if (source.value === 'csv') {
+    return (
+      <Panel title="Text/CSV" description="Delimited-file import with encoding, delimiter, header, and sample-row controls.">
+        <ConnectorHeader source={source} nextAction="Preview detected table" />
+        <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
+          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+            <label className="block text-sm font-medium text-slate-300">
+              CSV / TSV file
+              <input className={`${inputClass} mt-1 w-full`} type="file" accept=".csv,.tsv,.txt" />
+            </label>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <label className="text-sm font-medium text-slate-300">
+                Delimiter
+                <select className={`${selectClass} mt-1 w-full`} defaultValue="Auto detect">
+                  <option>Auto detect</option>
+                  <option>Comma</option>
+                  <option>Semicolon</option>
+                  <option>Tab</option>
+                  <option>Pipe</option>
+                </select>
+              </label>
+              <label className="text-sm font-medium text-slate-300">
+                Encoding
+                <select className={`${selectClass} mt-1 w-full`} defaultValue="UTF-8">
+                  <option>UTF-8</option>
+                  <option>UTF-16</option>
+                  <option>Windows-1252</option>
+                </select>
+              </label>
+              <label className="text-sm font-medium text-slate-300">
+                First row as headers
+                <select className={`${selectClass} mt-1 w-full`} defaultValue="Yes">
+                  <option>Yes</option>
+                  <option>No</option>
+                </select>
+              </label>
+              <label className="text-sm font-medium text-slate-300">
+                Bad row handling
+                <select className={`${selectClass} mt-1 w-full`} defaultValue="Keep as validation errors">
+                  <option>Keep as validation errors</option>
+                  <option>Skip bad rows</option>
+                  <option>Stop import</option>
+                </select>
+              </label>
+            </div>
+          </div>
+          <ConnectorNavigator title="Detected preview settings" items={['Column count auto-detected', 'Text qualifiers supported', 'Numeric and date type inference', 'Rejected-row list created']} />
+        </div>
+        {commonFooter}
+      </Panel>
+    );
+  }
+
+  if (source.value === 'sql_server') {
+    return (
+      <Panel title="SQL Server Database" description="Database connector format with server, optional database, connectivity mode, and advanced query options.">
+        <ConnectorHeader source={source} nextAction="Open SQL object navigator" />
+        <div className="grid gap-4 xl:grid-cols-[1fr_0.85fr]">
+          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-5">
+            <div className="space-y-4">
+              <label className="block text-sm font-medium text-slate-300">
+                Server
+                <input className={`${inputClass} mt-1 w-full`} placeholder="sql-server.company.local,1433" autoFocus />
+              </label>
+              <label className="block text-sm font-medium text-slate-300">
+                Database (optional)
+                <input className={`${inputClass} mt-1 w-full`} placeholder="manufacturing_ops" />
+              </label>
+              <div>
+                <p className="text-sm font-medium text-slate-300">Data connectivity mode</p>
+                <div className="mt-2 flex flex-wrap gap-3">
+                  {['Import', 'DirectQuery'].map((mode, index) => (
+                    <label key={mode} className="flex items-center gap-2 rounded-xl border border-white/10 bg-slate-950/40 px-3 py-2 text-sm text-slate-200">
+                      <input type="radio" name="sql-connectivity" defaultChecked={index === 0} />
+                      {mode}
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <details className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
+                <summary className="cursor-pointer text-sm font-semibold text-cyan-100">Advanced options</summary>
+                <label className="mt-3 block text-sm font-medium text-slate-300">
+                  SQL statement
+                  <textarea className={`${inputClass} mt-1 min-h-24 w-full`} placeholder="Optional SELECT statement. Read-only queries only." />
+                </label>
+                <label className="mt-3 block text-sm font-medium text-slate-300">
+                  Command timeout
+                  <input className={`${inputClass} mt-1 w-full`} placeholder="30 seconds" />
+                </label>
+              </details>
+            </div>
+          </div>
+          <DatabaseCredentialCard authOptions={['Database credentials', 'Windows / AD', 'Azure AD']} />
+        </div>
+        {commonFooter}
+      </Panel>
+    );
+  }
+
+  if (source.connectorType === 'DATABASE' || source.connectorType === 'WAREHOUSE') {
+    return (
+      <Panel title={`${source.label} Database`} description="Schema-first database connector with host, port, database, schema, SSL, credentials, and table discovery.">
+        <ConnectorHeader source={source} nextAction="Discover schemas and tables" />
+        <div className="grid gap-4 xl:grid-cols-[1fr_0.85fr]">
+          <div className="grid gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-4 sm:grid-cols-2">
+            <label className="text-sm font-medium text-slate-300">
+              Host
+              <input className={`${inputClass} mt-1 w-full`} placeholder={`${source.value}.company.local`} />
+            </label>
+            <label className="text-sm font-medium text-slate-300">
+              Port
+              <input className={`${inputClass} mt-1 w-full`} placeholder={source.value === 'postgresql' ? '5432' : '3306'} />
+            </label>
+            <label className="text-sm font-medium text-slate-300">
+              Database
+              <input className={`${inputClass} mt-1 w-full`} placeholder="manufacturing_ops" />
+            </label>
+            <label className="text-sm font-medium text-slate-300">
+              Schema / collection
+              <input className={`${inputClass} mt-1 w-full`} placeholder="public / dbo / collection" />
+            </label>
+            <label className="text-sm font-medium text-slate-300">
+              SSL mode
+              <select className={`${selectClass} mt-1 w-full`} defaultValue="Require">
+                <option>Require</option>
+                <option>Prefer</option>
+                <option>Disable</option>
+              </select>
+            </label>
+            <label className="text-sm font-medium text-slate-300">
+              Connection role
+              <select className={`${selectClass} mt-1 w-full`} defaultValue="Read-only">
+                <option>Read-only</option>
+                <option>Read-only with warehouse views</option>
+              </select>
+            </label>
+          </div>
+          <DatabaseCredentialCard authOptions={source.auth.split('/').map((item) => item.trim())} />
+        </div>
+        {commonFooter}
+      </Panel>
+    );
+  }
+
+  if (source.connectorType === 'API' || source.connectorType === 'WEB' || source.connectorType === 'WEBHOOK') {
+    return (
+      <Panel title={source.value === 'web_url' ? 'Web URL' : `${source.label} Endpoint`} description="Endpoint connector with method, auth, headers, parameters, pagination, and response-shape controls.">
+        <ConnectorHeader source={source} nextAction="Fetch endpoint sample" />
+        <div className="grid gap-4 xl:grid-cols-[1fr_0.85fr]">
+          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+            <div className="grid gap-3 sm:grid-cols-[140px_1fr]">
+              <label className="text-sm font-medium text-slate-300">
+                Method
+                <select className={`${selectClass} mt-1 w-full`} defaultValue="GET">
+                  <option>GET</option>
+                  <option>POST</option>
+                  <option>PUT</option>
+                </select>
+              </label>
+              <label className="text-sm font-medium text-slate-300">
+                URL
+                <input className={`${inputClass} mt-1 w-full`} placeholder="https://api.company.com/v1/inventory/items" />
+              </label>
+            </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <label className="text-sm font-medium text-slate-300">
+                Authentication
+                <select className={`${selectClass} mt-1 w-full`} defaultValue="Bearer token">
+                  <option>No Auth</option>
+                  <option>API key</option>
+                  <option>Bearer token</option>
+                  <option>OAuth2</option>
+                  <option>Basic Auth</option>
+                </select>
+              </label>
+              <label className="text-sm font-medium text-slate-300">
+                Token / key
+                <input className={`${inputClass} mt-1 w-full`} type="password" placeholder="Masked after save" />
+              </label>
+            </div>
+            <label className="mt-3 block text-sm font-medium text-slate-300">
+              Headers
+              <textarea className={`${inputClass} mt-1 min-h-20 w-full`} placeholder='{"Accept":"application/json","x-tenant":"ABC"}' />
+            </label>
+          </div>
+          <ConnectorNavigator title="Response handling" items={['JSON path selector', 'Pagination: next link / offset', 'Retry policy', 'Webhook receiver URL', 'Sample payload validation']} />
+        </div>
+        {commonFooter}
+      </Panel>
+    );
+  }
+
+  if (source.connectorType === 'CLOUD_APP' || source.connectorType === 'ERP' || source.connectorType === 'MES' || source.connectorType === 'WMS' || source.connectorType === 'SCM') {
+    return (
+      <Panel title={`${source.label} Application Connector`} description="Business-application connector with tenant, OAuth/API credentials, object scope, and module routing.">
+        <ConnectorHeader source={source} nextAction="Authorize and list business objects" />
+        <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+          <div className="rounded-2xl border border-cyan-300/15 bg-cyan-400/[0.06] p-4">
+            <label className="block text-sm font-medium text-slate-300">
+              Tenant / client / company code
+              <input className={`${inputClass} mt-1 w-full`} placeholder="SAP client, Salesforce org, Google workspace, MES site" />
+            </label>
+            <label className="mt-3 block text-sm font-medium text-slate-300">
+              Resource URL
+              <input className={`${inputClass} mt-1 w-full`} placeholder="https://system.company.com" />
+            </label>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <label className="text-sm font-medium text-slate-300">
+                Auth flow
+                <select className={`${selectClass} mt-1 w-full`} defaultValue={source.auth.split('/')[0]?.trim()}>
+                  {source.auth.split('/').map((option) => <option key={option.trim()}>{option.trim()}</option>)}
+                </select>
+              </label>
+              <label className="text-sm font-medium text-slate-300">
+                Refresh policy
+                <select className={`${selectClass} mt-1 w-full`} defaultValue="Scheduled refresh">
+                  <option>Scheduled refresh</option>
+                  <option>Manual refresh only</option>
+                  <option>Incremental refresh</option>
+                </select>
+              </label>
+            </div>
+          </div>
+          <ConnectorNavigator title="Business objects" items={['Material master', 'Stock balance', 'Purchase orders', 'Production orders', 'Asset register', 'Quality lots']} />
+        </div>
+        {commonFooter}
+      </Panel>
+    );
+  }
+
+  if (source.connectorType === 'IOT' || source.connectorType === 'DEVICE' || source.connectorType === 'EVENT') {
+    return (
+      <Panel title={`${source.label} Stream`} description="Machine and event-data format with gateway, topics, tags, certificate/token, and sampling controls.">
+        <ConnectorHeader source={source} nextAction="Subscribe to sample stream" />
+        <div className="grid gap-4 xl:grid-cols-[1fr_0.85fr]">
+          <div className="grid gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-4 sm:grid-cols-2">
+            <label className="text-sm font-medium text-slate-300 sm:col-span-2">
+              Gateway endpoint
+              <input className={`${inputClass} mt-1 w-full`} placeholder="opc.tcp://edge.local:4840 or mqtts://broker.company.com" />
+            </label>
+            <label className="text-sm font-medium text-slate-300">
+              Topic / tag path
+              <input className={`${inputClass} mt-1 w-full`} placeholder="factory/line1/machine5/#" />
+            </label>
+            <label className="text-sm font-medium text-slate-300">
+              Sampling interval
+              <select className={`${selectClass} mt-1 w-full`} defaultValue="Real time">
+                <option>Real time</option>
+                <option>5 seconds</option>
+                <option>1 minute</option>
+                <option>5 minutes</option>
+              </select>
+            </label>
+            <label className="text-sm font-medium text-slate-300">
+              Certificate alias
+              <input className={`${inputClass} mt-1 w-full`} placeholder="edge-cert-prod" />
+            </label>
+            <label className="text-sm font-medium text-slate-300">
+              Token
+              <input className={`${inputClass} mt-1 w-full`} type="password" placeholder="Masked after save" />
+            </label>
+          </div>
+          <ConnectorNavigator title="Stream payloads" items={['Runtime tag', 'Temperature tag', 'Barcode event', 'Quality sensor', 'Downtime signal']} />
+        </div>
+        {commonFooter}
+      </Panel>
+    );
+  }
+
+  if (source.connectorType === 'MANUAL') {
+    return (
+      <Panel title={source.label} description="Manual data format for controlled entry, copy-paste tables, or template uploads.">
+        <ConnectorHeader source={source} nextAction="Create controlled manual dataset" />
+        <div className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
+          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+            <label className="block text-sm font-medium text-slate-300">
+              Template
+              <select className={`${selectClass} mt-1 w-full`} defaultValue="Inventory template">
+                <option>Inventory template</option>
+                <option>Planning template</option>
+                <option>Maintenance template</option>
+                <option>Admin master data</option>
+              </select>
+            </label>
+            <label className="mt-3 block text-sm font-medium text-slate-300">
+              Owner
+              <input className={`${inputClass} mt-1 w-full`} placeholder="data.owner@company.com" />
+            </label>
+            <label className="mt-3 block text-sm font-medium text-slate-300">
+              Approval reason
+              <textarea className={`${inputClass} mt-1 min-h-20 w-full`} placeholder="Reason for manual import" />
+            </label>
+          </div>
+          <div className="rounded-2xl border border-cyan-300/20 bg-slate-950/35 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-100">Paste table</p>
+            <textarea className={`${inputClass} mt-3 min-h-44 w-full font-mono text-xs`} placeholder={'item_code\titem_name\tquantity\nRM-001\tSteel coil\t680'} />
+          </div>
+        </div>
+        {commonFooter}
+      </Panel>
+    );
+  }
+
+  return (
+    <Panel title={profile.title} description={profile.description}>
+      <ConnectorHeader source={source} nextAction={profile.primaryAction} />
+      <ConnectorNavigator title="Available source assets" items={profile.assets} />
+      {commonFooter}
+    </Panel>
+  );
+}
+
+function ConnectorHeader({ source, nextAction }: { source: DataSourceOption; nextAction: string }) {
+  return (
+    <div className="mb-4 grid gap-3 rounded-2xl border border-cyan-300/15 bg-cyan-400/[0.06] p-4 sm:grid-cols-3">
+      <div>
+        <p className="text-xs uppercase tracking-[0.16em] text-cyan-100">Selected source</p>
+        <p className="mt-1 font-semibold text-white">{source.label}</p>
+      </div>
+      <div>
+        <p className="text-xs uppercase tracking-[0.16em] text-cyan-100">Format</p>
+        <p className="mt-1 font-semibold text-white">{source.connectorType}</p>
+      </div>
+      <div>
+        <p className="text-xs uppercase tracking-[0.16em] text-cyan-100">Next action</p>
+        <p className="mt-1 font-semibold text-white">{nextAction}</p>
+      </div>
+    </div>
+  );
+}
+
+function ConnectorActionFooter({
+  primaryAction,
+  connectionTested,
+  readOnly,
+  onTestConnection,
+}: {
+  primaryAction: string;
+  connectionTested: boolean;
+  readOnly: boolean;
+  onTestConnection: () => void;
+}) {
+  return (
+    <div className="mt-4 flex flex-wrap gap-2">
+      <button className="form-button-primary" onClick={onTestConnection}>{primaryAction}</button>
+      <StatusBadge status={connectionTested ? 'Connection Tested' : 'Not Tested'} />
+      {readOnly ? <StatusBadge status="Read-only mode" /> : <StatusBadge status="Approval required" />}
+    </div>
+  );
+}
+
+function ConnectorNavigator({ title, items }: { title: string; items: string[] }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-100">{title}</p>
+      <div className="mt-3 space-y-2">
+        {items.map((item, index) => (
+          <label key={item} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-slate-200">
+            <span>{item}</span>
+            <input type="checkbox" defaultChecked={index < 2} />
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DatabaseCredentialCard({ authOptions }: { authOptions: string[] }) {
+  return (
+    <div className="rounded-2xl border border-cyan-300/15 bg-slate-950/35 p-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-100">Credentials</p>
+      <label className="mt-3 block text-sm font-medium text-slate-300">
+        Authentication
+        <select className={`${selectClass} mt-1 w-full`} defaultValue={authOptions[0]}>
+          {authOptions.map((option) => <option key={option}>{option}</option>)}
+        </select>
+      </label>
+      <label className="mt-3 block text-sm font-medium text-slate-300">
+        Read-only username
+        <input className={`${inputClass} mt-1 w-full`} placeholder="readonly_user" />
+      </label>
+      <label className="mt-3 block text-sm font-medium text-slate-300">
+        Password / secret
+        <input className={`${inputClass} mt-1 w-full`} type="password" placeholder="Stored securely" />
+      </label>
+      <div className="mt-4 rounded-xl border border-emerald-300/15 bg-emerald-400/10 p-3 text-xs leading-5 text-emerald-100">
+        Credentials are masked in the UI, saved as metadata placeholders in this demo, and treated as read-only for imports.
       </div>
     </div>
   );
