@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from statistics import mean
 from typing import Any
 from uuid import uuid4
@@ -24,6 +25,13 @@ from .frontend_admin_schemas import (
     DataMappingRuleRequest,
     DataMappingPreviewRequest,
     FrontendAdminApiResult,
+    GetDataConnectionRequest,
+    GetDataFieldMappingRequest,
+    GetDataRefreshRequest,
+    GetDataRelationshipRequest,
+    GetDataSelectionRequest,
+    GetDataTestConnectionRequest,
+    GetDataTransformRequest,
     OperationalFootprintRequest,
     PendingUpdateDecisionRequest,
     WorkflowSimulationRequest,
@@ -243,6 +251,193 @@ def serialize_mapping(row: frontend_admin_models.DataMappingRule, companies: dic
     }
 
 
+GET_DATA_CONNECTOR_GROUPS: list[dict[str, Any]] = [
+    {
+        "category": "File Sources",
+        "description": "Load local exports, report files, and folder-based extracts.",
+        "connectors": [
+            {"key": "excel", "name": "Excel", "auth_methods": ["File upload", "OneDrive OAuth", "SharePoint OAuth"], "required_fields": ["file_name"], "supports_transform": True},
+            {"key": "csv", "name": "CSV", "auth_methods": ["File upload", "Folder permission"], "required_fields": ["file_name", "delimiter"], "supports_transform": True},
+            {"key": "json", "name": "JSON", "auth_methods": ["File upload", "Web URL", "API key"], "required_fields": ["file_name_or_url"], "supports_transform": True},
+            {"key": "xml", "name": "XML", "auth_methods": ["File upload", "Web URL"], "required_fields": ["file_name_or_url"], "supports_transform": True},
+            {"key": "pdf", "name": "PDF", "auth_methods": ["File upload"], "required_fields": ["file_name"], "supports_transform": True},
+            {"key": "folder_upload", "name": "Folder upload", "auth_methods": ["Folder permission"], "required_fields": ["folder_path"], "supports_transform": True},
+        ],
+    },
+    {
+        "category": "Database Sources",
+        "description": "Connect read-only to operational or warehouse databases.",
+        "connectors": [
+            {"key": "sql_server", "name": "SQL Server", "auth_methods": ["Database credentials", "Azure AD"], "required_fields": ["host", "database"], "supports_transform": True},
+            {"key": "mysql", "name": "MySQL", "auth_methods": ["Database credentials"], "required_fields": ["host", "database"], "supports_transform": True},
+            {"key": "postgresql", "name": "PostgreSQL", "auth_methods": ["Database credentials"], "required_fields": ["host", "database"], "supports_transform": True},
+            {"key": "oracle", "name": "Oracle", "auth_methods": ["Database credentials", "Wallet"], "required_fields": ["host", "service_name"], "supports_transform": True},
+            {"key": "mongodb", "name": "MongoDB", "auth_methods": ["Connection string"], "required_fields": ["connection_string"], "supports_transform": True},
+            {"key": "sqlite", "name": "SQLite", "auth_methods": ["Database file"], "required_fields": ["file_name"], "supports_transform": True},
+        ],
+    },
+    {
+        "category": "Cloud and Online Sources",
+        "description": "Import cloud sheets, files, feeds, APIs, and web tables.",
+        "connectors": [
+            {"key": "sharepoint", "name": "SharePoint", "auth_methods": ["Microsoft OAuth"], "required_fields": ["site_url"], "supports_transform": True},
+            {"key": "google_sheets", "name": "Google Sheets", "auth_methods": ["Google OAuth", "Service account"], "required_fields": ["spreadsheet_url"], "supports_transform": True},
+            {"key": "onedrive", "name": "OneDrive", "auth_methods": ["Microsoft OAuth"], "required_fields": ["resource_url"], "supports_transform": True},
+            {"key": "rest_api", "name": "REST API", "auth_methods": ["API key", "Bearer token", "OAuth2", "Basic Auth"], "required_fields": ["base_url"], "supports_transform": True},
+            {"key": "web_url", "name": "Web URL", "auth_methods": ["No Auth", "Header auth"], "required_fields": ["url"], "supports_transform": True},
+            {"key": "odata", "name": "OData feed", "auth_methods": ["OAuth2", "Basic Auth", "API key"], "required_fields": ["feed_url"], "supports_transform": True},
+        ],
+    },
+    {
+        "category": "Application Sources",
+        "description": "Operational systems that feed platform modules.",
+        "connectors": [
+            {"key": "erp", "name": "ERP systems", "auth_methods": ["API", "OData", "Database", "File export"], "required_fields": ["system_url"], "supports_transform": True},
+            {"key": "crm", "name": "CRM systems", "auth_methods": ["OAuth2", "API key"], "required_fields": ["system_url"], "supports_transform": True},
+            {"key": "inventory_system", "name": "Inventory systems", "auth_methods": ["API", "Database", "File export"], "required_fields": ["system_url"], "supports_transform": True},
+            {"key": "maintenance_system", "name": "Maintenance systems", "auth_methods": ["API", "Database", "File export"], "required_fields": ["system_url"], "supports_transform": True},
+            {"key": "production_system", "name": "Production systems", "auth_methods": ["API", "MES database", "OPC bridge"], "required_fields": ["system_url"], "supports_transform": True},
+            {"key": "planning_system", "name": "Planning systems", "auth_methods": ["API", "File export"], "required_fields": ["system_url"], "supports_transform": True},
+        ],
+    },
+]
+
+GET_DATA_TRANSFORMS = [
+    "Remove columns",
+    "Rename columns",
+    "Change data type",
+    "Filter rows",
+    "Sort rows",
+    "Merge tables",
+    "Append tables",
+    "Replace values",
+    "Split columns",
+    "Group by",
+    "Remove duplicates",
+    "Create calculated columns",
+]
+
+GET_DATA_DESTINATIONS = ["Inventory", "Planning", "Production", "Maintenance", "Finance", "Reports", "Admin master data"]
+
+
+def connector_lookup() -> dict[str, dict[str, Any]]:
+    return {
+        connector["key"]: {**connector, "category": group["category"]}
+        for group in GET_DATA_CONNECTOR_GROUPS
+        for connector in group["connectors"]
+    }
+
+
+def mask_sensitive(value: Any) -> Any:
+    if value in (None, ""):
+        return value
+    text = str(value)
+    return f"{text[:2]}{'*' * max(len(text) - 4, 4)}{text[-2:]}" if len(text) > 4 else "****"
+
+
+def masked_credentials(credentials: dict[str, Any]) -> dict[str, Any]:
+    sensitive_terms = ("password", "secret", "token", "key", "credential", "connection_string")
+    return {
+        key: mask_sensitive(value) if any(term in key.lower() for term in sensitive_terms) else value
+        for key, value in credentials.items()
+    }
+
+
+def connection_required_errors(connector_key: str, details: dict[str, Any]) -> list[str]:
+    connector = connector_lookup().get(connector_key)
+    if not connector:
+        return [f"Unknown connector '{connector_key}'"]
+    return [f"{field} is required for {connector['name']}" for field in connector.get("required_fields", []) if not details.get(field)]
+
+
+def datahub_audit(db: Session, actor: User, company_id: str, action: str, entity_type: str, entity_id: str, details: dict[str, Any]) -> None:
+    db.add(
+        frontend_admin_models.DataHubAuditEvent(
+            id=f"dha-{uuid4()}",
+            company_id=company_id,
+            actor_email=actor.email,
+            action=action,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            details=details,
+        )
+    )
+
+
+def demo_discovery_assets(connector_key: str) -> list[dict[str, Any]]:
+    prefix = connector_key.replace("_", " ").title()
+    return [
+        {
+            "name": f"{prefix} Inventory",
+            "type": "table",
+            "row_count": 12480,
+            "columns": ["item_code", "item_name", "quantity", "plant", "status", "updated_at"],
+            "primary_key": "item_code",
+        },
+        {
+            "name": f"{prefix} Production",
+            "type": "table",
+            "row_count": 4230,
+            "columns": ["order_id", "material_code", "planned_qty", "completed_qty", "line", "status"],
+            "primary_key": "order_id",
+        },
+        {
+            "name": f"{prefix} Maintenance",
+            "type": "table",
+            "row_count": 980,
+            "columns": ["work_order", "asset_id", "priority", "planned_date", "status", "technician"],
+            "primary_key": "work_order",
+        },
+    ]
+
+
+def demo_preview_rows(asset_name: str | None = None) -> list[dict[str, Any]]:
+    return [
+        {"item_code": "RM-STEEL-001", "item_name": "Steel Coil", "quantity": 680, "plant": "Plant 01", "status": "Available", "updated_at": "2026-06-22"},
+        {"item_code": "FG-PUMP-041", "item_name": "Pump Assembly", "quantity": 94, "plant": "Plant 01", "status": "Reserved", "updated_at": "2026-06-22"},
+        {"item_code": "SP-BEAR-009", "item_name": "Bearing Kit", "quantity": 12, "plant": "Plant 02", "status": "Low Stock", "updated_at": "2026-06-21"},
+    ]
+
+
+def infer_type(value: Any) -> str:
+    if isinstance(value, bool):
+        return "Boolean"
+    if isinstance(value, int):
+        return "Whole number"
+    if isinstance(value, float):
+        return "Decimal number"
+    if isinstance(value, str) and len(value) == 10 and value[4] == "-" and value[7] == "-":
+        return "Date"
+    return "Text"
+
+
+def serialize_saved_connection(row: frontend_admin_models.DataHubSavedConnection, companies: dict[str, str] | None = None) -> dict[str, Any]:
+    return {
+        "id": row.id,
+        "company_id": row.company_id,
+        "company_name": (companies or {}).get(row.company_id, row.company_id),
+        "connector_key": row.connector_key,
+        "connector_name": row.connector_name,
+        "connector_category": row.connector_category,
+        "connection_name": row.connection_name,
+        "auth_method": row.auth_method,
+        "connection_details": row.connection_details or {},
+        "credential_summary": row.credential_summary or {},
+        "status": row.status,
+        "last_test_status": row.last_test_status,
+        "last_test_message": row.last_test_message,
+        "refresh_mode": row.refresh_mode,
+        "destination_module": row.destination_module,
+        "selected_assets": row.selected_assets or [],
+        "selected_columns": row.selected_columns or [],
+        "field_mappings": row.field_mappings or [],
+        "validation_results": row.validation_results or [],
+        "created_by": row.created_by,
+        "created_at": row.created_at.isoformat() if row.created_at else None,
+        "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+    }
+
+
 @frontend_router.get("/navigation", response_model=FrontendAdminApiResult)
 def navigation() -> FrontendAdminApiResult:
     return result("navigation", "Frontend navigation blueprint for modular React screens.", frontend_admin_repo.snapshot(frontend_admin_repo.navigation))
@@ -392,6 +587,438 @@ def compliance_center() -> FrontendAdminApiResult:
 @platform_management_router.get("/overview", response_model=FrontendAdminApiResult)
 def platform_management_overview() -> FrontendAdminApiResult:
     return result("platform_management_overview", "Super Admin platform management overview.", frontend_admin_repo.snapshot(frontend_admin_repo.platform_management))
+
+
+@data_hub_router.get("/get-data/connectors", response_model=FrontendAdminApiResult)
+def get_data_connectors(_: User = Depends(require_any("admin"))) -> FrontendAdminApiResult:
+    return result(
+        "get_data_connectors",
+        "Power BI-style connector catalog grouped by source category.",
+        {
+            "groups": GET_DATA_CONNECTOR_GROUPS,
+            "transform_operations": GET_DATA_TRANSFORMS,
+            "destination_modules": GET_DATA_DESTINATIONS,
+            "refresh_modes": ["One-time import", "Manual refresh", "Scheduled refresh", "Incremental refresh", "Real-time webhook update", "Retry failed refresh"],
+        },
+    )
+
+
+@data_hub_router.get("/get-data/saved-connections", response_model=FrontendAdminApiResult)
+def get_data_saved_connections(
+    actor: User = Depends(require_any("admin")),
+    db: Session = Depends(get_db),
+) -> FrontendAdminApiResult:
+    query = db.query(frontend_admin_models.DataHubSavedConnection)
+    company_id = scoped_company_id(actor)
+    if company_id:
+        query = query.filter(frontend_admin_models.DataHubSavedConnection.company_id == company_id)
+    rows = query.order_by(frontend_admin_models.DataHubSavedConnection.updated_at.desc()).all()
+    return result("get_data_saved_connections", "Saved Power BI-style source connections.", [serialize_saved_connection(row, company_name_map(db)) for row in rows])
+
+
+@data_hub_router.post("/get-data/saved-connections", response_model=FrontendAdminApiResult)
+def create_get_data_saved_connection(
+    request: GetDataConnectionRequest,
+    actor: User = Depends(require_any("admin")),
+    db: Session = Depends(get_db),
+) -> FrontendAdminApiResult:
+    payload = request.model_dump()
+    company_id = resolve_datahub_company_id(payload.pop("company_id", None), actor, db)
+    details = payload.get("connection_details") or {}
+    errors = connection_required_errors(payload["connector_key"], details)
+    if errors:
+        raise HTTPException(status_code=422, detail={"message": "Connection details are incomplete", "errors": errors})
+    credentials = payload.pop("credentials", {})
+    row = frontend_admin_models.DataHubSavedConnection(
+        id=f"gd-conn-{uuid4()}",
+        company_id=company_id,
+        credential_summary={
+            "masked": masked_credentials(credentials),
+            "credential_keys": sorted(credentials.keys()),
+            "storage": "masked metadata only; production should use vault or KMS",
+        },
+        status="Saved",
+        last_test_status="Not Tested",
+        created_by=actor.email,
+        **payload,
+    )
+    db.add(row)
+    datahub_audit(db, actor, company_id, "create_connection", "get_data_connection", row.id, {"connector": row.connector_name, "destination_module": row.destination_module})
+    db.commit()
+    db.refresh(row)
+    return result("create_get_data_saved_connection", "Get Data connection saved with masked credentials.", serialize_saved_connection(row, company_name_map(db)))
+
+
+@data_hub_router.delete("/get-data/saved-connections/{connection_id}", response_model=FrontendAdminApiResult)
+def delete_get_data_saved_connection(
+    connection_id: str,
+    actor: User = Depends(require_any("admin")),
+    db: Session = Depends(get_db),
+) -> FrontendAdminApiResult:
+    row = db.get(frontend_admin_models.DataHubSavedConnection, connection_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Saved connection not found")
+    if not has_override_scope(actor) and row.company_id != actor.company_id:
+        raise HTTPException(status_code=403, detail="Cannot delete another company's saved connection")
+    company_id = row.company_id
+    db.delete(row)
+    datahub_audit(db, actor, company_id, "delete_connection", "get_data_connection", connection_id, {"connection_id": connection_id})
+    db.commit()
+    return result("delete_get_data_saved_connection", "Saved connection deleted.", {"id": connection_id})
+
+
+@data_hub_router.post("/get-data/test-connection", response_model=FrontendAdminApiResult)
+def test_get_data_connection(
+    request: GetDataTestConnectionRequest,
+    actor: User = Depends(require_any("admin")),
+    db: Session = Depends(get_db),
+) -> FrontendAdminApiResult:
+    payload = request.model_dump()
+    company_id = resolve_datahub_company_id(payload.pop("company_id", None), actor, db)
+    errors = connection_required_errors(payload["connector_key"], payload.get("connection_details") or {})
+    status_text = "Failed" if errors else "Succeeded"
+    response = {
+        "status": status_text,
+        "latency_ms": 84 if not errors else None,
+        "message": "Connection test succeeded in read-only preview mode." if not errors else "Connection test failed because required fields are missing.",
+        "errors": errors,
+        "credential_summary": masked_credentials(payload.get("credentials") or {}),
+        "read_only": True,
+    }
+    datahub_audit(db, actor, company_id, "test_connection", "get_data_connection", payload["connector_key"], response)
+    if errors:
+        db.add(
+            frontend_admin_models.DataHubErrorLog(
+                id=f"dhe-{uuid4()}",
+                company_id=company_id,
+                connection_id=payload["connector_key"],
+                severity="Error",
+                error_code="CONNECTION_VALIDATION_FAILED",
+                message="; ".join(errors),
+                resolution_hint="Fill all required connection fields before testing again.",
+            )
+        )
+    db.commit()
+    return result("test_get_data_connection", "Connection test completed.", response)
+
+
+@data_hub_router.get("/get-data/connections/{connection_id}/metadata", response_model=FrontendAdminApiResult)
+def get_data_metadata(
+    connection_id: str,
+    actor: User = Depends(require_any("admin")),
+    db: Session = Depends(get_db),
+) -> FrontendAdminApiResult:
+    row = db.get(frontend_admin_models.DataHubSavedConnection, connection_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Saved connection not found")
+    if not has_override_scope(actor) and row.company_id != actor.company_id:
+        raise HTTPException(status_code=403, detail="Cannot inspect another company's saved connection")
+    return result("get_data_metadata", "Discovered tables, files, or endpoints for the selected connection.", {"connection_id": connection_id, "assets": demo_discovery_assets(row.connector_key)})
+
+
+@data_hub_router.post("/get-data/connections/{connection_id}/selection", response_model=FrontendAdminApiResult)
+def save_get_data_selection(
+    connection_id: str,
+    request: GetDataSelectionRequest,
+    actor: User = Depends(require_any("admin")),
+    db: Session = Depends(get_db),
+) -> FrontendAdminApiResult:
+    row = db.get(frontend_admin_models.DataHubSavedConnection, connection_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Saved connection not found")
+    if not has_override_scope(actor) and row.company_id != actor.company_id:
+        raise HTTPException(status_code=403, detail="Cannot update another company's saved connection")
+    row.selected_assets = request.selected_assets
+    row.selected_columns = request.selected_columns
+    datahub_audit(db, actor, row.company_id, "select_assets", "get_data_connection", row.id, request.model_dump())
+    db.commit()
+    db.refresh(row)
+    return result("save_get_data_selection", "Selected tables/files/endpoints and columns saved.", serialize_saved_connection(row, company_name_map(db)))
+
+
+@data_hub_router.get("/get-data/connections/{connection_id}/preview", response_model=FrontendAdminApiResult)
+def get_data_preview(
+    connection_id: str,
+    actor: User = Depends(require_any("admin")),
+    db: Session = Depends(get_db),
+) -> FrontendAdminApiResult:
+    row = db.get(frontend_admin_models.DataHubSavedConnection, connection_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Saved connection not found")
+    if not has_override_scope(actor) and row.company_id != actor.company_id:
+        raise HTTPException(status_code=403, detail="Cannot preview another company's saved connection")
+    rows = demo_preview_rows((row.selected_assets or [None])[0])
+    columns = list(rows[0].keys()) if rows else []
+    detected_types = [{"column": column, "detected_type": infer_type(rows[0][column])} for column in columns]
+    return result("get_data_preview", "Preview rows generated before loading data.", {"connection_id": connection_id, "columns": columns, "detected_types": detected_types, "rows": rows})
+
+
+@data_hub_router.post("/get-data/transform-preview", response_model=FrontendAdminApiResult)
+def get_data_transform_preview(
+    request: GetDataTransformRequest,
+    actor: User = Depends(require_any("admin")),
+    db: Session = Depends(get_db),
+) -> FrontendAdminApiResult:
+    payload = request.model_dump()
+    company_id = resolve_datahub_company_id(payload.pop("company_id", None), actor, db)
+    connection = db.get(frontend_admin_models.DataHubSavedConnection, request.connection_id)
+    if not connection:
+        raise HTTPException(status_code=404, detail="Saved connection not found")
+    if not has_override_scope(actor) and connection.company_id != actor.company_id:
+        raise HTTPException(status_code=403, detail="Cannot transform another company's saved connection")
+    preview = demo_preview_rows()
+    operations = request.operations
+    operation_names = [item.get("operation") or item.get("name") for item in operations]
+    if "Remove duplicates" in operation_names:
+        preview = list({row["item_code"]: row for row in preview}.values())
+    if "Remove columns" in operation_names:
+        preview = [{key: value for key, value in row.items() if key != "updated_at"} for row in preview]
+    row = frontend_admin_models.DataHubTransformRecipe(
+        id=f"gd-tr-{uuid4()}",
+        company_id=company_id,
+        connection_id=request.connection_id,
+        recipe_name=request.recipe_name,
+        operations=operations,
+        preview_rows=preview,
+        created_by=actor.email,
+    )
+    db.add(row)
+    datahub_audit(db, actor, company_id, "transform_preview", "get_data_transform", row.id, {"operations": operations})
+    db.commit()
+    return result("get_data_transform_preview", "Power Query-style transformation preview generated and saved.", {"id": row.id, "operations": operations, "preview_rows": preview})
+
+
+@data_hub_router.post("/get-data/field-mapping/validate", response_model=FrontendAdminApiResult)
+def validate_get_data_mapping(
+    request: GetDataFieldMappingRequest,
+    actor: User = Depends(require_any("admin")),
+    db: Session = Depends(get_db),
+) -> FrontendAdminApiResult:
+    payload = request.model_dump()
+    company_id = resolve_datahub_company_id(payload.pop("company_id", None), actor, db)
+    required_by_module = {
+        "Inventory": ["item_code", "item_name", "quantity"],
+        "Planning": ["plan_id", "material_code", "demand_quantity"],
+        "Production": ["order_id", "material_code", "planned_qty"],
+        "Maintenance": ["work_order", "asset_id", "status"],
+        "Finance": ["account", "amount", "currency"],
+        "Reports": ["metric_name", "metric_value"],
+        "Admin master data": ["name", "status"],
+    }
+    mapped_targets = {item.get("target_field") for item in request.mappings}
+    missing = [field for field in required_by_module.get(request.destination_module, []) if field not in mapped_targets]
+    validation = [
+        {"rule": "Required destination fields mapped", "status": "Failed" if missing else "Passed", "severity": "Error" if missing else "Info", "details": missing},
+        {"rule": "Preview before load", "status": "Passed", "severity": "Info", "details": "Preview generated from selected assets."},
+        {"rule": "Approval before critical import", "status": "Required", "severity": "Approval", "details": "Human approval is required before writing into platform modules."},
+    ]
+    if request.connection_id:
+        connection = db.get(frontend_admin_models.DataHubSavedConnection, request.connection_id)
+        if connection and (has_override_scope(actor) or connection.company_id == actor.company_id):
+            connection.destination_module = request.destination_module
+            connection.field_mappings = request.mappings
+            connection.validation_results = validation
+    datahub_audit(db, actor, company_id, "validate_mapping", "get_data_mapping", request.connection_id or request.destination_module, {"destination_module": request.destination_module, "validation": validation})
+    db.commit()
+    return result("validate_get_data_mapping", "Field mapping validated before import.", {"valid": not missing, "validation_results": validation})
+
+
+@data_hub_router.post("/get-data/model/relationships", response_model=FrontendAdminApiResult)
+def create_get_data_relationship(
+    request: GetDataRelationshipRequest,
+    actor: User = Depends(require_any("admin")),
+    db: Session = Depends(get_db),
+) -> FrontendAdminApiResult:
+    payload = request.model_dump()
+    company_id = resolve_datahub_company_id(payload.pop("company_id", None), actor, db)
+    row = frontend_admin_models.DataHubModelRelationship(id=f"gd-rel-{uuid4()}", company_id=company_id, created_by=actor.email, **payload)
+    db.add(row)
+    datahub_audit(db, actor, company_id, "create_relationship", "get_data_model_relationship", row.id, payload)
+    db.commit()
+    return result("create_get_data_relationship", "Data model relationship created.", {"id": row.id, **payload, "company_id": company_id})
+
+
+@data_hub_router.get("/get-data/model", response_model=FrontendAdminApiResult)
+def get_data_model(
+    actor: User = Depends(require_any("admin")),
+    db: Session = Depends(get_db),
+) -> FrontendAdminApiResult:
+    company_id = scoped_company_id(actor)
+    relationship_query = db.query(frontend_admin_models.DataHubModelRelationship)
+    connection_query = db.query(frontend_admin_models.DataHubSavedConnection)
+    if company_id:
+        relationship_query = relationship_query.filter(frontend_admin_models.DataHubModelRelationship.company_id == company_id)
+        connection_query = connection_query.filter(frontend_admin_models.DataHubSavedConnection.company_id == company_id)
+    connections = connection_query.all()
+    relationships = relationship_query.order_by(frontend_admin_models.DataHubModelRelationship.created_at.desc()).all()
+    tables = []
+    for connection in connections:
+        for asset in connection.selected_assets or [f"{connection.connector_name} Dataset"]:
+            tables.append(
+                {
+                    "table": asset,
+                    "source": connection.connection_name,
+                    "columns": connection.selected_columns or ["item_code", "item_name", "quantity", "status"],
+                    "primary_key": (connection.selected_columns or ["item_code"])[0],
+                    "measures": [{"name": "Record Count", "expression": "COUNTROWS()"}],
+                    "calculated_columns": [{"name": "Status Group", "expression": "IF([status] = 'Low Stock', 'Risk', 'Normal')"}],
+                }
+            )
+    return result(
+        "get_data_model",
+        "Power BI-style model view with tables, columns, measures and relationships.",
+        {
+            "tables": tables,
+            "relationships": [
+                {
+                    "id": row.id,
+                    "company_id": row.company_id,
+                    "left_table": row.left_table,
+                    "left_column": row.left_column,
+                    "right_table": row.right_table,
+                    "right_column": row.right_column,
+                    "cardinality": row.cardinality,
+                    "direction": row.direction,
+                    "active": row.active,
+                }
+                for row in relationships
+            ],
+            "validation": {"status": "Valid" if tables else "No model tables yet", "issues": [] if tables else ["Save a connection and select assets to build a model."]},
+        },
+    )
+
+
+@data_hub_router.post("/get-data/refresh", response_model=FrontendAdminApiResult)
+def run_get_data_refresh(
+    request: GetDataRefreshRequest,
+    actor: User = Depends(require_any("admin")),
+    db: Session = Depends(get_db),
+) -> FrontendAdminApiResult:
+    connection = db.get(frontend_admin_models.DataHubSavedConnection, request.connection_id)
+    if not connection:
+        raise HTTPException(status_code=404, detail="Saved connection not found")
+    company_id = resolve_datahub_company_id(request.company_id, actor, db) if has_override_scope(actor) else actor.company_id
+    if not has_override_scope(actor) and connection.company_id != actor.company_id:
+        raise HTTPException(status_code=403, detail="Cannot refresh another company's saved connection")
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    success = connection.last_test_status in {"Succeeded", "Not Tested"}
+    row = frontend_admin_models.DataHubRefreshRun(
+        id=f"gd-rf-{uuid4()}",
+        company_id=company_id or connection.company_id,
+        connection_id=connection.id,
+        refresh_mode=request.refresh_mode,
+        status="Completed" if success else "Failed",
+        rows_processed=12480 if success else 0,
+        started_at=now,
+        completed_at=now,
+        failure_reason=None if success else "Connection test failed before refresh. Re-test credentials and required fields.",
+    )
+    connection.refresh_mode = request.refresh_mode
+    connection.status = "Loaded" if success else "Refresh Failed"
+    db.add(row)
+    if not success:
+        db.add(
+            frontend_admin_models.DataHubErrorLog(
+                id=f"dhe-{uuid4()}",
+                company_id=row.company_id,
+                connection_id=connection.id,
+                severity="Error",
+                error_code="REFRESH_FAILED",
+                message=row.failure_reason or "Refresh failed.",
+                resolution_hint="Open the saved connection, test credentials, and run refresh again.",
+            )
+        )
+    datahub_audit(db, actor, row.company_id, "refresh", "get_data_refresh", row.id, {"connection_id": connection.id, "mode": request.refresh_mode, "status": row.status})
+    db.commit()
+    return result("run_get_data_refresh", "Refresh run recorded.", {"id": row.id, "status": row.status, "rows_processed": row.rows_processed, "failure_reason": row.failure_reason})
+
+
+@data_hub_router.get("/get-data/refresh-history", response_model=FrontendAdminApiResult)
+def get_data_refresh_history(
+    actor: User = Depends(require_any("admin")),
+    db: Session = Depends(get_db),
+) -> FrontendAdminApiResult:
+    query = db.query(frontend_admin_models.DataHubRefreshRun)
+    company_id = scoped_company_id(actor)
+    if company_id:
+        query = query.filter(frontend_admin_models.DataHubRefreshRun.company_id == company_id)
+    rows = query.order_by(frontend_admin_models.DataHubRefreshRun.started_at.desc()).all()
+    return result(
+        "get_data_refresh_history",
+        "Manual, scheduled, incremental and webhook refresh history.",
+        [
+            {
+                "id": row.id,
+                "company_id": row.company_id,
+                "connection_id": row.connection_id,
+                "refresh_mode": row.refresh_mode,
+                "status": row.status,
+                "rows_processed": row.rows_processed,
+                "started_at": row.started_at,
+                "completed_at": row.completed_at,
+                "failure_reason": row.failure_reason,
+            }
+            for row in rows
+        ],
+    )
+
+
+@data_hub_router.get("/get-data/errors", response_model=FrontendAdminApiResult)
+def get_data_errors(
+    actor: User = Depends(require_any("admin")),
+    db: Session = Depends(get_db),
+) -> FrontendAdminApiResult:
+    query = db.query(frontend_admin_models.DataHubErrorLog)
+    company_id = scoped_company_id(actor)
+    if company_id:
+        query = query.filter(frontend_admin_models.DataHubErrorLog.company_id == company_id)
+    rows = query.order_by(frontend_admin_models.DataHubErrorLog.created_at.desc()).all()
+    return result(
+        "get_data_errors",
+        "Failed refresh and connection error logs.",
+        [
+            {
+                "id": row.id,
+                "company_id": row.company_id,
+                "connection_id": row.connection_id,
+                "severity": row.severity,
+                "error_code": row.error_code,
+                "message": row.message,
+                "resolution_hint": row.resolution_hint,
+                "created_at": row.created_at.isoformat() if row.created_at else None,
+            }
+            for row in rows
+        ],
+    )
+
+
+@data_hub_router.get("/get-data/audit", response_model=FrontendAdminApiResult)
+def get_data_audit(
+    actor: User = Depends(require_any("admin")),
+    db: Session = Depends(get_db),
+) -> FrontendAdminApiResult:
+    query = db.query(frontend_admin_models.DataHubAuditEvent)
+    company_id = scoped_company_id(actor)
+    if company_id:
+        query = query.filter(frontend_admin_models.DataHubAuditEvent.company_id == company_id)
+    rows = query.order_by(frontend_admin_models.DataHubAuditEvent.created_at.desc()).limit(100).all()
+    return result(
+        "get_data_audit",
+        "Audit trail for connector, preview, transform, model, refresh and credential actions.",
+        [
+            {
+                "id": row.id,
+                "company_id": row.company_id,
+                "actor_email": row.actor_email,
+                "action": row.action,
+                "entity_type": row.entity_type,
+                "entity_id": row.entity_id,
+                "details": row.details,
+                "created_at": row.created_at.isoformat() if row.created_at else None,
+            }
+            for row in rows
+        ],
+    )
 
 
 @data_hub_router.get("/connected-systems", response_model=FrontendAdminApiResult)

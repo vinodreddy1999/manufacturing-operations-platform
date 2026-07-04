@@ -63,6 +63,8 @@ The Manufacturing Intelligence module has been added as a future command-center 
 
 The Frontend & Admin Platform module has been added as a backend contract layer for future React/TypeScript screens. It exposes navigation, folder structure, admin dashboard, company setup, RBAC, dashboard access, data scopes, workflows, KPIs, alerts, notifications, security, documents, compliance, platform management, Manufacturing Data Hub, Planning, AI Command Center, Digital Twin and Digital Operations Center APIs.
 
+The Data Integration Hub now includes a Power BI-style **Get Data** module for source selection, connection testing, table/file/API discovery, preview, Power Query-style transforms, field mapping, model relationships, validation, refresh history, error logs, and audit logs. See [Get Data Module](docs/get-data-module.md).
+
 ## Diagram
 
 See the GitHub-rendered end-to-end scheme diagram here:
@@ -771,7 +773,7 @@ Key endpoint groups:
 - Admin engines: `/admin/workflows`, `/admin/workflows/simulate`, `/admin/kpis`, `/admin/alerts`, `/admin/notifications`
 - Governance: `/admin/security`, `/admin/documents`, `/admin/compliance`
 - Super Admin: `/platform-management/overview`
-- Manufacturing Data Hub: `/manufacturing-data-hub/connected-systems`, `/catalog`, `/mappings`, `/mappings/preview`, `/data-quality`, `/ai-readiness`, `/lineage`, `/event-streaming`, `/pending-updates`, `/action-center`, `/erp-feedback`, `/reconciliation`, `/synchronization-dashboard`
+- Manufacturing Data Hub: `/manufacturing-data-hub/connected-systems`, `/catalog`, `/mappings`, `/mappings/preview`, `/data-quality`, `/ai-readiness`, `/lineage`, `/event-streaming`, `/pending-updates`, `/action-center`, `/erp-feedback`, `/reconciliation`, `/synchronization-dashboard`, `/get-data/connectors`, `/get-data/saved-connections`, `/get-data/test-connection`, `/get-data/transform-preview`, `/get-data/field-mapping/validate`, `/get-data/model`, `/get-data/refresh-history`, `/get-data/errors`, `/get-data/audit`
 - Future command surfaces: `/planning/overview`, `/ai-command-center/overview`, `/digital-twin/overview`, `/digital-operations-center/overview`
 
 Dashboard visibility uses the defined rule: tenant enabled dashboard plus role permission plus user permission plus data scope permission. Data Hub pending updates are approval-first so read-only ERP integrations can export recommended changes only after human decision.

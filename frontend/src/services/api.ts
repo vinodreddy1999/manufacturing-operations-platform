@@ -21,6 +21,13 @@ import type {
   OperationalFootprint,
   RuntimeAnalytics,
   DataHubUpload,
+  GetDataAuditEvent,
+  GetDataCatalog,
+  GetDataErrorLog,
+  GetDataModel,
+  GetDataPreview,
+  GetDataRefreshRun,
+  GetDataSavedConnection,
   PasswordPolicy,
   RuntimeLoginResult,
   RuntimeUser,
@@ -167,6 +174,65 @@ export const backend = {
     const response = await api.post<ApiEnvelope<DataHubUpload>>('/manufacturing-data-hub/cloud-sources', payload);
     return response.data.data;
   },
+  getDataConnectors: () => getEnvelope<GetDataCatalog>('/manufacturing-data-hub/get-data/connectors'),
+  getDataSavedConnections: () => getEnvelope<GetDataSavedConnection[]>('/manufacturing-data-hub/get-data/saved-connections'),
+  createGetDataConnection: async (payload: {
+    company_id?: string;
+    connector_key: string;
+    connector_name: string;
+    connector_category: string;
+    connection_name: string;
+    auth_method: string;
+    connection_details: Record<string, unknown>;
+    credentials: Record<string, unknown>;
+    refresh_mode: string;
+    destination_module: string;
+  }) => {
+    const response = await api.post<ApiEnvelope<GetDataSavedConnection>>('/manufacturing-data-hub/get-data/saved-connections', payload);
+    return response.data.data;
+  },
+  deleteGetDataConnection: async (id: string) => {
+    const response = await api.delete<ApiEnvelope<{ id: string }>>(`/manufacturing-data-hub/get-data/saved-connections/${id}`);
+    return response.data.data;
+  },
+  testGetDataConnection: async (payload: {
+    company_id?: string;
+    connector_key: string;
+    connector_name: string;
+    connector_category: string;
+    auth_method: string;
+    connection_details: Record<string, unknown>;
+    credentials: Record<string, unknown>;
+  }) => {
+    const response = await api.post<ApiEnvelope<Record<string, unknown>>>('/manufacturing-data-hub/get-data/test-connection', payload);
+    return response.data.data;
+  },
+  getDataMetadata: async (connectionId: string) => getEnvelope<{ connection_id: string; assets: Array<Record<string, unknown>> }>(`/manufacturing-data-hub/get-data/connections/${connectionId}/metadata`),
+  saveGetDataSelection: async (connectionId: string, payload: { selected_assets: string[]; selected_columns: string[] }) => {
+    const response = await api.post<ApiEnvelope<GetDataSavedConnection>>(`/manufacturing-data-hub/get-data/connections/${connectionId}/selection`, payload);
+    return response.data.data;
+  },
+  getDataPreview: async (connectionId: string) => getEnvelope<GetDataPreview>(`/manufacturing-data-hub/get-data/connections/${connectionId}/preview`),
+  transformGetDataPreview: async (payload: { company_id?: string; connection_id: string; recipe_name: string; operations: Array<Record<string, unknown>> }) => {
+    const response = await api.post<ApiEnvelope<{ id: string; operations: Array<Record<string, unknown>>; preview_rows: Array<Record<string, unknown>> }>>('/manufacturing-data-hub/get-data/transform-preview', payload);
+    return response.data.data;
+  },
+  validateGetDataMapping: async (payload: { company_id?: string; connection_id?: string; destination_module: string; mappings: Array<Record<string, unknown>> }) => {
+    const response = await api.post<ApiEnvelope<{ valid: boolean; validation_results: Array<Record<string, unknown>> }>>('/manufacturing-data-hub/get-data/field-mapping/validate', payload);
+    return response.data.data;
+  },
+  createGetDataRelationship: async (payload: { company_id?: string; left_table: string; left_column: string; right_table: string; right_column: string; cardinality: string; direction: string; active: boolean }) => {
+    const response = await api.post<ApiEnvelope<Record<string, unknown>>>('/manufacturing-data-hub/get-data/model/relationships', payload);
+    return response.data.data;
+  },
+  getDataModel: () => getEnvelope<GetDataModel>('/manufacturing-data-hub/get-data/model'),
+  runGetDataRefresh: async (payload: { company_id?: string; connection_id: string; refresh_mode: string; incremental_column?: string; schedule?: Record<string, unknown> }) => {
+    const response = await api.post<ApiEnvelope<Record<string, unknown>>>('/manufacturing-data-hub/get-data/refresh', payload);
+    return response.data.data;
+  },
+  getDataRefreshHistory: () => getEnvelope<GetDataRefreshRun[]>('/manufacturing-data-hub/get-data/refresh-history'),
+  getDataErrors: () => getEnvelope<GetDataErrorLog[]>('/manufacturing-data-hub/get-data/errors'),
+  getDataAudit: () => getEnvelope<GetDataAuditEvent[]>('/manufacturing-data-hub/get-data/audit'),
   commandCenter: () => getEnvelope<CommandCenter>('/manufacturing-intelligence/command-center'),
   inventoryDashboard: () => getEnvelope<InventoryDashboard>('/inventory/dashboard'),
   evaluateDashboardAccess: async () => {

@@ -250,3 +250,103 @@ export type DataHubUpload = {
     };
   };
 };
+
+export type GetDataConnector = {
+  key: string;
+  name: string;
+  auth_methods: string[];
+  required_fields: string[];
+  supports_transform: boolean;
+};
+
+export type GetDataConnectorGroup = {
+  category: string;
+  description: string;
+  connectors: GetDataConnector[];
+};
+
+export type GetDataCatalog = {
+  groups: GetDataConnectorGroup[];
+  transform_operations: string[];
+  destination_modules: string[];
+  refresh_modes: string[];
+};
+
+export type GetDataSavedConnection = {
+  id: string;
+  company_id: string;
+  company_name?: string;
+  connector_key: string;
+  connector_name: string;
+  connector_category: string;
+  connection_name: string;
+  auth_method: string;
+  connection_details: Record<string, unknown>;
+  credential_summary: Record<string, unknown>;
+  status: string;
+  last_test_status: string;
+  last_test_message?: string | null;
+  refresh_mode: string;
+  destination_module: string;
+  selected_assets: string[];
+  selected_columns: string[];
+  field_mappings: Array<Record<string, unknown>>;
+  validation_results: Array<Record<string, unknown>>;
+  created_by: string;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type GetDataPreview = {
+  connection_id: string;
+  columns: string[];
+  detected_types: Array<{ column: string; detected_type: string }>;
+  rows: Array<Record<string, unknown>>;
+};
+
+export type GetDataModel = {
+  tables: Array<{
+    table: string;
+    source: string;
+    columns: string[];
+    primary_key: string;
+    measures: Array<Record<string, unknown>>;
+    calculated_columns: Array<Record<string, unknown>>;
+  }>;
+  relationships: Array<Record<string, unknown>>;
+  validation: Record<string, unknown>;
+};
+
+export type GetDataRefreshRun = {
+  id: string;
+  company_id: string;
+  connection_id: string;
+  refresh_mode: string;
+  status: string;
+  rows_processed: number;
+  started_at: string;
+  completed_at?: string | null;
+  failure_reason?: string | null;
+};
+
+export type GetDataErrorLog = {
+  id: string;
+  company_id: string;
+  connection_id: string;
+  severity: string;
+  error_code: string;
+  message: string;
+  resolution_hint?: string | null;
+  created_at?: string | null;
+};
+
+export type GetDataAuditEvent = {
+  id: string;
+  company_id: string;
+  actor_email: string;
+  action: string;
+  entity_type: string;
+  entity_id: string;
+  details: Record<string, unknown>;
+  created_at?: string | null;
+};

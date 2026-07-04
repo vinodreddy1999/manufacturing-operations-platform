@@ -94,3 +94,64 @@ class CloudSourceUploadRequest(BaseModel):
     sync_mode: str = Field(default="manual")
     auth_method: str | None = None
     connection_details: dict[str, Any] = Field(default_factory=dict)
+
+
+class GetDataConnectionRequest(BaseModel):
+    company_id: str | None = None
+    connector_key: str
+    connector_name: str
+    connector_category: str
+    connection_name: str
+    auth_method: str = "No Auth"
+    connection_details: dict[str, Any] = Field(default_factory=dict)
+    credentials: dict[str, Any] = Field(default_factory=dict)
+    refresh_mode: str = "Manual refresh"
+    destination_module: str = "Inventory"
+
+
+class GetDataTestConnectionRequest(BaseModel):
+    company_id: str | None = None
+    connector_key: str
+    connector_name: str
+    connector_category: str
+    auth_method: str = "No Auth"
+    connection_details: dict[str, Any] = Field(default_factory=dict)
+    credentials: dict[str, Any] = Field(default_factory=dict)
+
+
+class GetDataSelectionRequest(BaseModel):
+    selected_assets: list[str] = Field(default_factory=list)
+    selected_columns: list[str] = Field(default_factory=list)
+
+
+class GetDataTransformRequest(BaseModel):
+    company_id: str | None = None
+    connection_id: str
+    recipe_name: str = "Power Query Draft"
+    operations: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class GetDataFieldMappingRequest(BaseModel):
+    company_id: str | None = None
+    connection_id: str | None = None
+    destination_module: str
+    mappings: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class GetDataRelationshipRequest(BaseModel):
+    company_id: str | None = None
+    left_table: str
+    left_column: str
+    right_table: str
+    right_column: str
+    cardinality: str = "many-to-one"
+    direction: str = "single"
+    active: bool = True
+
+
+class GetDataRefreshRequest(BaseModel):
+    company_id: str | None = None
+    connection_id: str
+    refresh_mode: str = "Manual refresh"
+    incremental_column: str | None = None
+    schedule: dict[str, Any] = Field(default_factory=dict)

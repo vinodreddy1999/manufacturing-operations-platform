@@ -68,6 +68,101 @@ class ManufacturingDataConnection(Base):
     record_count = Column(Integer, nullable=False, default=0)
 
 
+class DataHubSavedConnection(Base):
+    __tablename__ = "datahub_saved_connections"
+
+    id = Column(String, primary_key=True)
+    company_id = Column(String, index=True, nullable=False)
+    connector_key = Column(String, index=True, nullable=False)
+    connector_name = Column(String, nullable=False)
+    connector_category = Column(String, nullable=False)
+    connection_name = Column(String, nullable=False)
+    auth_method = Column(String, nullable=False, default="No Auth")
+    connection_details = Column(JSON, nullable=False, default=dict)
+    credential_summary = Column(JSON, nullable=False, default=dict)
+    status = Column(String, nullable=False, default="Draft")
+    last_test_status = Column(String, nullable=False, default="Not Tested")
+    last_test_message = Column(Text)
+    refresh_mode = Column(String, nullable=False, default="Manual refresh")
+    destination_module = Column(String, nullable=False, default="Inventory")
+    selected_assets = Column(JSON, nullable=False, default=list)
+    selected_columns = Column(JSON, nullable=False, default=list)
+    field_mappings = Column(JSON, nullable=False, default=list)
+    validation_results = Column(JSON, nullable=False, default=list)
+    created_by = Column(String, nullable=False, default="system")
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class DataHubTransformRecipe(Base):
+    __tablename__ = "datahub_transform_recipes"
+
+    id = Column(String, primary_key=True)
+    company_id = Column(String, index=True, nullable=False)
+    connection_id = Column(String, index=True, nullable=False)
+    recipe_name = Column(String, nullable=False)
+    operations = Column(JSON, nullable=False, default=list)
+    preview_rows = Column(JSON, nullable=False, default=list)
+    created_by = Column(String, nullable=False, default="system")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class DataHubModelRelationship(Base):
+    __tablename__ = "datahub_model_relationships"
+
+    id = Column(String, primary_key=True)
+    company_id = Column(String, index=True, nullable=False)
+    left_table = Column(String, nullable=False)
+    left_column = Column(String, nullable=False)
+    right_table = Column(String, nullable=False)
+    right_column = Column(String, nullable=False)
+    cardinality = Column(String, nullable=False, default="many-to-one")
+    direction = Column(String, nullable=False, default="single")
+    active = Column(Boolean, nullable=False, default=True)
+    created_by = Column(String, nullable=False, default="system")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class DataHubRefreshRun(Base):
+    __tablename__ = "datahub_refresh_runs"
+
+    id = Column(String, primary_key=True)
+    company_id = Column(String, index=True, nullable=False)
+    connection_id = Column(String, index=True, nullable=False)
+    refresh_mode = Column(String, nullable=False)
+    status = Column(String, nullable=False, default="Queued")
+    rows_processed = Column(Integer, nullable=False, default=0)
+    started_at = Column(String, nullable=False)
+    completed_at = Column(String)
+    failure_reason = Column(Text)
+
+
+class DataHubAuditEvent(Base):
+    __tablename__ = "datahub_audit_events"
+
+    id = Column(String, primary_key=True)
+    company_id = Column(String, index=True, nullable=False)
+    actor_email = Column(String, nullable=False)
+    action = Column(String, nullable=False)
+    entity_type = Column(String, nullable=False)
+    entity_id = Column(String, nullable=False)
+    details = Column(JSON, nullable=False, default=dict)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class DataHubErrorLog(Base):
+    __tablename__ = "datahub_error_logs"
+
+    id = Column(String, primary_key=True)
+    company_id = Column(String, index=True, nullable=False)
+    connection_id = Column(String, index=True, nullable=False)
+    severity = Column(String, nullable=False, default="Warning")
+    error_code = Column(String, nullable=False)
+    message = Column(Text, nullable=False)
+    resolution_hint = Column(Text)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
 class DataCatalogEntry(Base):
     __tablename__ = "data_catalog_entries"
 

@@ -12,7 +12,7 @@ import { StatCard } from '../components/StatCard';
 import { StatusBadge } from '../components/StatusBadge';
 import { canManagePlatform, canUseDataHubUploads } from '../lib/rbac';
 import { backend } from '../services/api';
-import type { Company, ConnectedSystem, DataCatalogEntry, DataMappingRule, RuntimeUser } from '../types';
+import type { Company, ConnectedSystem, DataCatalogEntry, DataMappingRule, GetDataCatalog, GetDataModel, GetDataPreview, GetDataSavedConnection, RuntimeUser } from '../types';
 
 const acceptedFormats = '.csv,.tsv,.xls,.xlsx,.xlsm,.json,.xml,.txt,.ods';
 
@@ -283,6 +283,19 @@ function PowerBiGetDataExperience({
   targetCompanyName,
   moduleFilter,
   onCreateDraft,
+  onTestConnection,
+  backendCatalog,
+  savedConnections,
+  selectedSavedConnection,
+  backendPreview,
+  backendModel,
+  refreshRows,
+  errorRows,
+  auditRows,
+  onSelectSavedConnection,
+  onRunRefresh,
+  onValidateMapping,
+  onDeleteSavedConnection,
 }: {
   selectedSource: DataSourceOption;
   selectedSourceValue: string;
@@ -300,10 +313,27 @@ function PowerBiGetDataExperience({
   targetCompanyName: string;
   moduleFilter: string;
   onCreateDraft: () => void;
+  onTestConnection: () => void;
+  backendCatalog?: GetDataCatalog;
+  savedConnections: GetDataSavedConnection[];
+  selectedSavedConnection?: GetDataSavedConnection;
+  backendPreview?: GetDataPreview;
+  backendModel?: GetDataModel;
+  refreshRows: Array<Record<string, unknown>>;
+  errorRows: Array<Record<string, unknown>>;
+  auditRows: Array<Record<string, unknown>>;
+  onSelectSavedConnection: (connectionId: string) => void;
+  onRunRefresh: () => void;
+  onValidateMapping: () => void;
+  onDeleteSavedConnection: (connectionId: string) => void;
 }) {
   const [sourceSearch, setSourceSearch] = useState('');
   const [sourceMenuOpen, setSourceMenuOpen] = useState(false);
   const visibleDestinations = destinationModules.filter((module) => !moduleFilter || module === moduleFilter);
+  const liveConnectorGroups = backendCatalog?.groups ?? [];
+  const liveConnectorCount = liveConnectorGroups.reduce((total, group) => total + group.connectors.length, 0);
+  const liveTransformOptions = backendCatalog?.transform_operations ?? transformOptions;
+  const liveRefreshOptions = backendCatalog?.refresh_modes ?? refreshOptions;
   const detailFields = connectionFieldsFor(selectedSource);
   const commonSourceValues = ['excel', 'sql_server', 'csv', 'web_url', 'odata', 'postgresql', 'google_sheets', 'manual_entry'];
   const commonSources = commonSourceValues
@@ -490,6 +520,67 @@ function PowerBiGetDataExperience({
         </div>
       </Panel>
 
+      <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+        <Panel title="Live Connector Catalog" description="Connector registry returned by the backend, grouped like Power BI Get Data.">
+          <div className="mb-4 flex flex-wrap gap-2">
+            <StatusBadge status={`${liveConnectorGroups.length} groups`} />
+            <StatusBadge status={`${liveConnectorCount} connectors`} />
+            <StatusBadge status={`${liveTransformOptions.length} transforms`} />
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            {liveConnectorGroups.map((group) => (
+              <div key={group.category} className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-white">{group.category}</p>
+                    <p className="mt-1 text-xs leading-5 text-slate-400">{group.description}</p>
+                  </div>
+                  <StatusBadge status={`${group.connectors.length}`} />
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {group.connectors.map((connector) => (
+                    <span key={connector.key} className="rounded-full border border-cyan-300/15 bg-cyan-400/8 px-3 py-1 text-xs text-cyan-50">
+                      {connector.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Panel>
+
+        <Panel title="Saved Connections" description="Manage credentials, source selections, refresh mode, and destination module from backend records.">
+          <div className="mb-4 grid gap-2">
+            {savedConnections.length ? savedConnections.slice(0, 5).map((connection) => (
+              <div key={connection.id} className={`rounded-2xl border p-3 ${selectedSavedConnection?.id === connection.id ? 'border-cyan-300/35 bg-cyan-400/12' : 'border-white/10 bg-white/[0.04]'}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <button type="button" className="text-left" onClick={() => onSelectSavedConnection(connection.id)}>
+                    <span className="block text-sm font-semibold text-white">{connection.connection_name}</span>
+                    <span className="mt-1 block text-xs text-slate-400">{connection.connector_name} {'->'} {connection.destination_module}</span>
+                  </button>
+                  <StatusBadge status={connection.status} />
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <StatusBadge status={connection.last_test_status} />
+                  <StatusBadge status={connection.refresh_mode} />
+                  <button type="button" className="rounded-full border border-red-300/20 bg-red-400/10 px-3 py-1 text-xs text-red-100" onClick={() => onDeleteSavedConnection(connection.id)}>
+                    Delete
+                  </button>
+                </div>
+              </div>
+            )) : (
+              <div className="rounded-2xl border border-dashed border-white/15 bg-white/[0.03] p-4 text-sm text-slate-400">
+                No saved Get Data connections yet. Select a source and create an import draft.
+              </div>
+            )}
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <button type="button" className="form-button-primary" disabled={!selectedSavedConnection} onClick={onRunRefresh}>Run Refresh</button>
+            <button type="button" className="form-button-subtle" disabled={!selectedSavedConnection} onClick={onValidateMapping}>Validate Mapping</button>
+          </div>
+        </Panel>
+      </div>
+
       <div className="grid gap-4 xl:grid-cols-[1fr_0.95fr]">
         <Panel title="Select Data Source" description={`Target client: ${targetCompanyName}. Search by source name, system type, file type, or authentication method.`}>
           <div className="mb-4 grid gap-3 md:grid-cols-[1fr_auto]">
@@ -558,7 +649,7 @@ function PowerBiGetDataExperience({
               ))}
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
-              <button className="form-button-primary" onClick={() => { setConnectionTested(true); setWizardStep(Math.max(wizardStep, 4)); }}>
+              <button className="form-button-primary" onClick={() => { onTestConnection(); setConnectionTested(true); setWizardStep(Math.max(wizardStep, 4)); }}>
                 Test Connection
               </button>
               <StatusBadge status={connectionTested ? 'Connection Tested' : 'Not Tested'} />
@@ -596,7 +687,7 @@ function PowerBiGetDataExperience({
 
         <Panel title="Clean and Transform" description="Select transformations to apply to the import draft. You can change these before approval.">
           <div className="grid gap-2 sm:grid-cols-2">
-            {transformOptions.map((option) => {
+            {liveTransformOptions.map((option) => {
               const selected = selectedTransforms.includes(option);
               return (
                 <button key={option} type="button" className={`rounded-2xl border px-3 py-2 text-left text-sm transition ${selected ? 'border-cyan-300/35 bg-cyan-400/12 text-cyan-50' : 'border-white/10 bg-white/[0.04] text-slate-400 hover:text-white'}`} onClick={() => setSelectedTransforms(selected ? selectedTransforms.filter((item) => item !== option) : [...selectedTransforms, option])}>
@@ -652,12 +743,95 @@ function PowerBiGetDataExperience({
             <label className="block text-sm font-medium text-slate-300">
               Refresh mode
               <select className={`${selectClass} mt-1 w-full`} value={selectedRefresh} onChange={(event) => setSelectedRefresh(event.target.value)}>
-                {refreshOptions.map((mode) => <option key={mode}>{mode}</option>)}
+                {liveRefreshOptions.map((mode) => <option key={mode}>{mode}</option>)}
               </select>
             </label>
             <button className="form-button-primary w-full" onClick={onCreateDraft}>Create Import Draft</button>
             <button className="form-button-subtle w-full" onClick={() => setWizardStep(10)}>Send for Approval</button>
           </div>
+        </Panel>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
+        <Panel title="Backend Preview and Type Detection" description="Preview rows and inferred data types returned by the Get Data API before loading.">
+          {backendPreview ? (
+            <>
+              <div className="mb-4 flex flex-wrap gap-2">
+                {backendPreview.detected_types.map((item) => (
+                  <StatusBadge key={item.column} status={`${item.column}: ${item.detected_type}`} />
+                ))}
+              </div>
+              <DataTable
+                rows={backendPreview.rows}
+                emptyTitle="No backend preview rows"
+                columns={backendPreview.columns.map((column) => ({ key: column, label: column.replaceAll('_', ' ') }))}
+              />
+            </>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-white/15 bg-white/[0.03] p-4 text-sm text-slate-400">Save/select a connection to fetch backend preview rows.</div>
+          )}
+        </Panel>
+
+        <Panel title="Data Model" description="Power BI-style model area with tables, columns, measures, calculated columns, keys, and relationships.">
+          <div className="space-y-3">
+            {(backendModel?.tables ?? []).slice(0, 4).map((table) => (
+              <div key={`${table.source}-${table.table}`} className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-white">{table.table}</p>
+                    <p className="mt-1 text-xs text-slate-400">{table.source}</p>
+                  </div>
+                  <StatusBadge status={`PK: ${table.primary_key}`} />
+                </div>
+                <p className="mt-3 text-xs leading-5 text-slate-300">{table.columns.join(', ')}</p>
+              </div>
+            ))}
+            {(backendModel?.relationships ?? []).slice(0, 3).map((relationship) => (
+              <div key={String(relationship.id)} className="rounded-2xl border border-cyan-300/15 bg-cyan-400/8 p-3 text-sm text-cyan-50">
+                {String(relationship.left_table)}.{String(relationship.left_column)} {'->'} {String(relationship.right_table)}.{String(relationship.right_column)}
+              </div>
+            ))}
+            {!backendModel?.tables?.length ? <p className="text-sm text-slate-400">No model yet. Select assets on a saved connection to build the model.</p> : null}
+          </div>
+        </Panel>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-3">
+        <Panel title="Refresh History" description="Manual, scheduled, incremental, webhook and failed refresh outcomes.">
+          <DataTable
+            rows={refreshRows.slice(0, 6)}
+            emptyTitle="No backend refresh runs"
+            columns={[
+              { key: 'refresh_mode', label: 'Mode' },
+              { key: 'status', label: 'Status', render: (value) => <StatusBadge status={String(value)} /> },
+              { key: 'rows_processed', label: 'Rows' },
+              { key: 'failure_reason', label: 'Failure Reason' },
+            ]}
+          />
+        </Panel>
+        <Panel title="Error Logs" description="Failed connection tests and refresh problems include clear reasons and next steps.">
+          <DataTable
+            rows={errorRows.slice(0, 6)}
+            emptyTitle="No backend error logs"
+            columns={[
+              { key: 'severity', label: 'Severity', render: (value) => <StatusBadge status={String(value)} /> },
+              { key: 'error_code', label: 'Code' },
+              { key: 'message', label: 'Message' },
+              { key: 'resolution_hint', label: 'Resolution' },
+            ]}
+          />
+        </Panel>
+        <Panel title="Audit Trail" description="Every connector, preview, transform, mapping and refresh action is tracked.">
+          <DataTable
+            rows={auditRows.slice(0, 6)}
+            emptyTitle="No backend audit events"
+            columns={[
+              { key: 'actor_email', label: 'Actor' },
+              { key: 'action', label: 'Action' },
+              { key: 'entity_type', label: 'Entity' },
+              { key: 'created_at', label: 'Time' },
+            ]}
+          />
         </Panel>
       </div>
     </div>
@@ -686,6 +860,7 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
   const [selectedRefresh, setSelectedRefresh] = useState('One-time import');
   const [connectionTested, setConnectionTested] = useState(false);
   const [selectedModuleFilter, setSelectedModuleFilter] = useState('');
+  const [selectedGetDataConnectionId, setSelectedGetDataConnectionId] = useState('');
   const [selectedCompanyId, setSelectedCompanyId] = useState(user.company_id ?? '');
   const [sourceCategory, setSourceCategory] = useState('erp');
   const [catalogSourceCategory, setCatalogSourceCategory] = useState('erp');
@@ -730,7 +905,7 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
     sync_mode: 'manual',
     auth_method: 'OAuth2',
   });
-  const [companies, systems, quality, readiness, catalog, mappings, uploads] = useQueries({
+  const [companies, systems, quality, readiness, catalog, mappings, uploads, getDataCatalog, getDataConnections, getDataModel, getDataRefreshHistory, getDataErrors, getDataAudit] = useQueries({
     queries: [
       { queryKey: ['companies'], queryFn: backend.companies },
       { queryKey: ['connected-systems'], queryFn: backend.connectedSystems },
@@ -739,6 +914,12 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
       { queryKey: ['data-catalog'], queryFn: backend.dataCatalog },
       { queryKey: ['data-mappings'], queryFn: backend.dataMappings },
       { queryKey: ['datahub-uploads'], queryFn: backend.uploads },
+      { queryKey: ['get-data-catalog'], queryFn: backend.getDataConnectors },
+      { queryKey: ['get-data-connections'], queryFn: backend.getDataSavedConnections },
+      { queryKey: ['get-data-model'], queryFn: backend.getDataModel },
+      { queryKey: ['get-data-refresh-history'], queryFn: backend.getDataRefreshHistory },
+      { queryKey: ['get-data-errors'], queryFn: backend.getDataErrors },
+      { queryKey: ['get-data-audit'], queryFn: backend.getDataAudit },
     ],
   });
 
@@ -749,6 +930,17 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
   const activeCatalogSource = getSourceConfig(catalogSourceCategory);
   const activeDomain = getDomain(newCatalogEntry.data_type);
   const selectedPowerSource = flatPowerBiSources.find((source) => source.value === selectedSourceValue) ?? flatPowerBiSources[0];
+  const getDataConnectionRows = getDataConnections.data ?? [];
+  const selectedGetDataConnection = getDataConnectionRows.find((connection) => connection.id === selectedGetDataConnectionId) ?? getDataConnectionRows[0];
+  const getDataPreview = useQueries({
+    queries: [
+      {
+        queryKey: ['get-data-preview', selectedGetDataConnection?.id],
+        queryFn: () => backend.getDataPreview(selectedGetDataConnection?.id ?? ''),
+        enabled: Boolean(selectedGetDataConnection?.id),
+      },
+    ],
+  })[0];
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['connected-systems'] });
@@ -757,6 +949,12 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
     queryClient.invalidateQueries({ queryKey: ['data-catalog'] });
     queryClient.invalidateQueries({ queryKey: ['data-mappings'] });
     queryClient.invalidateQueries({ queryKey: ['datahub-uploads'] });
+    queryClient.invalidateQueries({ queryKey: ['get-data-connections'] });
+    queryClient.invalidateQueries({ queryKey: ['get-data-model'] });
+    queryClient.invalidateQueries({ queryKey: ['get-data-refresh-history'] });
+    queryClient.invalidateQueries({ queryKey: ['get-data-errors'] });
+    queryClient.invalidateQueries({ queryKey: ['get-data-audit'] });
+    queryClient.invalidateQueries({ queryKey: ['get-data-preview'] });
   };
 
   const createConnection = useMutation({
@@ -823,6 +1021,32 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
       invalidate();
     },
   });
+  const createGetDataConnection = useMutation({
+    mutationFn: backend.createGetDataConnection,
+    onSuccess: (connection) => {
+      setSelectedGetDataConnectionId(connection.id);
+      setConnectionTested(true);
+      invalidate();
+    },
+  });
+  const deleteGetDataConnection = useMutation({
+    mutationFn: backend.deleteGetDataConnection,
+    onSuccess: () => {
+      setSelectedGetDataConnectionId('');
+      invalidate();
+    },
+  });
+  const testGetDataConnection = useMutation({
+    mutationFn: backend.testGetDataConnection,
+    onSuccess: () => {
+      setConnectionTested(true);
+      setWizardStep(Math.max(wizardStep, 4));
+      invalidate();
+    },
+  });
+  const runGetDataRefresh = useMutation({ mutationFn: backend.runGetDataRefresh, onSuccess: invalidate });
+  const validateGetDataMapping = useMutation({ mutationFn: backend.validateGetDataMapping, onSuccess: invalidate });
+  const transformGetDataPreview = useMutation({ mutationFn: backend.transformGetDataPreview, onSuccess: invalidate });
 
   const uploadRows = useMemo(() => uploads.data ?? [], [uploads.data]);
   const uploadPreview = useMemo(() => uploadRows[0]?.metadata?.preview?.sample_rows ?? [], [uploadRows]);
@@ -830,11 +1054,11 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
   const catalogRows = catalog.data ?? [];
   const mappingRows = mappings.data ?? [];
 
-  if ([companies, systems, quality, readiness, catalog, mappings, uploads].some((query) => query.isLoading)) {
+  if ([companies, systems, quality, readiness, catalog, mappings, uploads, getDataCatalog, getDataConnections, getDataModel, getDataRefreshHistory, getDataErrors, getDataAudit].some((query) => query.isLoading)) {
     return <LoadingState label="Loading company-scoped Manufacturing Data Hub responses" />;
   }
 
-  const firstError = [companies, systems, quality, readiness, catalog, mappings, uploads].find((query) => query.isError)?.error;
+  const firstError = [companies, systems, quality, readiness, catalog, mappings, uploads, getDataCatalog, getDataConnections, getDataModel, getDataRefreshHistory, getDataErrors, getDataAudit].find((query) => query.isError)?.error;
   if (firstError) {
     return <ErrorState error={firstError} title="Manufacturing Data Hub integration failed" />;
   }
@@ -912,6 +1136,83 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
     setNewCatalogEntry((current) => ({ ...current, company_id: companyId }));
     setNewMapping((current) => ({ ...current, company_id: companyId }));
     setCloudSource((current) => ({ ...current, company_id: companyId }));
+  }
+
+  function defaultGetDataDetails(source: DataSourceOption) {
+    const base: Record<string, unknown> = {
+      file_name: `${source.value}_sample.xlsx`,
+      file_name_or_url: `https://example.local/${source.value}`,
+      delimiter: ',',
+      folder_path: '/exports/monthly',
+      host: `${source.value}.metam.local`,
+      database: 'metam_operational',
+      service_name: 'METAM',
+      connection_string: 'masked://connection-string',
+      site_url: 'https://tenant.sharepoint.com/sites/operations',
+      spreadsheet_url: 'https://docs.google.com/spreadsheets/demo',
+      resource_url: 'https://storage.example.local/export',
+      base_url: 'https://api.example.local/v1',
+      url: 'https://example.local/table',
+      feed_url: 'https://sap.example.local/odata',
+      system_url: `https://${source.value}.example.local`,
+    };
+    return { ...base, source_description: source.description, connector_type: source.connectorType };
+  }
+
+  function getDataPayload() {
+    return {
+      company_id: targetCompanyId,
+      connector_key: selectedPowerSource.value,
+      connector_name: selectedPowerSource.label,
+      connector_category: selectedPowerSource.group,
+      connection_name: `${targetCompany?.code ?? 'CLIENT'} ${selectedPowerSource.label} ${selectedDestination}`,
+      auth_method: selectedPowerSource.auth,
+      connection_details: defaultGetDataDetails(selectedPowerSource),
+      credentials: {
+        username: 'readonly.integration',
+        api_key: 'sample-api-key-for-masked-storage',
+        password: 'sample-password-for-masked-storage',
+      },
+      refresh_mode: selectedRefresh,
+      destination_module: selectedDestination,
+    };
+  }
+
+  function createGetDataDraft() {
+    createGetDataConnection.mutate(getDataPayload());
+    setWizardStep(10);
+  }
+
+  function testSelectedGetDataConnection() {
+    testGetDataConnection.mutate(getDataPayload());
+  }
+
+  function runSelectedRefresh() {
+    const connectionId = selectedGetDataConnection?.id;
+    if (!connectionId) return;
+    runGetDataRefresh.mutate({ company_id: targetCompanyId, connection_id: connectionId, refresh_mode: selectedRefresh });
+  }
+
+  function validateSelectedMapping() {
+    if (selectedGetDataConnection?.id) {
+      transformGetDataPreview.mutate({
+        company_id: targetCompanyId,
+        connection_id: selectedGetDataConnection.id,
+        recipe_name: `${selectedPowerSource.label} Power Query Draft`,
+        operations: selectedTransforms.map((operation) => ({ operation })),
+      });
+    }
+    validateGetDataMapping.mutate({
+      company_id: targetCompanyId,
+      connection_id: selectedGetDataConnection?.id,
+      destination_module: selectedDestination,
+      mappings: [
+        { source_field: 'item_code', target_field: 'item_code', data_type: 'Text' },
+        { source_field: 'item_name', target_field: 'item_name', data_type: 'Text' },
+        { source_field: 'quantity', target_field: 'quantity', data_type: 'Whole number' },
+        { source_field: 'status', target_field: 'status', data_type: 'Text' },
+      ],
+    });
   }
 
   return (
@@ -1009,26 +1310,20 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
           setConnectionTested={setConnectionTested}
           targetCompanyName={targetCompany?.name ?? targetCompanyId}
           moduleFilter={selectedModuleFilter}
-          onCreateDraft={() => {
-            createConnection.mutate({
-              ...newConnection,
-              company_id: targetCompanyId,
-              system_name: newConnection.system_name || `${selectedPowerSource.label} connector`,
-              system_type: selectedPowerSource.connectorType,
-              source_category: selectedPowerSource.group,
-              auth_method: selectedPowerSource.auth,
-              connection_status: connectionTested ? 'Tested - Draft' : 'Draft',
-              connection_details: {
-                selected_source: selectedPowerSource.label,
-                selected_group: selectedPowerSource.group,
-                destination_module: selectedDestination,
-                refresh_mode: selectedRefresh,
-                transformations: selectedTransforms.join(', '),
-                credentials: 'masked',
-                import_policy: 'approval_required',
-              },
-            });
-          }}
+          onTestConnection={testSelectedGetDataConnection}
+          onCreateDraft={createGetDataDraft}
+          backendCatalog={getDataCatalog.data}
+          savedConnections={getDataConnectionRows}
+          selectedSavedConnection={selectedGetDataConnection}
+          backendPreview={getDataPreview.data}
+          backendModel={getDataModel.data}
+          refreshRows={(getDataRefreshHistory.data ?? []) as Array<Record<string, unknown>>}
+          errorRows={(getDataErrors.data ?? []) as Array<Record<string, unknown>>}
+          auditRows={(getDataAudit.data ?? []) as Array<Record<string, unknown>>}
+          onSelectSavedConnection={setSelectedGetDataConnectionId}
+          onRunRefresh={runSelectedRefresh}
+          onValidateMapping={validateSelectedMapping}
+          onDeleteSavedConnection={(connectionId) => deleteGetDataConnection.mutate(connectionId)}
         />
       ) : null}
 
