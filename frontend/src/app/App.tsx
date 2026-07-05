@@ -24,6 +24,7 @@ import { canAccessSection } from '../lib/rbac';
 import { apiConfig, backend } from '../services/api';
 import type { RuntimeUser } from '../types';
 import { PlatformProvider, usePlatform } from '../platform/PlatformContext';
+import type { PlatformClient } from '../platform/types';
 
 const AdminCenterPage = lazy(() => import('../pages/AdminCenterPage').then((module) => ({ default: module.AdminCenterPage })));
 const DataHubPage = lazy(() => import('../pages/DataHubPage').then((module) => ({ default: module.DataHubPage })));
@@ -68,6 +69,91 @@ const platformNavItems = [
   { to: '/data-hub', label: 'Data Hub', icon: DatabaseZap },
   { to: '/admin/performance', label: 'Performance', icon: Activity },
 ];
+
+function ClientContextSelector({
+  clients,
+  selectedClientId,
+  canSelectPlatform,
+  platformUserClientId,
+  onSelect,
+}: {
+  clients: PlatformClient[];
+  selectedClientId: string | null;
+  canSelectPlatform: boolean;
+  platformUserClientId?: string | null;
+  onSelect: (clientId: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const availableClients = clients.filter((client) => canSelectPlatform || client.clientId === platformUserClientId);
+  const normalizedSearch = search.trim().toLowerCase();
+  const filteredClients = availableClients.filter((client) =>
+    !normalizedSearch || `${client.clientName} ${client.clientId} ${client.market} ${client.region}`.toLowerCase().includes(normalizedSearch));
+  const selectedClient = clients.find((client) => client.clientId === selectedClientId);
+
+  return (
+    <div className="relative w-[min(260px,72vw)]">
+      <button
+        type="button"
+        className="form-input flex w-full items-center justify-between gap-3 py-1.5 text-left text-sm"
+        onClick={() => setOpen((value) => !value)}
+      >
+        <span className="truncate">{selectedClient?.clientName ?? 'Platform View'}</span>
+        <span className="text-slate-400">v</span>
+      </button>
+      {open ? (
+        <div className="absolute left-0 top-[calc(100%+6px)] z-50 w-[min(360px,86vw)] rounded-2xl border border-cyan-300/25 bg-slate-950/95 p-3 shadow-[0_24px_80px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+          <input
+            className="form-input w-full py-2 text-sm"
+            placeholder="Search clients..."
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            autoFocus
+          />
+          <div className="mt-2 max-h-64 overflow-y-auto pr-1 [scrollbar-color:rgba(34,211,238,0.55)_rgba(255,255,255,0.05)]">
+            {canSelectPlatform && (!normalizedSearch || 'platform view'.includes(normalizedSearch)) ? (
+              <button
+                type="button"
+                className={`flex w-full flex-col rounded-xl px-3 py-2 text-left transition ${
+                  selectedClientId === null ? 'bg-cyan-400/18 text-white' : 'text-slate-300 hover:bg-white/8 hover:text-white'
+                }`}
+                onClick={() => {
+                  onSelect(null);
+                  setOpen(false);
+                  setSearch('');
+                }}
+              >
+                <span className="font-semibold">Platform View</span>
+                <span className="text-xs text-slate-500">All clients / platform administration</span>
+              </button>
+            ) : null}
+            {filteredClients.map((client) => (
+              <button
+                key={client.clientId}
+                type="button"
+                className={`flex w-full flex-col rounded-xl px-3 py-2 text-left transition ${
+                  client.clientId === selectedClientId ? 'bg-cyan-400/18 text-white' : 'text-slate-300 hover:bg-white/8 hover:text-white'
+                }`}
+                onClick={() => {
+                  onSelect(client.clientId);
+                  setOpen(false);
+                  setSearch('');
+                }}
+              >
+                <span className="font-semibold">{client.clientName}</span>
+                <span className="text-xs text-slate-500">{client.clientId} · {client.region} / {client.market}</span>
+              </button>
+            ))}
+            {!filteredClients.length && (!canSelectPlatform || normalizedSearch !== 'platform view') ? (
+              <div className="rounded-xl border border-amber-300/20 bg-amber-400/10 p-3 text-sm text-amber-100">No clients matched.</div>
+            ) : null}
+          </div>
+          <div className="mt-2 text-xs text-slate-500">{filteredClients.length} of {availableClients.length} clients</div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 export function App() {
   const baseUrl = useMemo(() => apiConfig.baseUrl, []);
@@ -175,23 +261,20 @@ function AuthenticatedApp({ user, onLogout }: { user: RuntimeUser; onLogout: () 
                 <Menu className="h-4 w-4" />
               </button>
               <div className="min-w-0">
-                <select
-                  className="form-input max-w-[260px] py-1.5 text-sm"
-                  value={selectedClientId ?? 'platform'}
-                  onChange={(event) => {
-                    const value = event.target.value;
-                    if (value === 'platform') {
-                      selectClient(null);
+                <ClientContextSelector
+                  clients={state.clients}
+                  selectedClientId={selectedClientId}
+                  canSelectPlatform={canSelectPlatform}
+                  platformUserClientId={platformUser.clientId}
+                  onSelect={(clientId) => {
+                    selectClient(clientId);
+                    if (clientId === null) {
                       navigate('/platform');
                       return;
                     }
-                    selectClient(value);
                     if (location.pathname.startsWith('/platform')) navigate('/');
                   }}
-                >
-                  {canSelectPlatform ? <option value="platform">Platform View</option> : null}
-                  {state.clients.filter((client) => canSelectPlatform || client.clientId === platformUser.clientId).map((client) => <option key={client.clientId} value={client.clientId}>{client.clientName}</option>)}
-                </select>
+                />
                 <p className="hidden truncate text-xs text-slate-400 sm:block">{isPlatformContext ? 'Platform Context · USD' : `${selectedClient?.clientId} · ${selectedClient?.currency}`}</p>
               </div>
             </div>

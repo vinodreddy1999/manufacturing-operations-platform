@@ -1,4 +1,4 @@
-import { FormEvent, useMemo, useRef, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query';
 import { Cable, CheckCircle2, Database, Gauge, KeyRound, RadioTower, Route, ShieldCheck, Trash2, UploadCloud } from 'lucide-react';
 
@@ -250,31 +250,91 @@ function companyIdForPlatformClient(client: PlatformClient, backendCompanies: Co
   return byCode?.id ?? `company-${code.toLowerCase()}`;
 }
 
-function mergeBackendAndPlatformCompanies(backendCompanies: Company[], platformClients: PlatformClient[]) {
-  const merged = [...backendCompanies];
-  const seenIds = new Set(merged.map((company) => company.id));
-  const seenNames = new Set(merged.map((company) => normalizeCompanyName(company.name)));
-  for (const client of platformClients) {
-    const id = companyIdForPlatformClient(client, backendCompanies);
-    const normalizedName = normalizeCompanyName(client.clientName);
-    if (seenIds.has(id) || seenNames.has(normalizedName)) continue;
-    merged.push({
-      id,
+function platformCompanies(backendCompanies: Company[], platformClients: PlatformClient[]) {
+  return platformClients
+    .map((client) => ({
+      id: companyIdForPlatformClient(client, backendCompanies),
       tenant_id: 'tenant-demo-001',
       name: client.clientName,
       code: platformClientCode(client),
       is_active: client.status !== 'Suspended',
       created_at: client.createdDate,
-    });
-    seenIds.add(id);
-    seenNames.add(normalizedName);
-  }
-  return merged.sort((first, second) => first.name.localeCompare(second.name));
+    }))
+    .sort((first, second) => first.name.localeCompare(second.name));
+}
+
+function visibleDataHubCompanies(backendCompanies: Company[], platformClients: PlatformClient[]) {
+  if (platformClients.length) return platformCompanies(backendCompanies, platformClients);
+  return backendCompanies.sort((first, second) => first.name.localeCompare(second.name));
 }
 
 function meanScore(values: number[]) {
   if (!values.length) return 0;
   return Math.round((values.reduce((total, value) => total + value, 0) / values.length) * 100) / 100;
+}
+
+function CompanySearchSelect({
+  companies,
+  selectedCompanyId,
+  onChange,
+}: {
+  companies: Company[];
+  selectedCompanyId: string;
+  onChange: (companyId: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const activeCompany = companies.find((company) => company.id === selectedCompanyId);
+  const normalizedSearch = search.trim().toLowerCase();
+  const filteredCompanies = companies.filter((company) =>
+    !normalizedSearch || `${company.name} ${company.code}`.toLowerCase().includes(normalizedSearch));
+
+  return (
+    <div className="relative mt-3">
+      <button
+        type="button"
+        className={`${selectClass} flex w-full items-center justify-between gap-3 text-left`}
+        onClick={() => setOpen((value) => !value)}
+      >
+        <span className="truncate">{activeCompany ? `${activeCompany.name} (${activeCompany.code})` : 'Select client'}</span>
+        <span className="text-slate-400">v</span>
+      </button>
+      {open ? (
+        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-40 rounded-2xl border border-cyan-300/25 bg-slate-950/95 p-3 shadow-[0_24px_80px_rgba(0,0,0,0.42)] backdrop-blur-xl">
+          <input
+            className={`${inputClass} w-full`}
+            placeholder="Search clients..."
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            autoFocus
+          />
+          <div className="mt-2 max-h-64 overflow-y-auto pr-1 [scrollbar-color:rgba(34,211,238,0.55)_rgba(255,255,255,0.05)]">
+            {filteredCompanies.map((company) => (
+              <button
+                key={company.id}
+                type="button"
+                className={`flex w-full flex-col rounded-xl px-3 py-2 text-left transition ${
+                  company.id === selectedCompanyId ? 'bg-cyan-400/18 text-white' : 'text-slate-300 hover:bg-white/8 hover:text-white'
+                }`}
+                onClick={() => {
+                  onChange(company.id);
+                  setOpen(false);
+                  setSearch('');
+                }}
+              >
+                <span className="font-semibold">{company.name}</span>
+                <span className="text-xs text-slate-500">{company.code}</span>
+              </button>
+            ))}
+            {!filteredCompanies.length ? (
+              <div className="rounded-xl border border-amber-300/20 bg-amber-400/10 p-3 text-sm text-amber-100">No clients matched.</div>
+            ) : null}
+          </div>
+          <div className="mt-2 text-xs text-slate-500">{filteredCompanies.length} of {companies.length} clients</div>
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 function CompanySelector({
@@ -301,16 +361,10 @@ function CompanySelector({
 
   return (
     <div className="rounded-[24px] border border-cyan-300/15 bg-cyan-400/8 p-4 shadow-[0_18px_60px_rgba(8,145,178,0.12)]">
-      <label className="text-xs uppercase tracking-[0.22em] text-cyan-100">Super Admin target company</label>
-      <select className={`${selectClass} mt-3 w-full`} value={selectedCompanyId} onChange={(event) => onChange(event.target.value)}>
-        {companies.map((company) => (
-          <option key={company.id} value={company.id}>
-            {company.name} ({company.code})
-          </option>
-        ))}
-      </select>
+      <label className="text-xs uppercase tracking-[0.22em] text-cyan-100">Super Admin target client</label>
+      <CompanySearchSelect companies={companies} selectedCompanyId={selectedCompanyId} onChange={onChange} />
       <p className="mt-2 text-sm text-slate-300">
-        New connected systems, catalog entries, mappings, uploads, and cloud links will be added to this selected company.
+        This follows Platform View clients. DataHub will sync the backend company record before saving data.
       </p>
     </div>
   );
@@ -1545,7 +1599,7 @@ function connectionProfileFor(source: DataSourceOption): ConnectionProfile {
 
 export function DataHubPage({ user }: { user: RuntimeUser }) {
   const queryClient = useQueryClient();
-  const { state: platformState } = usePlatform();
+  const { state: platformState, selectedClient: platformSelectedClient } = usePlatform();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const canUpload = canUseDataHubUploads(user);
   const [isDragging, setIsDragging] = useState(false);
@@ -1622,10 +1676,11 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
 
   const backendCompanyRows = useMemo(() => companies.data ?? [], [companies.data]);
   const companyRows = useMemo(
-    () => mergeBackendAndPlatformCompanies(backendCompanyRows, platformState.clients),
+    () => visibleDataHubCompanies(backendCompanyRows, platformState.clients),
     [backendCompanyRows, platformState.clients],
   );
-  const targetCompanyId = selectedCompanyId || user.company_id || companyRows[0]?.id || '';
+  const platformSelectedCompanyId = platformSelectedClient ? companyIdForPlatformClient(platformSelectedClient, backendCompanyRows) : '';
+  const targetCompanyId = selectedCompanyId || platformSelectedCompanyId || user.company_id || companyRows[0]?.id || '';
   const targetCompany = companyRows.find((company) => company.id === targetCompanyId);
   const activeSource = getSourceConfig(sourceCategory);
   const activeCatalogSource = getSourceConfig(catalogSourceCategory);
@@ -1655,6 +1710,12 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
       },
     ],
   })[0];
+
+  useEffect(() => {
+    if (platformSelectedCompanyId && platformSelectedCompanyId !== selectedCompanyId) {
+      changeTargetCompany(platformSelectedCompanyId);
+    }
+  }, [platformSelectedCompanyId, selectedCompanyId]);
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['companies'] });
