@@ -11,6 +11,8 @@ import { Panel } from '../components/Panel';
 import { StatCard } from '../components/StatCard';
 import { StatusBadge } from '../components/StatusBadge';
 import { canManagePlatform, canUseDataHubUploads } from '../lib/rbac';
+import { usePlatform } from '../platform/PlatformContext';
+import type { PlatformClient } from '../platform/types';
 import { backend } from '../services/api';
 import type { Company, ConnectedSystem, DataCatalogEntry, DataMappingRule, GetDataCatalog, GetDataModel, GetDataPreview, GetDataSavedConnection, RuntimeUser } from '../types';
 
@@ -225,6 +227,49 @@ function getSourceConfig(value: string) {
 
 function getDomain(value: string) {
   return dataDomains.find((domain) => domain.value === value) ?? dataDomains[0];
+}
+
+function normalizeCompanyName(value: string) {
+  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function platformClientCode(client: PlatformClient) {
+  return client.clientName
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40) || client.clientId.replace(/[^A-Z0-9]+/gi, '-').toUpperCase();
+}
+
+function companyIdForPlatformClient(client: PlatformClient, backendCompanies: Company[]) {
+  const byName = backendCompanies.find((company) => normalizeCompanyName(company.name) === normalizeCompanyName(client.clientName));
+  if (byName) return byName.id;
+  const code = platformClientCode(client);
+  const byCode = backendCompanies.find((company) => company.code.toUpperCase() === code);
+  return byCode?.id ?? `company-${code.toLowerCase()}`;
+}
+
+function mergeBackendAndPlatformCompanies(backendCompanies: Company[], platformClients: PlatformClient[]) {
+  const merged = [...backendCompanies];
+  const seenIds = new Set(merged.map((company) => company.id));
+  const seenNames = new Set(merged.map((company) => normalizeCompanyName(company.name)));
+  for (const client of platformClients) {
+    const id = companyIdForPlatformClient(client, backendCompanies);
+    const normalizedName = normalizeCompanyName(client.clientName);
+    if (seenIds.has(id) || seenNames.has(normalizedName)) continue;
+    merged.push({
+      id,
+      tenant_id: 'tenant-demo-001',
+      name: client.clientName,
+      code: platformClientCode(client),
+      is_active: client.status !== 'Suspended',
+      created_at: client.createdDate,
+    });
+    seenIds.add(id);
+    seenNames.add(normalizedName);
+  }
+  return merged.sort((first, second) => first.name.localeCompare(second.name));
 }
 
 function CompanySelector({
@@ -1495,6 +1540,7 @@ function connectionProfileFor(source: DataSourceOption): ConnectionProfile {
 
 export function DataHubPage({ user }: { user: RuntimeUser }) {
   const queryClient = useQueryClient();
+  const { state: platformState } = usePlatform();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const canUpload = canUseDataHubUploads(user);
   const [isDragging, setIsDragging] = useState(false);
@@ -1569,7 +1615,11 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
     ],
   });
 
-  const companyRows = companies.data ?? [];
+  const backendCompanyRows = useMemo(() => companies.data ?? [], [companies.data]);
+  const companyRows = useMemo(
+    () => mergeBackendAndPlatformCompanies(backendCompanyRows, platformState.clients),
+    [backendCompanyRows, platformState.clients],
+  );
   const targetCompanyId = selectedCompanyId || user.company_id || companyRows[0]?.id || '';
   const targetCompany = companyRows.find((company) => company.id === targetCompanyId);
   const activeSource = getSourceConfig(sourceCategory);
@@ -1589,6 +1639,7 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
   })[0];
 
   const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ['companies'] });
     queryClient.invalidateQueries({ queryKey: ['connected-systems'] });
     queryClient.invalidateQueries({ queryKey: ['data-quality'] });
     queryClient.invalidateQueries({ queryKey: ['ai-readiness'] });
@@ -1602,6 +1653,20 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
     queryClient.invalidateQueries({ queryKey: ['get-data-audit'] });
     queryClient.invalidateQueries({ queryKey: ['get-data-preview'] });
   };
+
+  async function ensureTargetCompanyExists(companyId = targetCompanyId) {
+    if (!companyId || backendCompanyRows.some((company) => company.id === companyId)) return companyId;
+    const company = companyRows.find((item) => item.id === companyId);
+    if (!company) return companyId;
+    try {
+      await backend.createCompany({ name: company.name, code: company.code });
+      queryClient.invalidateQueries({ queryKey: ['companies'] });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!message.includes('409')) throw error;
+    }
+    return companyId;
+  }
 
   const createConnection = useMutation({
     mutationFn: backend.createConnectedSystem,
@@ -1732,11 +1797,12 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
     ));
   }
 
-  function submitConnection(event: FormEvent<HTMLFormElement>) {
+  async function submitConnection(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const companyId = await ensureTargetCompanyExists();
     createConnection.mutate({
       ...newConnection,
-      company_id: targetCompanyId,
+      company_id: companyId,
       system_type: activeSource.defaultSystemType,
       source_category: activeSource.label,
       auth_method: newConnection.auth_method ?? activeSource.authMethods[0],
@@ -1744,11 +1810,12 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
     });
   }
 
-  function submitCatalog(event: FormEvent<HTMLFormElement>) {
+  async function submitCatalog(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const companyId = await ensureTargetCompanyExists();
     createCatalog.mutate({
       ...newCatalogEntry,
-      company_id: targetCompanyId,
+      company_id: companyId,
       lineage: {
         ...newCatalogEntry.lineage,
         source_category: activeCatalogSource.label,
@@ -1761,19 +1828,22 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
     });
   }
 
-  function submitMapping(event: FormEvent<HTMLFormElement>) {
+  async function submitMapping(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    createMapping.mutate({ ...newMapping, company_id: targetCompanyId });
+    const companyId = await ensureTargetCompanyExists();
+    createMapping.mutate({ ...newMapping, company_id: companyId });
   }
 
-  function submitCloudSource(event: FormEvent<HTMLFormElement>) {
+  async function submitCloudSource(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    createCloudSource.mutate({ ...cloudSource, company_id: targetCompanyId, connection_details: cloudDetails });
+    const companyId = await ensureTargetCompanyExists();
+    createCloudSource.mutate({ ...cloudSource, company_id: companyId, connection_details: cloudDetails });
   }
 
-  function handleFiles(fileList: FileList | null) {
+  async function handleFiles(fileList: FileList | null) {
     if (!fileList?.length || !canUpload) return;
-    uploadFile.mutate({ file: fileList[0], companyId: targetCompanyId });
+    const companyId = await ensureTargetCompanyExists();
+    uploadFile.mutate({ file: fileList[0], companyId });
   }
 
   function changeTargetCompany(companyId: string) {
@@ -1805,9 +1875,9 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
     return { ...base, source_description: source.description, connector_type: source.connectorType };
   }
 
-  function getDataPayload() {
+  function getDataPayload(companyId = targetCompanyId) {
     return {
-      company_id: targetCompanyId,
+      company_id: companyId,
       connector_key: selectedPowerSource.value,
       connector_name: selectedPowerSource.label,
       connector_category: selectedPowerSource.group,
@@ -1824,32 +1894,36 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
     };
   }
 
-  function createGetDataDraft() {
-    createGetDataConnection.mutate(getDataPayload());
+  async function createGetDataDraft() {
+    const companyId = await ensureTargetCompanyExists();
+    createGetDataConnection.mutate(getDataPayload(companyId));
     setWizardStep(10);
   }
 
-  function testSelectedGetDataConnection() {
-    testGetDataConnection.mutate(getDataPayload());
+  async function testSelectedGetDataConnection() {
+    const companyId = await ensureTargetCompanyExists();
+    testGetDataConnection.mutate(getDataPayload(companyId));
   }
 
-  function runSelectedRefresh() {
+  async function runSelectedRefresh() {
     const connectionId = selectedGetDataConnection?.id;
     if (!connectionId) return;
-    runGetDataRefresh.mutate({ company_id: targetCompanyId, connection_id: connectionId, refresh_mode: selectedRefresh });
+    const companyId = await ensureTargetCompanyExists();
+    runGetDataRefresh.mutate({ company_id: companyId, connection_id: connectionId, refresh_mode: selectedRefresh });
   }
 
-  function validateSelectedMapping() {
+  async function validateSelectedMapping() {
+    const companyId = await ensureTargetCompanyExists();
     if (selectedGetDataConnection?.id) {
       transformGetDataPreview.mutate({
-        company_id: targetCompanyId,
+        company_id: companyId,
         connection_id: selectedGetDataConnection.id,
         recipe_name: `${selectedPowerSource.label} Power Query Draft`,
         operations: selectedTransforms.map((operation) => ({ operation })),
       });
     }
     validateGetDataMapping.mutate({
-      company_id: targetCompanyId,
+      company_id: companyId,
       connection_id: selectedGetDataConnection?.id,
       destination_module: selectedDestination,
       mappings: [
