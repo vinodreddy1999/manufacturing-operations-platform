@@ -272,6 +272,11 @@ function mergeBackendAndPlatformCompanies(backendCompanies: Company[], platformC
   return merged.sort((first, second) => first.name.localeCompare(second.name));
 }
 
+function meanScore(values: number[]) {
+  if (!values.length) return 0;
+  return Math.round((values.reduce((total, value) => total + value, 0) / values.length) * 100) / 100;
+}
+
 function CompanySelector({
   companies,
   selectedCompanyId,
@@ -1625,8 +1630,21 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
   const activeSource = getSourceConfig(sourceCategory);
   const activeCatalogSource = getSourceConfig(catalogSourceCategory);
   const activeDomain = getDomain(newCatalogEntry.data_type);
+  const isTargetCompanyRecord = useMemo(() => {
+    const targetName = normalizeCompanyName(targetCompany?.name ?? '');
+    return (row: { company_id?: string | null; company_name?: string | null }) => {
+      if (!targetCompanyId) return true;
+      if (row.company_id === targetCompanyId) return true;
+      if (targetName && row.company_name && normalizeCompanyName(row.company_name) === targetName) return true;
+      return false;
+    };
+  }, [targetCompany?.name, targetCompanyId]);
   const selectedPowerSource = flatPowerBiSources.find((source) => source.value === selectedSourceValue) ?? flatPowerBiSources[0];
-  const getDataConnectionRows = getDataConnections.data ?? [];
+  const allGetDataConnectionRows = useMemo(() => getDataConnections.data ?? [], [getDataConnections.data]);
+  const getDataConnectionRows = useMemo(
+    () => allGetDataConnectionRows.filter(isTargetCompanyRecord),
+    [allGetDataConnectionRows, isTargetCompanyRecord],
+  );
   const selectedGetDataConnection = getDataConnectionRows.find((connection) => connection.id === selectedGetDataConnectionId) ?? getDataConnectionRows[0];
   const getDataPreview = useQueries({
     queries: [
@@ -1759,11 +1777,38 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
   const validateGetDataMapping = useMutation({ mutationFn: backend.validateGetDataMapping, onSuccess: invalidate });
   const transformGetDataPreview = useMutation({ mutationFn: backend.transformGetDataPreview, onSuccess: invalidate });
 
-  const uploadRows = useMemo(() => uploads.data ?? [], [uploads.data]);
+  const uploadRows = useMemo(() => (uploads.data ?? []).filter(isTargetCompanyRecord), [isTargetCompanyRecord, uploads.data]);
   const uploadPreview = useMemo(() => uploadRows[0]?.metadata?.preview?.sample_rows ?? [], [uploadRows]);
-  const rows = systems.data ?? [];
-  const catalogRows = catalog.data ?? [];
-  const mappingRows = mappings.data ?? [];
+  const rows = useMemo(() => (systems.data ?? []).filter(isTargetCompanyRecord), [isTargetCompanyRecord, systems.data]);
+  const catalogRows = useMemo(() => (catalog.data ?? []).filter(isTargetCompanyRecord), [catalog.data, isTargetCompanyRecord]);
+  const mappingRows = useMemo(() => (mappings.data ?? []).filter(isTargetCompanyRecord), [isTargetCompanyRecord, mappings.data]);
+  const scopedQualityScore = useMemo(() => meanScore(catalogRows.map((row) => Number(row.quality_score) || 0)), [catalogRows]);
+  const scopedAiReadinessScore = useMemo(
+    () => meanScore(catalogRows.map((row) => (row.ai_ready ? Number(row.quality_score) || 0 : Math.min(Number(row.quality_score) || 0, 50)))),
+    [catalogRows],
+  );
+  const refreshRows = useMemo(
+    () => ((getDataRefreshHistory.data ?? []) as Array<Record<string, unknown>>).filter((row) => isTargetCompanyRecord(row as { company_id?: string | null; company_name?: string | null })),
+    [getDataRefreshHistory.data, isTargetCompanyRecord],
+  );
+  const errorRows = useMemo(
+    () => ((getDataErrors.data ?? []) as Array<Record<string, unknown>>).filter((row) => isTargetCompanyRecord(row as { company_id?: string | null; company_name?: string | null })),
+    [getDataErrors.data, isTargetCompanyRecord],
+  );
+  const auditRows = useMemo(
+    () => ((getDataAudit.data ?? []) as Array<Record<string, unknown>>).filter((row) => isTargetCompanyRecord(row as { company_id?: string | null; company_name?: string | null })),
+    [getDataAudit.data, isTargetCompanyRecord],
+  );
+  const scopedGetDataModel = useMemo(() => {
+    const model = getDataModel.data;
+    if (!model) return undefined;
+    const scopedConnectionNames = new Set(getDataConnectionRows.map((connection) => connection.connection_name));
+    return {
+      ...model,
+      tables: model.tables.filter((table) => scopedConnectionNames.has(table.source)),
+      relationships: model.relationships.filter((relationship) => isTargetCompanyRecord(relationship as { company_id?: string | null; company_name?: string | null })),
+    };
+  }, [getDataConnectionRows, getDataModel.data, isTargetCompanyRecord]);
 
   if ([companies, systems, quality, readiness, catalog, mappings, uploads, getDataCatalog, getDataConnections, getDataModel, getDataRefreshHistory, getDataErrors, getDataAudit].some((query) => query.isLoading)) {
     return <LoadingState label="Loading company-scoped Manufacturing Data Hub responses" />;
@@ -1961,8 +2006,8 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
         <CompanySelector companies={companyRows} selectedCompanyId={targetCompanyId} user={user} onChange={changeTargetCompany} />
         <div className="grid gap-4 md:grid-cols-3">
           <StatCard label="Connected Systems" value={rows.length} helper="Persisted company integrations" icon={<Database className="h-5 w-5" />} accent="blue" />
-          <StatCard label="Data Quality" value={`${quality.data?.overall_score ?? 0}%`} helper="Computed from catalog entries" icon={<Gauge className="h-5 w-5" />} accent="amber" />
-          <StatCard label="AI Readiness" value={`${readiness.data?.overall_ai_readiness ?? 0}%`} helper="Catalog readiness score" icon={<RadioTower className="h-5 w-5" />} accent="violet" />
+          <StatCard label="Data Quality" value={`${scopedQualityScore}%`} helper={`Computed from ${catalogRows.length} selected-client catalog entries`} icon={<Gauge className="h-5 w-5" />} accent="amber" />
+          <StatCard label="AI Readiness" value={`${scopedAiReadinessScore}%`} helper="Selected-client catalog readiness score" icon={<RadioTower className="h-5 w-5" />} accent="violet" />
         </div>
       </div>
 
@@ -2036,10 +2081,10 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
           savedConnections={getDataConnectionRows}
           selectedSavedConnection={selectedGetDataConnection}
           backendPreview={getDataPreview.data}
-          backendModel={getDataModel.data}
-          refreshRows={(getDataRefreshHistory.data ?? []) as Array<Record<string, unknown>>}
-          errorRows={(getDataErrors.data ?? []) as Array<Record<string, unknown>>}
-          auditRows={(getDataAudit.data ?? []) as Array<Record<string, unknown>>}
+          backendModel={scopedGetDataModel}
+          refreshRows={refreshRows}
+          errorRows={errorRows}
+          auditRows={auditRows}
           onSelectSavedConnection={setSelectedGetDataConnectionId}
           onRunRefresh={runSelectedRefresh}
           onValidateMapping={validateSelectedMapping}
