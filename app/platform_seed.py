@@ -37,6 +37,11 @@ MODULE_KEYS = [
 
 COMPANY_SEEDS = [
     ("company-c", "Company C", "CO-C", "plant-north", "North Plant", "PLANT-NORTH", "dept-ops", "Operations", "OPS"),
+    ("company-abc-manufacturing", "ABC Manufacturing", "ABC-MANUFACTURING", "plant-abc-manufacturing-001", "Plant A", "ABC-MFG-A", "dept-abc-ops", "ABC Manufacturing Operations", "ABC-OPS"),
+    ("company-green-valley-foods", "Green Valley Foods", "GREEN-VALLEY-FOODS", "plant-green-valley-foods-001", "Plant A", "GVF-A", "dept-green-ops", "Green Valley Operations", "GVF-OPS"),
+    ("company-europack-industries", "EuroPack Industries", "EUROPACK-INDUSTRIES", "plant-europack-industries-001", "Plant A", "EPI-A", "dept-europack-ops", "EuroPack Operations", "EPI-OPS"),
+    ("company-gulf-plastics", "Gulf Plastics", "GULF-PLASTICS", "plant-gulf-plastics-001", "Plant A", "GP-A", "dept-gulf-ops", "Gulf Plastics Operations", "GP-OPS"),
+    ("company-brittech-components", "BritTech Components", "BRITTECH-COMPONENTS", "plant-brittech-components-001", "Plant A", "BTC-A", "dept-brittech-ops", "BritTech Operations", "BTC-OPS"),
     ("company-apex", "Apex Components Ltd", "APEX", "plant-apex-hyd", "Apex Hyderabad Plant", "APEX-HYD", "dept-apex-ops", "Apex Operations", "APX-OPS"),
     ("company-nova", "Nova Textiles Pvt Ltd", "NOVA", "plant-nova-srt", "Nova Surat Mill", "NOVA-SRT", "dept-nova-prod", "Nova Production", "NOV-PROD"),
     ("company-fresh", "FreshFoods Processing Co", "FRESH", "plant-fresh-pune", "FreshFoods Pune Plant", "FRESH-PUNE", "dept-fresh-qa", "FreshFoods Quality", "FR-QA"),

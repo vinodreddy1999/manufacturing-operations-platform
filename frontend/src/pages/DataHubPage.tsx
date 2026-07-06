@@ -370,6 +370,97 @@ function CompanySelector({
   );
 }
 
+type DataHubPlantOption = {
+  plantId: string;
+  plantName: string;
+  status: string;
+};
+
+function PlantSearchSelect({
+  plants,
+  selectedPlantId,
+  onChange,
+}: {
+  plants: DataHubPlantOption[];
+  selectedPlantId: string;
+  onChange: (plantId: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const activePlant = plants.find((plant) => plant.plantId === selectedPlantId) ?? plants[0];
+  const normalizedSearch = search.trim().toLowerCase();
+  const filteredPlants = plants.filter((plant) =>
+    !normalizedSearch || `${plant.plantName} ${plant.plantId} ${plant.status}`.toLowerCase().includes(normalizedSearch));
+
+  return (
+    <div className="relative mt-3">
+      <button
+        type="button"
+        className={`${selectClass} flex w-full items-center justify-between gap-3 text-left`}
+        onClick={() => setOpen((value) => !value)}
+        disabled={!plants.length}
+      >
+        <span className="truncate">{activePlant ? `${activePlant.plantName} (${activePlant.plantId})` : 'No plants available'}</span>
+        <span className="text-slate-400">v</span>
+      </button>
+      {open ? (
+        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-30 rounded-2xl border border-cyan-300/25 bg-slate-950/95 p-3 shadow-[0_24px_80px_rgba(0,0,0,0.42)] backdrop-blur-xl">
+          <input
+            className={`${inputClass} w-full`}
+            placeholder="Search plants..."
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            autoFocus
+          />
+          <div className="mt-2 max-h-48 overflow-y-auto pr-1 [scrollbar-color:rgba(34,211,238,0.55)_rgba(255,255,255,0.05)]">
+            {filteredPlants.map((plant) => (
+              <button
+                key={plant.plantId}
+                type="button"
+                className={`flex w-full flex-col rounded-xl px-3 py-2 text-left transition ${
+                  plant.plantId === selectedPlantId ? 'bg-cyan-400/18 text-white' : 'text-slate-300 hover:bg-white/8 hover:text-white'
+                }`}
+                onClick={() => {
+                  onChange(plant.plantId);
+                  setOpen(false);
+                  setSearch('');
+                }}
+              >
+                <span className="font-semibold">{plant.plantName}</span>
+                <span className="text-xs text-slate-500">{plant.plantId} · {plant.status}</span>
+              </button>
+            ))}
+            {!filteredPlants.length ? (
+              <div className="rounded-xl border border-amber-300/20 bg-amber-400/10 p-3 text-sm text-amber-100">No plants matched.</div>
+            ) : null}
+          </div>
+          <div className="mt-2 text-xs text-slate-500">{filteredPlants.length} of {plants.length} plants</div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function PlantSelector({
+  plants,
+  selectedPlantId,
+  onChange,
+}: {
+  plants: DataHubPlantOption[];
+  selectedPlantId: string;
+  onChange: (plantId: string) => void;
+}) {
+  return (
+    <div className="rounded-[24px] border border-white/10 bg-white/6 p-4">
+      <label className="text-xs uppercase tracking-[0.22em] text-slate-400">Target plant</label>
+      <PlantSearchSelect plants={plants} selectedPlantId={selectedPlantId} onChange={onChange} />
+      <p className="mt-2 text-sm text-slate-300">
+        Plant context is saved with catalog, mapping, preview, and import draft metadata.
+      </p>
+    </div>
+  );
+}
+
 function PowerBiGetDataExperience({
   selectedSource,
   selectedSourceValue,
@@ -1613,6 +1704,7 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
   const [selectedModuleFilter, setSelectedModuleFilter] = useState('');
   const [selectedGetDataConnectionId, setSelectedGetDataConnectionId] = useState('');
   const [selectedCompanyId, setSelectedCompanyId] = useState(user.company_id ?? '');
+  const [selectedPlantId, setSelectedPlantId] = useState('');
   const [sourceCategory, setSourceCategory] = useState('erp');
   const [catalogSourceCategory, setCatalogSourceCategory] = useState('erp');
   const [catalogFormat, setCatalogFormat] = useState('xlsx');
@@ -1682,6 +1774,16 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
   const platformSelectedCompanyId = platformSelectedClient ? companyIdForPlatformClient(platformSelectedClient, backendCompanyRows) : '';
   const targetCompanyId = selectedCompanyId || platformSelectedCompanyId || user.company_id || companyRows[0]?.id || '';
   const targetCompany = companyRows.find((company) => company.id === targetCompanyId);
+  const targetPlatformClient = platformState.clients.find((client) => companyIdForPlatformClient(client, backendCompanyRows) === targetCompanyId || normalizeCompanyName(client.clientName) === normalizeCompanyName(targetCompany?.name ?? ''));
+  const targetPlantOptions = useMemo<DataHubPlantOption[]>(() => {
+    const platformPlants = targetPlatformClient?.plants ?? [];
+    if (platformPlants.length) return platformPlants;
+    return [
+      { plantId: `${targetCompany?.code ?? 'CLIENT'}-PLT-001`, plantName: 'Plant A', status: 'Active' },
+      { plantId: `${targetCompany?.code ?? 'CLIENT'}-PLT-002`, plantName: 'Plant B', status: 'Active' },
+    ];
+  }, [targetCompany?.code, targetPlatformClient?.plants]);
+  const targetPlant = targetPlantOptions.find((plant) => plant.plantId === selectedPlantId) ?? targetPlantOptions[0];
   const activeSource = getSourceConfig(sourceCategory);
   const activeCatalogSource = getSourceConfig(catalogSourceCategory);
   const activeDomain = getDomain(newCatalogEntry.data_type);
@@ -1716,6 +1818,12 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
       changeTargetCompany(platformSelectedCompanyId);
     }
   }, [platformSelectedCompanyId, selectedCompanyId]);
+
+  useEffect(() => {
+    if (targetPlantOptions.length && !targetPlantOptions.some((plant) => plant.plantId === selectedPlantId)) {
+      setSelectedPlantId(targetPlantOptions[0].plantId);
+    }
+  }, [selectedPlantId, targetPlantOptions]);
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['companies'] });
@@ -1929,6 +2037,8 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
         auth_method: catalogAuthMethod,
         routing_target: activeDomain.route,
         routing_description: activeDomain.description,
+        plant_id: targetPlant?.plantId,
+        plant_name: targetPlant?.plantName,
         required_connection: catalogDetails,
       },
     });
@@ -1954,6 +2064,7 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
 
   function changeTargetCompany(companyId: string) {
     setSelectedCompanyId(companyId);
+    setSelectedPlantId('');
     setNewConnection((current) => ({ ...current, company_id: companyId }));
     setNewCatalogEntry((current) => ({ ...current, company_id: companyId }));
     setNewMapping((current) => ({ ...current, company_id: companyId }));
@@ -1989,7 +2100,11 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
       connector_category: selectedPowerSource.group,
       connection_name: `${targetCompany?.code ?? 'CLIENT'} ${selectedPowerSource.label} ${selectedDestination}`,
       auth_method: selectedPowerSource.auth,
-      connection_details: defaultGetDataDetails(selectedPowerSource),
+      connection_details: {
+        ...defaultGetDataDetails(selectedPowerSource),
+        plant_id: targetPlant?.plantId,
+        plant_name: targetPlant?.plantName,
+      },
       credentials: {
         username: 'readonly.integration',
         api_key: 'sample-api-key-for-masked-storage',
@@ -2049,9 +2164,10 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
         description={`Target client: ${targetCompany?.name ?? targetCompanyId}. Use one guided flow to connect, preview, clean, map, validate, and create an approval-safe import draft.`}
       />
 
-      <div className="mb-5 grid gap-3 md:grid-cols-4">
+      <div className="mb-5 grid gap-3 md:grid-cols-5">
         {[
           ['Choose client', targetCompany?.name ?? targetCompanyId],
+          ['Choose plant', targetPlant?.plantName ?? 'Select plant'],
           ['Pick source', selectedPowerSource.label],
           ['Route to module', selectedDestination],
           ['Approval safety', connectionTested ? 'Ready for draft' : 'Test connection first'],
@@ -2063,8 +2179,9 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
         ))}
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+      <div className="grid gap-4 xl:grid-cols-[0.9fr_0.75fr_1.1fr]">
         <CompanySelector companies={companyRows} selectedCompanyId={targetCompanyId} user={user} onChange={changeTargetCompany} />
+        <PlantSelector plants={targetPlantOptions} selectedPlantId={targetPlant?.plantId ?? ''} onChange={setSelectedPlantId} />
         <div className="grid gap-4 md:grid-cols-3">
           <StatCard label="Connected Systems" value={rows.length} helper="Persisted company integrations" icon={<Database className="h-5 w-5" />} accent="blue" />
           <StatCard label="Data Quality" value={`${scopedQualityScore}%`} helper={`Computed from ${catalogRows.length} selected-client catalog entries`} icon={<Gauge className="h-5 w-5" />} accent="amber" />
