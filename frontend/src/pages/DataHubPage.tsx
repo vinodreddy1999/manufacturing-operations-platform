@@ -273,6 +273,30 @@ function meanScore(values: number[]) {
   return Math.round((values.reduce((total, value) => total + value, 0) / values.length) * 100) / 100;
 }
 
+function readRecord(value: unknown) {
+  return value && typeof value === 'object' ? value as Record<string, unknown> : {};
+}
+
+function dataHubPlantTokens(row: Record<string, unknown>) {
+  const lineage = readRecord(row.lineage);
+  const metadata = readRecord(row.metadata);
+  const connectionDetails = readRecord(row.connection_details);
+  const metadataConnectionDetails = readRecord(metadata.connection_details);
+  return [
+    row.plant_id,
+    row.plant_name,
+    lineage.plant_id,
+    lineage.plant,
+    lineage.plant_name,
+    metadata.plant_id,
+    metadata.plant_name,
+    metadataConnectionDetails.plant_id,
+    metadataConnectionDetails.plant_name,
+    connectionDetails.plant_id,
+    connectionDetails.plant_name,
+  ].filter((value): value is string => typeof value === 'string' && value.trim().length > 0);
+}
+
 function CompanySearchSelect({
   companies,
   selectedCompanyId,
@@ -1796,11 +1820,21 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
       return false;
     };
   }, [targetCompany?.name, targetCompanyId]);
+  const isTargetPlantRecord = useMemo(() => {
+    const targetPlantId = targetPlant?.plantId ?? '';
+    const targetPlantName = normalizeCompanyName(targetPlant?.plantName ?? '');
+    return (row: Record<string, unknown>) => {
+      if (!targetPlantId && !targetPlantName) return true;
+      const tokens = dataHubPlantTokens(row);
+      if (!tokens.length) return true;
+      return tokens.some((token) => token === targetPlantId || normalizeCompanyName(token) === targetPlantName);
+    };
+  }, [targetPlant?.plantId, targetPlant?.plantName]);
   const selectedPowerSource = flatPowerBiSources.find((source) => source.value === selectedSourceValue) ?? flatPowerBiSources[0];
   const allGetDataConnectionRows = useMemo(() => getDataConnections.data ?? [], [getDataConnections.data]);
   const getDataConnectionRows = useMemo(
-    () => allGetDataConnectionRows.filter(isTargetCompanyRecord),
-    [allGetDataConnectionRows, isTargetCompanyRecord],
+    () => allGetDataConnectionRows.filter((row) => isTargetCompanyRecord(row) && isTargetPlantRecord(row as unknown as Record<string, unknown>)),
+    [allGetDataConnectionRows, isTargetCompanyRecord, isTargetPlantRecord],
   );
   const selectedGetDataConnection = getDataConnectionRows.find((connection) => connection.id === selectedGetDataConnectionId) ?? getDataConnectionRows[0];
   const getDataPreview = useQueries({
@@ -1910,7 +1944,10 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
   });
   const updateMapping = useMutation({ mutationFn: ({ id, payload }: { id: string; payload: Omit<DataMappingRule, 'id'> }) => backend.updateDataMapping(id, payload), onSuccess: invalidate });
   const deleteMapping = useMutation({ mutationFn: backend.deleteDataMapping, onSuccess: invalidate });
-  const uploadFile = useMutation({ mutationFn: ({ file, companyId }: { file: File; companyId?: string }) => backend.uploadFile(file, companyId), onSuccess: invalidate });
+  const uploadFile = useMutation({
+    mutationFn: ({ file, companyId, plant }: { file: File; companyId?: string; plant?: { plantId?: string; plantName?: string } }) => backend.uploadFile(file, companyId, plant),
+    onSuccess: invalidate,
+  });
   const createCloudSource = useMutation({
     mutationFn: backend.createCloudSource,
     onSuccess: () => {
@@ -1946,27 +1983,37 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
   const validateGetDataMapping = useMutation({ mutationFn: backend.validateGetDataMapping, onSuccess: invalidate });
   const transformGetDataPreview = useMutation({ mutationFn: backend.transformGetDataPreview, onSuccess: invalidate });
 
-  const uploadRows = useMemo(() => (uploads.data ?? []).filter(isTargetCompanyRecord), [isTargetCompanyRecord, uploads.data]);
+  const uploadRows = useMemo(
+    () => (uploads.data ?? []).filter((row) => isTargetCompanyRecord(row) && isTargetPlantRecord(row as Record<string, unknown>)),
+    [isTargetCompanyRecord, isTargetPlantRecord, uploads.data],
+  );
   const uploadPreview = useMemo(() => uploadRows[0]?.metadata?.preview?.sample_rows ?? [], [uploadRows]);
-  const rows = useMemo(() => (systems.data ?? []).filter(isTargetCompanyRecord), [isTargetCompanyRecord, systems.data]);
-  const catalogRows = useMemo(() => (catalog.data ?? []).filter(isTargetCompanyRecord), [catalog.data, isTargetCompanyRecord]);
+  const rows = useMemo(
+    () => (systems.data ?? []).filter((row) => isTargetCompanyRecord(row) && isTargetPlantRecord(row as unknown as Record<string, unknown>)),
+    [isTargetCompanyRecord, isTargetPlantRecord, systems.data],
+  );
+  const catalogRows = useMemo(
+    () => (catalog.data ?? []).filter((row) => isTargetCompanyRecord(row) && isTargetPlantRecord(row as unknown as Record<string, unknown>)),
+    [catalog.data, isTargetCompanyRecord, isTargetPlantRecord],
+  );
   const mappingRows = useMemo(() => (mappings.data ?? []).filter(isTargetCompanyRecord), [isTargetCompanyRecord, mappings.data]);
   const scopedQualityScore = useMemo(() => meanScore(catalogRows.map((row) => Number(row.quality_score) || 0)), [catalogRows]);
   const scopedAiReadinessScore = useMemo(
     () => meanScore(catalogRows.map((row) => (row.ai_ready ? Number(row.quality_score) || 0 : Math.min(Number(row.quality_score) || 0, 50)))),
     [catalogRows],
   );
+  const selectedPlantConnectionIds = useMemo(() => new Set(getDataConnectionRows.map((connection) => connection.id)), [getDataConnectionRows]);
   const refreshRows = useMemo(
-    () => ((getDataRefreshHistory.data ?? []) as Array<Record<string, unknown>>).filter((row) => isTargetCompanyRecord(row as { company_id?: string | null; company_name?: string | null })),
-    [getDataRefreshHistory.data, isTargetCompanyRecord],
+    () => ((getDataRefreshHistory.data ?? []) as Array<Record<string, unknown>>).filter((row) => isTargetCompanyRecord(row as { company_id?: string | null; company_name?: string | null }) && (!row.connection_id || selectedPlantConnectionIds.has(String(row.connection_id)))),
+    [getDataRefreshHistory.data, isTargetCompanyRecord, selectedPlantConnectionIds],
   );
   const errorRows = useMemo(
-    () => ((getDataErrors.data ?? []) as Array<Record<string, unknown>>).filter((row) => isTargetCompanyRecord(row as { company_id?: string | null; company_name?: string | null })),
-    [getDataErrors.data, isTargetCompanyRecord],
+    () => ((getDataErrors.data ?? []) as Array<Record<string, unknown>>).filter((row) => isTargetCompanyRecord(row as { company_id?: string | null; company_name?: string | null }) && (!row.connection_id || selectedPlantConnectionIds.has(String(row.connection_id)))),
+    [getDataErrors.data, isTargetCompanyRecord, selectedPlantConnectionIds],
   );
   const auditRows = useMemo(
-    () => ((getDataAudit.data ?? []) as Array<Record<string, unknown>>).filter((row) => isTargetCompanyRecord(row as { company_id?: string | null; company_name?: string | null })),
-    [getDataAudit.data, isTargetCompanyRecord],
+    () => ((getDataAudit.data ?? []) as Array<Record<string, unknown>>).filter((row) => isTargetCompanyRecord(row as { company_id?: string | null; company_name?: string | null }) && (!row.entity_id || selectedPlantConnectionIds.has(String(row.entity_id)) || dataHubPlantTokens(row).length === 0)),
+    [getDataAudit.data, isTargetCompanyRecord, selectedPlantConnectionIds],
   );
   const scopedGetDataModel = useMemo(() => {
     const model = getDataModel.data;
@@ -2020,7 +2067,11 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
       system_type: activeSource.defaultSystemType,
       source_category: activeSource.label,
       auth_method: newConnection.auth_method ?? activeSource.authMethods[0],
-      connection_details: connectionDetails,
+      connection_details: {
+        ...connectionDetails,
+        plant_id: targetPlant?.plantId,
+        plant_name: targetPlant?.plantName,
+      },
     });
   }
 
@@ -2053,13 +2104,21 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
   async function submitCloudSource(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const companyId = await ensureTargetCompanyExists();
-    createCloudSource.mutate({ ...cloudSource, company_id: companyId, connection_details: cloudDetails });
+    createCloudSource.mutate({
+      ...cloudSource,
+      company_id: companyId,
+      connection_details: {
+        ...cloudDetails,
+        plant_id: targetPlant?.plantId,
+        plant_name: targetPlant?.plantName,
+      },
+    });
   }
 
   async function handleFiles(fileList: FileList | null) {
     if (!fileList?.length || !canUpload) return;
     const companyId = await ensureTargetCompanyExists();
-    uploadFile.mutate({ file: fileList[0], companyId });
+    uploadFile.mutate({ file: fileList[0], companyId, plant: { plantId: targetPlant?.plantId, plantName: targetPlant?.plantName } });
   }
 
   function changeTargetCompany(companyId: string) {
@@ -2161,7 +2220,7 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
       <PageHeader
         eyebrow="Data Integration Hub"
         title="Get data, transform it, and send it to modules"
-        description={`Target client: ${targetCompany?.name ?? targetCompanyId}. Use one guided flow to connect, preview, clean, map, validate, and create an approval-safe import draft.`}
+        description={`Target client: ${targetCompany?.name ?? targetCompanyId}; plant: ${targetPlant?.plantName ?? 'All plants'}. Use one guided flow to connect, preview, clean, map, validate, and create an approval-safe import draft.`}
       />
 
       <div className="mb-5 grid gap-3 md:grid-cols-5">
@@ -2184,8 +2243,8 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
         <PlantSelector plants={targetPlantOptions} selectedPlantId={targetPlant?.plantId ?? ''} onChange={setSelectedPlantId} />
         <div className="grid gap-4 md:grid-cols-3">
           <StatCard label="Connected Systems" value={rows.length} helper="Persisted company integrations" icon={<Database className="h-5 w-5" />} accent="blue" />
-          <StatCard label="Data Quality" value={`${scopedQualityScore}%`} helper={`Computed from ${catalogRows.length} selected-client catalog entries`} icon={<Gauge className="h-5 w-5" />} accent="amber" />
-          <StatCard label="AI Readiness" value={`${scopedAiReadinessScore}%`} helper="Selected-client catalog readiness score" icon={<RadioTower className="h-5 w-5" />} accent="violet" />
+          <StatCard label="Data Quality" value={`${scopedQualityScore}%`} helper={`Computed from ${catalogRows.length} selected plant catalog entries`} icon={<Gauge className="h-5 w-5" />} accent="amber" />
+          <StatCard label="AI Readiness" value={`${scopedAiReadinessScore}%`} helper="Selected plant catalog readiness score" icon={<RadioTower className="h-5 w-5" />} accent="violet" />
         </div>
       </div>
 

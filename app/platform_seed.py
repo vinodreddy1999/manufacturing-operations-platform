@@ -386,6 +386,20 @@ def seed_platform(db: Session) -> None:
                     record_count=24000,
                 )
             )
+        upsert_metadata(
+            db,
+            category="datahub_connection_details",
+            record_key=f"conn-{company_id}-erp",
+            row_id=f"details-conn-{company_id}-erp",
+            company_id=company_id,
+            payload={
+                "connection_id": f"conn-{company_id}-erp",
+                "source_category": "ERP",
+                "auth_method": "Database credentials",
+                "connection_details": {"plant_id": plant_id, "plant_name": plant_name},
+            },
+            name=f"{company_name} ERP",
+        )
         if not db.query(ManufacturingDataConnection).filter(ManufacturingDataConnection.id == f"conn-{company_id}-mes").first():
             db.add(
                 ManufacturingDataConnection(
@@ -399,6 +413,20 @@ def seed_platform(db: Session) -> None:
                     record_count=8200,
                 )
             )
+        upsert_metadata(
+            db,
+            category="datahub_connection_details",
+            record_key=f"conn-{company_id}-mes",
+            row_id=f"details-conn-{company_id}-mes",
+            company_id=company_id,
+            payload={
+                "connection_id": f"conn-{company_id}-mes",
+                "source_category": "MES",
+                "auth_method": "Database credentials",
+                "connection_details": {"plant_id": plant_id, "plant_name": plant_name},
+            },
+            name=f"{company_name} MES",
+        )
         if not db.query(DataCatalogEntry).filter(DataCatalogEntry.id == f"catalog-{company_id}-inventory").first():
             db.add(
                 DataCatalogEntry(

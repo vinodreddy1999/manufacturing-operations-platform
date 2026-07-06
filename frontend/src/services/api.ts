@@ -195,11 +195,17 @@ export const backend = {
     return response.data.data;
   },
   uploads: () => getEnvelope<DataHubUpload[]>('/manufacturing-data-hub/uploads'),
-  uploadFile: async (file: File, companyId?: string) => {
+  uploadFile: async (file: File, companyId?: string, plant?: { plantId?: string; plantName?: string }) => {
     const form = new FormData();
     form.append('file', file);
     if (companyId) {
       form.append('company_id', companyId);
+    }
+    if (plant?.plantId) {
+      form.append('plant_id', plant.plantId);
+    }
+    if (plant?.plantName) {
+      form.append('plant_name', plant.plantName);
     }
     const response = await api.post<ApiEnvelope<DataHubUpload>>('/manufacturing-data-hub/uploads', form, {
       headers: { 'Content-Type': 'multipart/form-data' },

@@ -209,7 +209,27 @@ def extract_upload_preview(filename: str, content: bytes) -> dict[str, Any]:
     return preview
 
 
-def serialize_connection(row: frontend_admin_models.ManufacturingDataConnection, companies: dict[str, str] | None = None) -> dict[str, Any]:
+def connection_details_map(db: Session, connection_ids: list[str]) -> dict[str, dict[str, Any]]:
+    if not connection_ids:
+        return {}
+    rows = (
+        db.query(AppMetadata)
+        .filter(
+            AppMetadata.tenant_id == "tenant-demo-001",
+            AppMetadata.category == "datahub_connection_details",
+            AppMetadata.record_key.in_(connection_ids),
+        )
+        .all()
+    )
+    return {row.record_key: row.payload or {} for row in rows}
+
+
+def serialize_connection(
+    row: frontend_admin_models.ManufacturingDataConnection,
+    companies: dict[str, str] | None = None,
+    details: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    detail_payload = details or {}
     return {
         "id": row.id,
         "company_id": row.company_id,
@@ -220,6 +240,9 @@ def serialize_connection(row: frontend_admin_models.ManufacturingDataConnection,
         "last_sync": row.last_sync,
         "health_score": row.health_score,
         "record_count": row.record_count,
+        "source_category": detail_payload.get("source_category"),
+        "auth_method": detail_payload.get("auth_method"),
+        "connection_details": detail_payload.get("connection_details", {}),
     }
 
 
@@ -1032,7 +1055,8 @@ def connected_systems(
         query = query.filter(frontend_admin_models.ManufacturingDataConnection.company_id == company_id)
     rows = query.order_by(frontend_admin_models.ManufacturingDataConnection.system_name).all()
     companies = company_name_map(db)
-    return result("connected_systems", "Connected systems with status, sync, health and record count.", [serialize_connection(row, companies) for row in rows])
+    details = connection_details_map(db, [row.id for row in rows])
+    return result("connected_systems", "Connected systems with status, sync, health and record count.", [serialize_connection(row, companies, details.get(row.id)) for row in rows])
 
 
 @data_hub_router.post("/connected-systems", response_model=FrontendAdminApiResult)
@@ -1074,7 +1098,8 @@ def create_connected_system(
             name=row.system_name,
         )
         db.commit()
-    return result("create_connected_system", "Connected system created for the selected company.", serialize_connection(row, company_name_map(db)))
+    details = connection_details_map(db, [row.id])
+    return result("create_connected_system", "Connected system created for the selected company.", serialize_connection(row, company_name_map(db), details.get(row.id)))
 
 
 @data_hub_router.put("/connected-systems/{connection_id}", response_model=FrontendAdminApiResult)
@@ -1117,7 +1142,8 @@ def update_connected_system(
         )
     db.commit()
     db.refresh(row)
-    return result("update_connected_system", "Connected system updated.", serialize_connection(row, company_name_map(db)))
+    details = connection_details_map(db, [row.id])
+    return result("update_connected_system", "Connected system updated.", serialize_connection(row, company_name_map(db), details.get(row.id)))
 
 
 @data_hub_router.delete("/connected-systems/{connection_id}", response_model=FrontendAdminApiResult)
@@ -1371,6 +1397,8 @@ def uploads(
 async def create_upload(
     file: UploadFile = File(...),
     company_id: str | None = Form(default=None),
+    plant_id: str | None = Form(default=None),
+    plant_name: str | None = Form(default=None),
     actor: User = Depends(require_executive_editor),
     db: Session = Depends(get_db),
 ) -> FrontendAdminApiResult:
@@ -1389,6 +1417,8 @@ async def create_upload(
             "content_type": file.content_type,
             "size_bytes": len(content),
             "preview": preview,
+            "plant_id": plant_id,
+            "plant_name": plant_name,
         },
     )
     upsert_metadata(
