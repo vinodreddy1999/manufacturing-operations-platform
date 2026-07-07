@@ -3,12 +3,16 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 
 import { LazyBarChart, LazyLineChart } from '../components/LazyCharts';
+import { ModuleFilterSelect } from '../components/ModuleFilterSelect';
 import { PageHeader } from '../components/PageHeader';
 import { Panel } from '../components/Panel';
+import { ReportExportButtons } from '../components/ReportExportButtons';
+import { RowActions } from '../components/RowActions';
 import { ScrollableTableFrame } from '../components/ScrollableTableFrame';
 import { StatCard } from '../components/StatCard';
 import { StatusBadge } from '../components/StatusBadge';
 import { formatCurrency } from '../lib/format';
+import { applyModuleFilters, type ModuleFilterValues } from '../lib/moduleFilters';
 import {
   adjustments,
   agingBuckets,
@@ -114,34 +118,55 @@ function InventorySectionContent({ section }: { section: InventorySection }) {
 }
 
 function InventoryDashboard() {
-  const totalValue = inventoryItems.reduce((sum, item) => sum + item.value, 0);
-  const available = inventoryItems.reduce((sum, item) => sum + item.availableQty, 0);
-  const reserved = inventoryItems.reduce((sum, item) => sum + item.reservedQty, 0);
-  const deadValue = deadStock.reduce((sum, item) => sum + item.value, 0);
-  const slowValue = slowMoving.reduce((sum, item) => sum + item.inventoryValue, 0);
-  const stockoutRisk = reorderRules.filter((item) => ['Critical', 'Stockout'].includes(item.status)).length;
+  const [filters, setFilters] = useState<ModuleFilterValues>({});
+  const filteredItems = useMemo(
+    () => applyModuleFilters(inventoryItems, filters, { Plant: 'plant', Warehouse: 'warehouse', Product: 'name', Category: 'category' }),
+    [filters],
+  );
+  const filteredDeadStock = useMemo(
+    () => deadStock.filter((item) => (!filters.Warehouse || item.warehouse === filters.Warehouse) && (!filters.Product || item.item === filters.Product)),
+    [filters],
+  );
+  const filteredSlowMoving = useMemo(
+    () => slowMoving.filter((item) => (!filters.Product || item.item === filters.Product)),
+    [filters],
+  );
+  const filteredReorderRules = useMemo(
+    () => reorderRules.filter((item) => !filters.Product || item.item === filters.Product),
+    [filters],
+  );
+  const totalValue = filteredItems.reduce((sum, item) => sum + item.value, 0);
+  const available = filteredItems.reduce((sum, item) => sum + item.availableQty, 0);
+  const reserved = filteredItems.reduce((sum, item) => sum + item.reservedQty, 0);
+  const deadValue = filteredDeadStock.reduce((sum, item) => sum + item.value, 0);
+  const slowValue = filteredSlowMoving.reduce((sum, item) => sum + item.inventoryValue, 0);
+  const stockoutRisk = filteredReorderRules.filter((item) => ['Critical', 'Stockout'].includes(item.status)).length;
+  const coverageDays = filteredItems.length
+    ? Math.round(filteredItems.reduce((sum, item) => sum + item.coverageDays, 0) / filteredItems.length)
+    : 0;
+
   return (
     <div className="space-y-5">
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <StatCard label="Total Inventory Value" value={formatCurrency(totalValue, inventoryCompany.currency)} helper="Company inventory value" accent="blue" />
+        <StatCard label="Total Inventory Value" value={formatCurrency(totalValue, inventoryCompany.currency)} helper="Filtered inventory value" accent="blue" />
         <StatCard label="Available Inventory" value={available.toLocaleString()} helper="Qty available" accent="emerald" />
         <StatCard label="Reserved Inventory" value={reserved.toLocaleString()} helper="Committed to demand" accent="amber" />
         <StatCard label="Inventory Accuracy" value="98.1%" helper="Cycle count weighted" accent="emerald" />
-        <StatCard label="Coverage Days" value="17" helper="Weighted coverage" accent="violet" />
+        <StatCard label="Coverage Days" value={coverageDays || '0'} helper="Filtered weighted coverage" accent="violet" />
         <StatCard label="Inventory Turns" value="8.4" helper="Annualized" accent="blue" />
         <StatCard label="Dead Stock Value" value={formatCurrency(deadValue, inventoryCompany.currency)} helper="No movement 180+ days" accent="amber" />
         <StatCard label="Slow Moving Value" value={formatCurrency(slowValue, inventoryCompany.currency)} helper="Low movement stock" accent="amber" />
         <StatCard label="Stockout Risk" value={stockoutRisk} helper="Critical reorder items" accent="amber" />
         <StatCard label="Inventory Health Score" value="91%" helper="Risk adjusted" accent="emerald" />
       </div>
-      <InventoryFilters />
+      <InventoryFilters filters={filters} onChange={setFilters} />
       <div className="grid gap-5 xl:grid-cols-2">
         <Panel title="Inventory Value Trend" description="Mock trend from inventory reduction and value optimization."><InventoryLineChart data={[{ name: 'Jan', value: 10000000 }, { name: 'Feb', value: 9400000 }, { name: 'Mar', value: 9100000 }, { name: 'Apr', value: 8700000 }, { name: 'May', value: 8300000 }, { name: 'Jun', value: 8000000 }]} /></Panel>
-        <Panel title="Inventory by Warehouse" description="Current value by warehouse."><InventoryBarChart data={warehouseValueRows()} bars={['value']} /></Panel>
-        <Panel title="Inventory Coverage" description="Coverage days by item."><InventoryBarChart data={inventoryItems.slice(0, 8).map((item) => ({ name: item.name, coverage: item.coverageDays }))} bars={['coverage']} /></Panel>
-        <Panel title="Stockout Risk" description="Items below reorder point or safety stock."><InventoryDataTable rows={reorderRows().filter((row) => ['Critical', 'Stockout'].includes(String(row.Status)))} /></Panel>
-        <Panel title="Dead Stock Summary" description="Items with no movement for 180+ days."><InventoryDataTable rows={deadStockRows()} /></Panel>
-        <Panel title="Slow Moving Inventory" description="Low movement count and high coverage days."><InventoryDataTable rows={slowMovingRows()} /></Panel>
+        <Panel title="Inventory by Warehouse" description="Current value by warehouse."><InventoryBarChart data={warehouseValueRows(filteredItems)} bars={['value']} /></Panel>
+        <Panel title="Inventory Coverage" description="Coverage days by item."><InventoryBarChart data={filteredItems.slice(0, 8).map((item) => ({ name: item.name, coverage: item.coverageDays }))} bars={['coverage']} /></Panel>
+        <Panel title="Stockout Risk" description="Items below reorder point or safety stock."><InventoryDataTable rows={reorderRows(filteredReorderRules).filter((row) => ['Critical', 'Stockout'].includes(String(row.Status)))} /></Panel>
+        <Panel title="Dead Stock Summary" description="Items with no movement for 180+ days."><InventoryDataTable rows={deadStockRows(filteredDeadStock)} /></Panel>
+        <Panel title="Slow Moving Inventory" description="Low movement count and high coverage days."><InventoryDataTable rows={slowMovingRows(filteredSlowMoving)} /></Panel>
       </div>
       <InventoryImpactGrid />
     </div>
@@ -159,11 +184,11 @@ function InventoryRegister({ title, description, rows, searchKeys, action }: { t
   }), [rows, search, searchKeys, status]);
   return (
     <div className="space-y-5">
-      <Panel title={title} description={description} action={<button className="form-button-primary" onClick={() => setDrawer(true)}>{action}</button>}>
+      <Panel title={title} description={description} action={<button type="button" className="form-button-primary" onClick={() => setDrawer(true)}>{action}</button>}>
         <div className="mb-4 grid gap-3 md:grid-cols-[minmax(240px,1fr)_220px_auto]">
           <label className="relative block"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" /><input className="form-input w-full pl-10" placeholder={`Search ${searchKeys.join(', ').toLowerCase()}...`} value={search} onChange={(event) => setSearch(event.target.value)} /></label>
           <select className="form-input" value={status} onChange={(event) => setStatus(event.target.value)}><option value="">All statuses</option>{['Healthy', 'Warning', 'Critical', 'Review', 'Posted', 'Approved', 'Pending Approval', 'Dead Stock', 'Slow Moving'].map((item) => <option key={item}>{item}</option>)}</select>
-          <button className="form-button-subtle" onClick={() => { setSearch(''); setStatus(''); }}>Clear</button>
+          <button type="button" className="form-button-subtle" onClick={() => { setSearch(''); setStatus(''); }}>Clear</button>
         </div>
         <InventoryDataTable rows={filteredRows} />
       </Panel>
@@ -194,27 +219,39 @@ function PhysicalInventory() {
 }
 
 function ReportsPanel() {
+  const [filters, setFilters] = useState<ModuleFilterValues>({});
   return (
     <div className="space-y-5">
-      <InventoryFilters />
+      <InventoryFilters filters={filters} onChange={setFilters} />
       <Panel title="Inventory Reports" description="Preview and export inventory reports as PDF, Excel, or CSV.">
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {inventoryReports.map((report) => <div key={report} className="rounded-xl border border-white/10 bg-slate-950/30 p-4"><p className="font-medium text-white">{report}</p><p className="mt-2 text-sm text-slate-400">Company-scoped report for ABC Manufacturing.</p><div className="mt-4 flex flex-wrap gap-2">{['Preview', 'PDF', 'Excel', 'CSV'].map((item) => <button key={item} className="form-button-subtle py-1 text-xs">{item}</button>)}</div></div>)}
+          {inventoryReports.map((report) => (
+            <div key={report} className="rounded-xl border border-white/10 bg-slate-950/30 p-4">
+              <p className="font-medium text-white">{report}</p>
+              <p className="mt-2 text-sm text-slate-400">Company-scoped report for ABC Manufacturing.</p>
+              <ReportExportButtons reportName={report} />
+            </div>
+          ))}
         </div>
       </Panel>
     </div>
   );
 }
 
-function InventoryFilters() {
+function InventoryFilters({ filters, onChange }: { filters: ModuleFilterValues; onChange: (next: ModuleFilterValues) => void }) {
+  function setFilter(key: string, value: string) {
+    onChange({ ...filters, [key]: value });
+  }
+
   return (
-    <Panel title="Inventory Filters" description="Company context is fixed. No client or company filter is shown for Company Admin.">
-      <div className="grid gap-3 md:grid-cols-5">
-        <Filter label="Plant" options={inventoryCompany.plants} />
-        <Filter label="Warehouse" options={inventoryCompany.warehouses} />
-        <Filter label="Product" options={inventoryCompany.products} />
-        <Filter label="Category" options={inventoryCompany.categories} />
+    <Panel title="Inventory Filters" description="Company context is fixed. Filters refresh dashboard cards, charts, and tables below.">
+      <div className="grid gap-3 md:grid-cols-[repeat(5,minmax(0,1fr))_auto]">
+        <ModuleFilterSelect label="Plant" options={inventoryCompany.plants} value={filters.Plant ?? ''} onChange={(value) => setFilter('Plant', value)} />
+        <ModuleFilterSelect label="Warehouse" options={inventoryCompany.warehouses} value={filters.Warehouse ?? ''} onChange={(value) => setFilter('Warehouse', value)} />
+        <ModuleFilterSelect label="Product" options={inventoryCompany.products} value={filters.Product ?? ''} onChange={(value) => setFilter('Product', value)} />
+        <ModuleFilterSelect label="Category" options={inventoryCompany.categories} value={filters.Category ?? ''} onChange={(value) => setFilter('Category', value)} />
         <Field label="Date Range"><input className="form-input mt-1 w-full" type="date" defaultValue="2026-06-24" /></Field>
+        <button type="button" className="form-button-subtle self-end" onClick={() => onChange({})}>Clear Filters</button>
       </div>
     </Panel>
   );
@@ -240,7 +277,7 @@ function InventoryFormDrawer({ title, onClose }: { title: string; onClose: () =>
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
       <section className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-white/10 bg-[#091225] p-5 shadow-2xl">
-        <div className="mb-5 flex items-start justify-between"><div><h3 className="text-lg font-semibold text-white">{title}</h3><p className="text-sm text-slate-400">Draft-only mock form. Critical inventory actions require approval.</p></div><button className="form-button-subtle" onClick={onClose}>Close</button></div>
+        <div className="mb-5 flex items-start justify-between"><div><h3 className="text-lg font-semibold text-white">{title}</h3><p className="text-sm text-slate-400">Draft-only mock form. Critical inventory actions require approval.</p></div><button type="button" className="form-button-subtle" onClick={onClose}>Close</button></div>
         <div className="grid gap-3 md:grid-cols-2">
           <Field label="Item"><select className="form-input mt-1 w-full">{inventoryItems.map((item) => <option key={item.code}>{item.name}</option>)}</select></Field>
           <Field label="Warehouse"><select className="form-input mt-1 w-full">{inventoryCompany.warehouses.map((item) => <option key={item}>{item}</option>)}</select></Field>
@@ -248,7 +285,7 @@ function InventoryFormDrawer({ title, onClose }: { title: string; onClose: () =>
           <Field label="Reason"><select className="form-input mt-1 w-full">{['Production', 'Maintenance', 'Sales', 'Damage', 'Audit Correction'].map((item) => <option key={item}>{item}</option>)}</select></Field>
           <Field label="Notes" className="md:col-span-2"><textarea className="form-input mt-1 min-h-24 w-full" placeholder="Business reason or inventory notes" /></Field>
         </div>
-        <div className="mt-5 flex justify-end gap-2"><button className="form-button-subtle" onClick={onClose}>Cancel</button><button className="form-button-primary" onClick={onClose}>Save Draft</button></div>
+        <div className="mt-5 flex justify-end gap-2"><button type="button" className="form-button-subtle" onClick={onClose}>Cancel</button><button type="button" className="form-button-primary" onClick={onClose}>Save Draft</button></div>
       </section>
     </div>
   );
@@ -256,10 +293,6 @@ function InventoryFormDrawer({ title, onClose }: { title: string; onClose: () =>
 
 function CompanyContext({ company }: { company: { clientName: string; clientId: string; currency: string; region: string; market: string } }) {
   return <div className="grid gap-3 rounded-2xl border border-white/10 bg-slate-950/35 p-4 md:grid-cols-4"><Detail label="Company" value={company.clientName} /><Detail label="Client ID" value={company.clientId} /><Detail label="Currency" value={company.currency} /><Detail label="Region / Market" value={`${company.region} / ${company.market}`} /></div>;
-}
-
-function Filter({ label, options }: { label: string; options: string[] }) {
-  return <label className="text-sm text-slate-300">{label}<select className="form-input mt-1 w-full"><option>All {label.toLowerCase()}</option>{options.map((item) => <option key={item}>{item}</option>)}</select></label>;
 }
 
 function Field({ label, children, className = '' }: { label: string; children: ReactNode; className?: string }) {
@@ -270,26 +303,22 @@ function Detail({ label, value }: { label: string; value: ReactNode }) {
   return <div><p className="text-xs uppercase tracking-[0.12em] text-slate-500">{label}</p><p className="mt-1 font-medium text-white">{value}</p></div>;
 }
 
-function RowActions({ labels = ['View', 'History', 'Export'] }: { labels?: string[] }) {
-  return <div className="flex gap-2">{labels.map((label) => <button key={label} className="form-button-subtle py-1 text-xs">{label}</button>)}</div>;
-}
-
 function linkClass(active: boolean) {
   return `flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm transition ${active ? 'border border-cyan-300/20 bg-cyan-400/10 text-white' : 'text-slate-400 hover:bg-white/[0.05] hover:text-white'}`;
 }
 
-function overviewRows() { return inventoryItems.map((item) => ({ 'Item Code': item.code, 'Item Name': item.name, Category: item.category, Plant: item.plant, Warehouse: item.warehouse, 'Available Qty': item.availableQty, 'Reserved Qty': item.reservedQty, 'Blocked Qty': item.blockedQty, 'In Transit Qty': item.inTransitQty, UOM: item.uom, 'Inventory Value': formatCurrency(item.value, inventoryCompany.currency), Status: item.status, Actions: <RowActions labels={['View', 'History', 'Transfer', 'Reserve', 'Export']} /> })); }
-function receiptRows() { return goodsReceipts.map((item) => ({ 'Receipt Number': item.receiptNo, Source: item.source, Supplier: item.supplier, 'PO Number': item.poNumber, Warehouse: item.warehouse, Item: item.item, Quantity: item.quantity, 'Lot Number': item.lotNumber, 'Expiry Date': item.expiryDate, 'Value Update': formatCurrency(item.valueUpdate, inventoryCompany.currency), Status: item.status, Actions: <RowActions /> })); }
-function issueRows() { return goodsIssues.map((item) => ({ 'Issue Number': item.issueNo, Type: item.type, Warehouse: item.warehouse, Department: item.department, Item: item.item, Quantity: item.quantity, Reason: item.reason, Status: item.status, Actions: <RowActions /> })); }
-function transferRows() { return stockTransfers.map((item) => ({ 'Transfer Number': item.transferNo, Type: item.type, Source: item.source, Destination: item.destination, Item: item.item, Quantity: item.quantity, 'Transfer Date': item.transferDate, Status: item.status, Actions: <RowActions /> })); }
-function adjustmentRows() { return adjustments.map((item) => ({ 'Adjustment Number': item.adjustmentNo, Reason: item.reason, Item: item.item, Warehouse: item.warehouse, Quantity: item.quantity, Workflow: item.workflow, Status: item.status, Actions: <RowActions labels={['View', 'Approve', 'Reject']} /> })); }
-function cycleRows() { return cycleCounts.map((item) => ({ 'Count Number': item.countNo, Warehouse: item.warehouse, Item: item.item, 'System Qty': item.systemQty, 'Counted Qty': item.countedQty, Variance: item.variance, 'Accuracy %': `${item.accuracy}%`, Status: item.status, Actions: <RowActions labels={['View', 'Post', 'Export']} /> })); }
+function overviewRows() { return inventoryItems.map((item) => ({ 'Item Code': item.code, 'Item Name': item.name, Category: item.category, Plant: item.plant, Warehouse: item.warehouse, 'Available Qty': item.availableQty, 'Reserved Qty': item.reservedQty, 'Blocked Qty': item.blockedQty, 'In Transit Qty': item.inTransitQty, UOM: item.uom, 'Inventory Value': formatCurrency(item.value, inventoryCompany.currency), Status: item.status, Actions: <RowActions labels={['View', 'History', 'Transfer', 'Reserve', 'Export']} recordId={item.code} recordTitle={item.name} recordDetails={{ Code: item.code, Name: item.name, Plant: item.plant, Warehouse: item.warehouse, Status: item.status }} /> })); }
+function receiptRows() { return goodsReceipts.map((item) => ({ 'Receipt Number': item.receiptNo, Source: item.source, Supplier: item.supplier, 'PO Number': item.poNumber, Warehouse: item.warehouse, Item: item.item, Quantity: item.quantity, 'Lot Number': item.lotNumber, 'Expiry Date': item.expiryDate, 'Value Update': formatCurrency(item.valueUpdate, inventoryCompany.currency), Status: item.status, Actions: <RowActions recordId={item.receiptNo} recordTitle={item.item} recordDetails={{ Receipt: item.receiptNo, Item: item.item, Warehouse: item.warehouse, Status: item.status }} /> })); }
+function issueRows() { return goodsIssues.map((item) => ({ 'Issue Number': item.issueNo, Type: item.type, Warehouse: item.warehouse, Department: item.department, Item: item.item, Quantity: item.quantity, Reason: item.reason, Status: item.status, Actions: <RowActions recordId={item.issueNo} recordTitle={item.item} recordDetails={{ Issue: item.issueNo, Item: item.item, Warehouse: item.warehouse, Status: item.status }} /> })); }
+function transferRows() { return stockTransfers.map((item) => ({ 'Transfer Number': item.transferNo, Type: item.type, Source: item.source, Destination: item.destination, Item: item.item, Quantity: item.quantity, 'Transfer Date': item.transferDate, Status: item.status, Actions: <RowActions recordId={item.transferNo} recordTitle={item.item} recordDetails={{ Transfer: item.transferNo, Item: item.item, Status: item.status }} /> })); }
+function adjustmentRows() { return adjustments.map((item) => ({ 'Adjustment Number': item.adjustmentNo, Reason: item.reason, Item: item.item, Warehouse: item.warehouse, Quantity: item.quantity, Workflow: item.workflow, Status: item.status, Actions: <RowActions labels={['View', 'Approve', 'Reject']} recordId={item.adjustmentNo} recordTitle={item.item} recordDetails={{ Adjustment: item.adjustmentNo, Item: item.item, Status: item.status }} /> })); }
+function cycleRows() { return cycleCounts.map((item) => ({ 'Count Number': item.countNo, Warehouse: item.warehouse, Item: item.item, 'System Qty': item.systemQty, 'Counted Qty': item.countedQty, Variance: item.variance, 'Accuracy %': `${item.accuracy}%`, Status: item.status, Actions: <RowActions labels={['View', 'Post', 'Export']} recordId={item.countNo} recordTitle={item.item} recordDetails={{ Count: item.countNo, Item: item.item, Status: item.status }} /> })); }
 function agingRows() { return agingBuckets.map((item) => ({ Bucket: item.bucket, 'Aging Quantity': item.quantity, 'Aging Value': formatCurrency(item.value, inventoryCompany.currency), Status: item.status })); }
-function deadStockRows() { return deadStock.map((item) => ({ Item: item.item, Warehouse: item.warehouse, 'Last Movement Date': item.lastMovementDate, 'Days Since Movement': item.daysSinceMovement, Value: formatCurrency(item.value, inventoryCompany.currency), Status: item.status, Actions: <RowActions labels={['Review', 'Dispose', 'Transfer']} /> })); }
-function slowMovingRows() { return slowMoving.map((item) => ({ Item: item.item, 'Movement Count': item.movementCount, 'Inventory Value': formatCurrency(item.inventoryValue, inventoryCompany.currency), 'Coverage Days': item.coverageDays, Status: item.status, Actions: <RowActions labels={['Review', 'Reduce', 'Transfer']} /> })); }
-function reorderRows() { return reorderRules.map((item) => ({ Item: item.item, 'Reorder Point': item.reorderPoint, 'Safety Stock': item.safetyStock, 'Minimum Stock': item.minimumStock, 'Maximum Stock': item.maximumStock, Status: item.status, Actions: <RowActions labels={['Create Draft', 'Approve', 'Export']} /> })); }
-function lotRows() { return lots.map((item) => ({ 'Lot Number': item.lotNumber, Item: item.item, 'Manufacturing Date': item.manufacturingDate, 'Expiry Date': item.expiryDate, Quantity: item.quantity, Status: item.status, Actions: <RowActions labels={['Trace Forward', 'Trace Backward', 'History']} /> })); }
-function serialRows() { return serials.map((item) => ({ 'Serial Number': item.serialNumber, Item: item.item, Warehouse: item.warehouse, Status: item.status, History: item.history, Actions: <RowActions labels={['View History', 'Transfer', 'Export']} /> })); }
-function valuationTableRows() { return valuationRows.map((item) => ({ Item: item.item, Method: item.method, 'Inventory Value': formatCurrency(item.inventoryValue, inventoryCompany.currency), 'Unit Cost': formatCurrency(item.unitCost, inventoryCompany.currency), 'Cost Variance %': `${item.costVariance}%`, Status: item.status, Actions: <RowActions labels={['View', 'Revalue', 'Export']} /> })); }
+function deadStockRows(source = deadStock) { return source.map((item) => ({ Item: item.item, Warehouse: item.warehouse, 'Last Movement Date': item.lastMovementDate, 'Days Since Movement': item.daysSinceMovement, Value: formatCurrency(item.value, inventoryCompany.currency), Status: item.status, Actions: <RowActions labels={['Review', 'Dispose', 'Transfer']} recordId={item.item} recordTitle={item.item} recordDetails={{ Item: item.item, Warehouse: item.warehouse, Status: item.status }} /> })); }
+function slowMovingRows(source = slowMoving) { return source.map((item) => ({ Item: item.item, 'Movement Count': item.movementCount, 'Inventory Value': formatCurrency(item.inventoryValue, inventoryCompany.currency), 'Coverage Days': item.coverageDays, Status: item.status, Actions: <RowActions labels={['Review', 'Reduce', 'Transfer']} recordId={item.item} recordTitle={item.item} recordDetails={{ Item: item.item, Status: item.status }} /> })); }
+function reorderRows(source = reorderRules) { return source.map((item) => ({ Item: item.item, 'Reorder Point': item.reorderPoint, 'Safety Stock': item.safetyStock, 'Minimum Stock': item.minimumStock, 'Maximum Stock': item.maximumStock, Status: item.status, Actions: <RowActions labels={['Create Draft', 'Approve', 'Export']} recordId={item.item} recordTitle={item.item} recordDetails={{ Item: item.item, Status: item.status }} /> })); }
+function lotRows() { return lots.map((item) => ({ 'Lot Number': item.lotNumber, Item: item.item, 'Manufacturing Date': item.manufacturingDate, 'Expiry Date': item.expiryDate, Quantity: item.quantity, Status: item.status, Actions: <RowActions labels={['Trace Forward', 'Trace Backward', 'History']} recordId={item.lotNumber} recordTitle={item.item} recordDetails={{ Lot: item.lotNumber, Item: item.item, Status: item.status }} /> })); }
+function serialRows() { return serials.map((item) => ({ 'Serial Number': item.serialNumber, Item: item.item, Warehouse: item.warehouse, Status: item.status, History: item.history, Actions: <RowActions labels={['View History', 'Transfer', 'Export']} recordId={item.serialNumber} recordTitle={item.item} recordDetails={{ Serial: item.serialNumber, Item: item.item, Status: item.status }} /> })); }
+function valuationTableRows() { return valuationRows.map((item) => ({ Item: item.item, Method: item.method, 'Inventory Value': formatCurrency(item.inventoryValue, inventoryCompany.currency), 'Unit Cost': formatCurrency(item.unitCost, inventoryCompany.currency), 'Cost Variance %': `${item.costVariance}%`, Status: item.status, Actions: <RowActions labels={['View', 'Revalue', 'Export']} recordId={item.item} recordTitle={item.item} recordDetails={{ Item: item.item, Method: item.method, Status: item.status }} /> })); }
 function auditRows() { return inventoryAudit.map((item) => ({ Timestamp: item.timestamp, User: item.user, Action: item.action, Item: item.item, 'Previous Value': item.previousValue, 'New Value': item.newValue })); }
-function warehouseValueRows() { return inventoryCompany.warehouses.map((warehouse) => ({ name: warehouse.replace(' Warehouse', ''), value: inventoryItems.filter((item) => item.warehouse === warehouse).reduce((sum, item) => sum + item.value, 0) })); }
+function warehouseValueRows(source = inventoryItems) { return inventoryCompany.warehouses.map((warehouse) => ({ name: warehouse.replace(' Warehouse', ''), value: source.filter((item) => item.warehouse === warehouse).reduce((sum, item) => sum + item.value, 0) })); }

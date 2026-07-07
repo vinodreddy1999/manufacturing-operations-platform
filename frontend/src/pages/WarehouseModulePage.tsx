@@ -3,12 +3,16 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 
 import { LazyBarChart, LazyLineChart } from '../components/LazyCharts';
+import { ModuleFilterSelect } from '../components/ModuleFilterSelect';
 import { PageHeader } from '../components/PageHeader';
 import { Panel } from '../components/Panel';
+import { ReportExportButtons } from '../components/ReportExportButtons';
+import { RowActions } from '../components/RowActions';
 import { ScrollableTableFrame } from '../components/ScrollableTableFrame';
 import { StatCard } from '../components/StatCard';
 import { StatusBadge } from '../components/StatusBadge';
 import { formatCurrency } from '../lib/format';
+import { applyModuleFilters, type ModuleFilterValues } from '../lib/moduleFilters';
 import { usePlatform } from '../platform/PlatformContext';
 import type { RuntimeUser } from '../types';
 import {
@@ -112,13 +116,123 @@ function WarehouseSectionContent({ section }: { section: WarehouseSection }) {
   return <WarehouseRegister title="Warehouse Audit" description="Business-friendly audit history for warehouse execution changes." rows={auditRows()} searchKeys={['Timestamp', 'User', 'Action', 'Warehouse Area', 'Reference ID']} action="Export Audit" />;
 }
 
+const warehouseCategoryOptions = ['Finished Goods', 'Raw Material', 'Spare Parts', 'Consumables'];
+const warehouseOwnerOptions = ['Receiving Lead', 'Putaway Lead', 'Picking Lead', 'Dispatch Lead', 'Company Admin', 'FG Supervisor', 'Quality Receiver', 'Transfer Desk'];
+
+function itemCategory(item: string) {
+  if (['Chocolate Cake', 'Vanilla Cake', 'Plastic Container'].includes(item)) return 'Finished Goods';
+  if (item === 'Industrial Component') return 'Spare Parts';
+  if (['Sugar', 'Flour', 'Milk Powder', 'Plastic Resin', 'Packaging Film', 'Food Packaging Film'].includes(item)) return 'Raw Material';
+  return 'Consumables';
+}
+
+function warehousePlantText(row: Record<string, unknown>) {
+  return [row.warehouse, row.source, row.destination, row.from, row.to].filter(Boolean).join(' ');
+}
+
+const receivingFilterMap = {
+  Plant: (row: (typeof receivingRecords)[number]) => warehousePlantText(row),
+  Warehouse: 'warehouse' as const,
+  Zone: 'warehouse' as const,
+  Product: 'item' as const,
+  Category: (row: (typeof receivingRecords)[number]) => itemCategory(row.item),
+  Owner: 'owner' as const,
+};
+
+const putawayFilterMap = {
+  Plant: (row: (typeof putawayTasks)[number]) => warehousePlantText(row),
+  Warehouse: (row: (typeof putawayTasks)[number]) => receivingRecords.find((receipt) => receipt.id === row.receiptId)?.warehouse ?? '',
+  Zone: 'suggestedZone' as const,
+  Product: 'item' as const,
+  Category: (row: (typeof putawayTasks)[number]) => itemCategory(row.item),
+  Owner: 'assignedUser' as const,
+};
+
+const pickingFilterMap = {
+  Plant: (row: (typeof pickingTasks)[number]) => warehousePlantText(row),
+  Warehouse: 'warehouse' as const,
+  Zone: 'bin' as const,
+  Product: 'item' as const,
+  Category: (row: (typeof pickingTasks)[number]) => itemCategory(row.item),
+  Owner: 'picker' as const,
+};
+
+const dispatchFilterMap = {
+  Plant: (row: (typeof dispatchRecords)[number]) => warehousePlantText(row),
+  Warehouse: 'warehouse' as const,
+  Zone: 'destination' as const,
+  Product: 'sourceReference' as const,
+  Category: () => '',
+  Owner: () => '',
+};
+
+const utilizationFilterMap = {
+  Plant: (row: (typeof utilizationRecords)[number]) => warehousePlantText(row),
+  Warehouse: 'warehouse' as const,
+  Zone: 'zone' as const,
+  Product: () => '',
+  Category: () => '',
+  Owner: () => '',
+};
+
+const cycleCountFilterMap = {
+  Plant: (row: (typeof cycleCounts)[number]) => warehousePlantText(row),
+  Warehouse: 'warehouse' as const,
+  Zone: 'zone' as const,
+  Product: 'item' as const,
+  Category: (row: (typeof cycleCounts)[number]) => itemCategory(row.item),
+  Owner: 'countedBy' as const,
+};
+
 function WarehouseDashboard() {
-  const pendingReceipts = receivingRecords.filter((item) => item.pendingQty > 0).length;
-  const pendingPutaway = putawayTasks.filter((item) => !['Completed'].includes(item.status)).length;
-  const dispatchReady = dispatchRecords.filter((item) => item.status === 'Ready').length;
-  const openTasks = [...putawayTasks, ...pickingTasks, ...internalMovements].filter((item) => !['Completed', 'Received', 'Delivered', 'Dispatched'].includes(item.status)).length;
-  const avgUtilization = Math.round(utilizationRecords.reduce((sum, item) => sum + item.utilization, 0) / utilizationRecords.length);
-  const avgCycleAccuracy = Math.round((cycleCounts.filter((item) => item.variance === 0).length / cycleCounts.length) * 100);
+  const [filters, setFilters] = useState<ModuleFilterValues>({});
+  const filteredReceiving = useMemo(
+    () => applyModuleFilters(receivingRecords, filters, receivingFilterMap),
+    [filters],
+  );
+  const filteredPutaway = useMemo(
+    () => applyModuleFilters(putawayTasks, filters, putawayFilterMap),
+    [filters],
+  );
+  const filteredPicking = useMemo(
+    () => applyModuleFilters(pickingTasks, filters, pickingFilterMap),
+    [filters],
+  );
+  const filteredDispatch = useMemo(
+    () => applyModuleFilters(dispatchRecords, filters, dispatchFilterMap),
+    [filters],
+  );
+  const filteredUtilization = useMemo(
+    () => applyModuleFilters(utilizationRecords, filters, utilizationFilterMap),
+    [filters],
+  );
+  const filteredCycleCounts = useMemo(
+    () => applyModuleFilters(cycleCounts, filters, cycleCountFilterMap),
+    [filters],
+  );
+  const filteredMovements = useMemo(
+    () => applyModuleFilters(internalMovements, filters, {
+      Plant: (row) => warehousePlantText(row),
+      Warehouse: (row) => `${row.from} ${row.to}`,
+      Zone: (row) => `${row.from} ${row.to}`,
+      Product: 'item' as const,
+      Category: (row) => itemCategory(row.item),
+      Owner: 'movedBy' as const,
+    }),
+    [filters],
+  );
+
+  const pendingReceipts = filteredReceiving.filter((item) => item.pendingQty > 0).length;
+  const pendingPutaway = filteredPutaway.filter((item) => !['Completed'].includes(item.status)).length;
+  const dispatchReady = filteredDispatch.filter((item) => item.status === 'Ready').length;
+  const openTasks = [...filteredPutaway, ...filteredPicking, ...filteredMovements].filter((item) => !['Completed', 'Received', 'Delivered', 'Dispatched'].includes(item.status)).length;
+  const avgUtilization = filteredUtilization.length
+    ? Math.round(filteredUtilization.reduce((sum, item) => sum + item.utilization, 0) / filteredUtilization.length)
+    : 0;
+  const avgCycleAccuracy = filteredCycleCounts.length
+    ? Math.round((filteredCycleCounts.filter((item) => item.variance === 0).length / filteredCycleCounts.length) * 100)
+    : 0;
+
   return (
     <div className="space-y-5">
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
@@ -133,13 +247,13 @@ function WarehouseDashboard() {
         <StatCard label="Open Warehouse Tasks" value={openTasks} helper="Putaway, picks, moves" accent="violet" />
         <StatCard label="Warehouse Health Score" value="88%" helper="Risk adjusted score" accent="emerald" />
       </div>
-      <WarehouseFilters />
+      <WarehouseFilters filters={filters} onChange={setFilters} />
       <div className="grid gap-5 xl:grid-cols-2">
-        <Panel title="Receiving Status" description="Expected, received, pending, and delayed inbound quantities."><WarehouseBarChart data={receivingStatusChart()} bars={['received', 'pending', 'delayed']} /></Panel>
-        <Panel title="Putaway Queue" description="Open putaway tasks by receipt, item, suggested bin, and priority."><WarehouseDataTable rows={putawayRows().filter((row) => row.Status !== 'Completed')} /></Panel>
-        <Panel title="Bin Utilization" description="Capacity, occupied space, available space, and utilization by zone."><WarehouseBarChart data={utilizationRecords.map((item) => ({ name: item.zone, occupied: item.occupied, available: item.available }))} bars={['occupied', 'available']} /></Panel>
-        <Panel title="Picking Performance" description="Pick task accuracy and status by order and picker."><WarehouseDataTable rows={pickingRows().slice(0, 6)} /></Panel>
-        <Panel title="Dispatch Readiness" description="Packed and pending items by dispatch date."><WarehouseDataTable rows={dispatchRows().slice(0, 6)} /></Panel>
+        <Panel title="Receiving Status" description="Expected, received, pending, and delayed inbound quantities."><WarehouseBarChart data={receivingStatusChart(filteredReceiving)} bars={['received', 'pending', 'delayed']} /></Panel>
+        <Panel title="Putaway Queue" description="Open putaway tasks by receipt, item, suggested bin, and priority."><WarehouseDataTable rows={putawayRows(filteredPutaway).filter((row) => row.Status !== 'Completed')} /></Panel>
+        <Panel title="Bin Utilization" description="Capacity, occupied space, available space, and utilization by zone."><WarehouseBarChart data={filteredUtilization.map((item) => ({ name: item.zone, occupied: item.occupied, available: item.available }))} bars={['occupied', 'available']} /></Panel>
+        <Panel title="Picking Performance" description="Pick task accuracy and status by order and picker."><WarehouseDataTable rows={pickingRows(filteredPicking).slice(0, 6)} /></Panel>
+        <Panel title="Dispatch Readiness" description="Packed and pending items by dispatch date."><WarehouseDataTable rows={dispatchRows(filteredDispatch).slice(0, 6)} /></Panel>
         <Panel title="Warehouse Performance Trend" description="Handling time and readiness trend."><WarehouseLineChart data={[{ name: 'Jan', value: 70 }, { name: 'Feb', value: 74 }, { name: 'Mar', value: 79 }, { name: 'Apr', value: 83 }, { name: 'May', value: 86 }, { name: 'Jun', value: 88 }]} /></Panel>
       </div>
       <WarehouseImpactGrid />
@@ -225,9 +339,7 @@ function ReportsPanel() {
             <div key={report} className="rounded-xl border border-white/10 bg-slate-950/30 p-4">
               <p className="font-medium text-white">{report}</p>
               <p className="mt-2 text-sm text-slate-400">Company-scoped report for ABC Manufacturing.</p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {['Preview', 'PDF', 'Excel', 'CSV'].map((item) => <button key={item} className="form-button-subtle py-1 text-xs">{item}</button>)}
-              </div>
+              <ReportExportButtons reportName={report} />
             </div>
           ))}
         </div>
@@ -258,18 +370,31 @@ function WarehouseDataTable({ rows }: { rows: TableRow[] }) {
   );
 }
 
-function WarehouseFilters({ compact = false }: { compact?: boolean }) {
+function WarehouseFilters({
+  compact = false,
+  filters = {},
+  onChange,
+}: {
+  compact?: boolean;
+  filters?: ModuleFilterValues;
+  onChange?: (next: ModuleFilterValues) => void;
+}) {
+  function setFilter(key: string, value: string) {
+    onChange?.({ ...filters, [key]: value });
+  }
+
   return (
-    <Panel title="Warehouse Filters" description="Company context is fixed. No client or company filter is shown for Company Admin.">
-      <div className={`grid gap-3 ${compact ? 'md:grid-cols-4 xl:grid-cols-8' : 'md:grid-cols-4 xl:grid-cols-8'}`}>
-        <Filter label="Plant" options={warehouseCompany.plants} />
-        <Filter label="Warehouse" options={warehouseCompany.warehouses} />
-        <Filter label="Zone" options={warehouseCompany.zones} />
-        <Filter label="Bin" options={warehouseCompany.bins} />
-        <Filter label="Product" options={warehouseCompany.products} />
-        <Filter label="Category" options={['Finished Goods', 'Raw Material', 'Spare Parts', 'Consumables']} />
+    <Panel title="Warehouse Filters" description="Company context is fixed. Filters refresh dashboard cards, charts, and tables below.">
+      <div className={`grid gap-3 ${compact ? 'md:grid-cols-4 xl:grid-cols-8' : 'md:grid-cols-4 xl:grid-cols-[repeat(8,minmax(0,1fr))_auto]'}`}>
+        <ModuleFilterSelect label="Plant" options={warehouseCompany.plants} value={filters.Plant ?? ''} onChange={(value) => setFilter('Plant', value)} />
+        <ModuleFilterSelect label="Warehouse" options={warehouseCompany.warehouses} value={filters.Warehouse ?? ''} onChange={(value) => setFilter('Warehouse', value)} />
+        <ModuleFilterSelect label="Zone" options={warehouseCompany.zones} value={filters.Zone ?? ''} onChange={(value) => setFilter('Zone', value)} />
+        <ModuleFilterSelect label="Bin" options={warehouseCompany.bins} value={filters.Bin ?? ''} onChange={(value) => setFilter('Bin', value)} />
+        <ModuleFilterSelect label="Product" options={warehouseCompany.products} value={filters.Product ?? ''} onChange={(value) => setFilter('Product', value)} />
+        <ModuleFilterSelect label="Category" options={warehouseCategoryOptions} value={filters.Category ?? ''} onChange={(value) => setFilter('Category', value)} />
         <Field label="Date Range"><input className="form-input mt-1 w-full" type="date" defaultValue="2026-06-24" /></Field>
-        <Filter label="Owner" options={['Receiving Lead', 'Putaway Lead', 'Picking Lead', 'Dispatch Lead', 'Company Admin']} />
+        <ModuleFilterSelect label="Owner" options={warehouseOwnerOptions} value={filters.Owner ?? ''} onChange={(value) => setFilter('Owner', value)} />
+        {onChange ? <button type="button" className="form-button-subtle self-end" onClick={() => onChange({})}>Clear</button> : null}
       </div>
     </Panel>
   );
@@ -351,10 +476,6 @@ function CompanyContext({ company }: { company: { clientName: string; clientId: 
   );
 }
 
-function Filter({ label, options }: { label: string; options: string[] }) {
-  return <label className="text-sm text-slate-300">{label}<select className="form-input mt-1 w-full"><option>All {label.toLowerCase()}</option>{options.map((item) => <option key={item}>{item}</option>)}</select></label>;
-}
-
 function Field({ label, children, className = '' }: { label: string; children: ReactNode; className?: string }) {
   return <label className={`text-sm text-slate-300 ${className}`}>{label}{children}</label>;
 }
@@ -367,25 +488,21 @@ function linkClass(active: boolean) {
   return `flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm transition ${active ? 'border border-cyan-300/20 bg-cyan-400/10 text-white' : 'text-slate-400 hover:bg-white/[0.05] hover:text-white'}`;
 }
 
-function RowActions({ labels = ['View', 'Edit', 'Submit'] }: { labels?: string[] }) {
-  return <div className="flex gap-2">{labels.map((label) => <button key={label} className="form-button-subtle py-1 text-xs">{label}</button>)}</div>;
-}
-
-function receivingStatusChart() {
+function receivingStatusChart(source = receivingRecords) {
   return [
-    { name: 'Expected', received: 0, pending: receivingRecords.reduce((sum, item) => sum + item.expectedQty, 0), delayed: 0 },
-    { name: 'Received', received: receivingRecords.reduce((sum, item) => sum + item.receivedQty, 0), pending: 0, delayed: 0 },
-    { name: 'Pending', received: 0, pending: receivingRecords.reduce((sum, item) => sum + item.pendingQty, 0), delayed: 0 },
-    { name: 'Delayed', received: 0, pending: 0, delayed: receivingRecords.filter((item) => item.status === 'Delayed').reduce((sum, item) => sum + item.pendingQty, 0) },
+    { name: 'Expected', received: 0, pending: source.reduce((sum, item) => sum + item.expectedQty, 0), delayed: 0 },
+    { name: 'Received', received: source.reduce((sum, item) => sum + item.receivedQty, 0), pending: 0, delayed: 0 },
+    { name: 'Pending', received: 0, pending: source.reduce((sum, item) => sum + item.pendingQty, 0), delayed: 0 },
+    { name: 'Delayed', received: 0, pending: 0, delayed: source.filter((item) => item.status === 'Delayed').reduce((sum, item) => sum + item.pendingQty, 0) },
   ];
 }
 
-function receivingRows() { return receivingRecords.map((item) => ({ 'Receipt ID': item.id, 'Source Type': item.sourceType, 'Source Reference': item.sourceReference, 'Supplier / Source': item.source, Warehouse: item.warehouse, Item: item.item, 'Expected Qty': item.expectedQty, 'Received Qty': item.receivedQty, 'Pending Qty': item.pendingQty, 'Received Date': item.receivedDate, Status: item.status, Owner: item.owner, Actions: <RowActions labels={['View Receipt', 'Confirm', 'Putaway']} /> })); }
-function putawayRows() { return putawayTasks.map((item) => ({ 'Putaway Task ID': item.id, 'Receipt ID': item.receiptId, Item: item.item, Quantity: item.quantity, 'Suggested Zone': item.suggestedZone, 'Suggested Bin': item.suggestedBin, 'Assigned User': item.assignedUser, Priority: item.priority, 'Created Date': item.createdDate, 'Completed Date': item.completedDate, Status: item.status, Actions: <RowActions labels={['Assign', 'Confirm', 'Change Bin']} /> })); }
+function receivingRows(source = receivingRecords) { return source.map((item) => ({ 'Receipt ID': item.id, 'Source Type': item.sourceType, 'Source Reference': item.sourceReference, 'Supplier / Source': item.source, Warehouse: item.warehouse, Item: item.item, 'Expected Qty': item.expectedQty, 'Received Qty': item.receivedQty, 'Pending Qty': item.pendingQty, 'Received Date': item.receivedDate, Status: item.status, Owner: item.owner, Actions: <RowActions labels={['View Receipt', 'Confirm', 'Putaway']} recordId={item.id} recordTitle={item.item} recordDetails={{ ID: item.id, Item: item.item, Warehouse: item.warehouse, Source: item.source, Status: item.status }} /> })); }
+function putawayRows(source = putawayTasks) { return source.map((item) => ({ 'Putaway Task ID': item.id, 'Receipt ID': item.receiptId, Item: item.item, Quantity: item.quantity, 'Suggested Zone': item.suggestedZone, 'Suggested Bin': item.suggestedBin, 'Assigned User': item.assignedUser, Priority: item.priority, 'Created Date': item.createdDate, 'Completed Date': item.completedDate, Status: item.status, Actions: <RowActions labels={['Assign', 'Confirm', 'Change Bin']} recordId={item.id} recordTitle={item.item} recordDetails={{ ID: item.id, Item: item.item, Zone: item.suggestedZone, Bin: item.suggestedBin, Status: item.status }} /> })); }
 function binRows() { return warehouseBins.map((item) => ({ 'Bin ID': item.id, Warehouse: item.warehouse, Zone: item.zone, Aisle: item.aisle, Rack: item.rack, Shelf: item.shelf, 'Bin Code': item.binCode, Capacity: item.capacity, Occupied: item.occupied, Available: item.available, 'Utilization %': `${item.utilization}%`, 'Storage Type': item.storageType, Status: item.status, Actions: <RowActions labels={['View Contents', 'Move Stock', 'Disable']} /> })); }
-function pickingRows() { return pickingTasks.map((item) => ({ 'Pick Task ID': item.id, 'Source Type': item.sourceType, 'Source Reference': item.sourceReference, Item: item.item, 'Required Qty': item.requiredQty, 'Picked Qty': item.pickedQty, Warehouse: item.warehouse, Bin: item.bin, Picker: item.picker, Priority: item.priority, 'Due Date': item.dueDate, Status: item.status, Actions: <RowActions labels={['Assign', 'Confirm', 'Short Pick']} /> })); }
+function pickingRows(source = pickingTasks) { return source.map((item) => ({ 'Pick Task ID': item.id, 'Source Type': item.sourceType, 'Source Reference': item.sourceReference, Item: item.item, 'Required Qty': item.requiredQty, 'Picked Qty': item.pickedQty, Warehouse: item.warehouse, Bin: item.bin, Picker: item.picker, Priority: item.priority, 'Due Date': item.dueDate, Status: item.status, Actions: <RowActions labels={['Assign', 'Confirm', 'Short Pick']} recordId={item.id} recordTitle={item.item} recordDetails={{ ID: item.id, Item: item.item, Warehouse: item.warehouse, Bin: item.bin, Picker: item.picker, Status: item.status }} /> })); }
 function packingRows() { return packingRecords.map((item) => ({ 'Packing ID': item.id, 'Pick Task ID': item.pickTaskId, 'Order / Source Reference': item.orderReference, 'Item Count': item.itemCount, 'Packed Qty': item.packedQty, 'Package Type': item.packageType, 'Packed By': item.packedBy, 'Packing Date': item.packingDate, Status: item.status, Actions: <RowActions labels={['Confirm', 'Print Label', 'View']} /> })); }
-function dispatchRows() { return dispatchRecords.map((item) => ({ 'Dispatch ID': item.id, 'Destination Type': item.destinationType, Destination: item.destination, 'Source Reference': item.sourceReference, Warehouse: item.warehouse, 'Packed Items': item.packedItems, 'Dispatch Date': item.dispatchDate, Carrier: item.carrier, Vehicle: item.vehicle, Status: item.status, Actions: <RowActions labels={['Confirm', 'Track', 'Cancel']} /> })); }
+function dispatchRows(source = dispatchRecords) { return source.map((item) => ({ 'Dispatch ID': item.id, 'Destination Type': item.destinationType, Destination: item.destination, 'Source Reference': item.sourceReference, Warehouse: item.warehouse, 'Packed Items': item.packedItems, 'Dispatch Date': item.dispatchDate, Carrier: item.carrier, Vehicle: item.vehicle, Status: item.status, Actions: <RowActions labels={['Confirm', 'Track', 'Cancel']} recordId={item.id} recordTitle={item.destination} recordDetails={{ ID: item.id, Destination: item.destination, Warehouse: item.warehouse, Carrier: item.carrier, Status: item.status }} /> })); }
 function movementRows() { return internalMovements.map((item) => ({ 'Movement ID': item.id, 'Movement Type': item.type, Item: item.item, Quantity: item.quantity, 'From Location': item.from, 'To Location': item.to, 'Moved By': item.movedBy, 'Movement Date': item.movementDate, Status: item.status, Actions: <RowActions labels={['Confirm', 'Cancel', 'Export']} /> })); }
 function cycleRows() { return cycleCounts.map((item) => ({ 'Count ID': item.id, Warehouse: item.warehouse, Zone: item.zone, Bin: item.bin, Item: item.item, 'System Qty': item.systemQty, 'Counted Qty': item.countedQty, Variance: item.variance, 'Counted By': item.countedBy, 'Count Date': item.countDate, Status: item.status, Actions: <RowActions labels={['Submit', 'Approve Variance', 'Post']} /> })); }
 function utilizationRows() { return utilizationRecords.map((item) => ({ Warehouse: item.warehouse, Zone: item.zone, Capacity: item.capacity, Occupied: item.occupied, Available: item.available, 'Utilization %': `${item.utilization}%`, Status: item.status })); }

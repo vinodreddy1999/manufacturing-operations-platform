@@ -3,12 +3,16 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 
 import { LazyBarChart, LazyLineChart } from '../components/LazyCharts';
+import { ModuleFilterSelect } from '../components/ModuleFilterSelect';
 import { PageHeader } from '../components/PageHeader';
 import { Panel } from '../components/Panel';
+import { ReportExportButtons } from '../components/ReportExportButtons';
+import { RowActions } from '../components/RowActions';
 import { ScrollableTableFrame } from '../components/ScrollableTableFrame';
 import { StatCard } from '../components/StatCard';
 import { StatusBadge } from '../components/StatusBadge';
 import { formatCurrency } from '../lib/format';
+import { applyModuleFilters, type ModuleFilterValues } from '../lib/moduleFilters';
 import { usePlatform } from '../platform/PlatformContext';
 import {
   approvals,
@@ -142,37 +146,86 @@ function PlanningSectionContent({ section, user }: { section: PlanningSection; u
   return <AuditPanel />;
 }
 
+const planningFilterFieldMap = {
+  Plant: 'plant' as const,
+  Warehouse: 'warehouse' as const,
+  Product: 'product' as const,
+  Category: (row: { product?: string }) => planningCategoryForProduct(row.product ?? ''),
+  Planner: 'owner' as const,
+  Status: 'status' as const,
+};
+
+function planningCategoryForProduct(product: string) {
+  if (['Chocolate Cake', 'Vanilla Cake', 'Snack Pack'].includes(product)) return 'Finished Goods';
+  if (['Sugar', 'Flour', 'Milk Powder', 'Packaging Film'].includes(product)) return 'Raw Material';
+  if (product.toLowerCase().includes('line') || product.toLowerCase().includes('machine')) return 'Capacity';
+  return 'Planning';
+}
+
+const materialFilterFieldMap = {
+  Product: 'product' as const,
+  Category: () => 'Raw Material',
+  Status: 'status' as const,
+};
+
 function PlanningDashboard() {
   const navigate = useNavigate();
-  const shortageCount = materialRequirements.filter((item) => item.shortageQty > 0).length;
-  const openRisks = [...materialRequirements, ...capacityPlans, ...workforcePlans, ...maintenancePlans].filter((item) => ['Critical', 'Warning', 'Review'].includes(item.status)).length;
-  const totalDemand = demandPlans.reduce((sum, item) => sum + item.forecastQty, 0);
-  const plannedProduction = productionPlans.reduce((sum, item) => sum + item.plannedProduction, 0);
+  const [filters, setFilters] = useState<ModuleFilterValues>({});
+  const filteredDemand = useMemo(
+    () => applyModuleFilters(demandPlans, filters, { Product: 'product', Category: planningFilterFieldMap.Category, Planner: 'owner', Status: 'status' }),
+    [filters],
+  );
+  const filteredProduction = useMemo(
+    () => applyModuleFilters(productionPlans, filters, planningFilterFieldMap),
+    [filters],
+  );
+  const filteredCapacity = useMemo(
+    () => applyModuleFilters(capacityPlans, filters, { Plant: 'plant', Planner: 'owner', Status: 'status' }),
+    [filters],
+  );
+  const filteredMaterials = useMemo(
+    () => applyModuleFilters(materialRequirements, filters, materialFilterFieldMap),
+    [filters],
+  );
+  const filteredInventory = useMemo(
+    () => applyModuleFilters(inventoryPlans, filters, planningFilterFieldMap),
+    [filters],
+  );
+  const shortageCount = filteredMaterials.filter((item) => item.shortageQty > 0).length;
+  const openRisks = [...filteredMaterials, ...filteredCapacity, ...workforcePlans, ...maintenancePlans].filter((item) => ['Critical', 'Warning', 'Review'].includes(item.status)).length;
+  const totalDemand = filteredDemand.reduce((sum, item) => sum + item.forecastQty, 0);
+  const plannedProduction = filteredProduction.reduce((sum, item) => sum + item.plannedProduction, 0);
+  const coverageDays = filteredInventory.length
+    ? Math.round(filteredInventory.reduce((sum, item) => sum + item.coverageDays, 0) / filteredInventory.length)
+    : 0;
+  const capacityUtilization = filteredCapacity.length
+    ? Math.round(filteredCapacity.reduce((sum, item) => sum + item.utilization, 0) / filteredCapacity.length)
+    : 0;
   return (
     <div className="space-y-5">
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Forecast Demand" value={totalDemand.toLocaleString()} helper="Monthly demand quantity" accent="blue" />
         <StatCard label="Planned Production" value={plannedProduction.toLocaleString()} helper="Approved and draft plan" accent="emerald" />
         <StatCard label="Material Shortages" value={shortageCount} helper="Shortage rows requiring action" accent="amber" onClick={() => navigate('/planning/materials')} />
-        <StatCard label="Inventory Coverage" value="17 days" helper="Weighted coverage" accent="violet" onClick={() => navigate('/planning/inventory')} />
-        <StatCard label="Capacity Utilization" value="97%" helper="Across work centers" accent="amber" onClick={() => navigate('/planning/capacity')} />
+        <StatCard label="Inventory Coverage" value={`${coverageDays} days`} helper="Filtered weighted coverage" accent="violet" onClick={() => navigate('/planning/inventory')} />
+        <StatCard label="Capacity Utilization" value={`${capacityUtilization}%`} helper="Across work centers" accent="amber" onClick={() => navigate('/planning/capacity')} />
         <StatCard label="Workforce Utilization" value="91%" helper="Shift labor utilization" accent="blue" onClick={() => navigate('/planning/workforce')} />
         <StatCard label="Open Planning Risks" value={openRisks} helper="Capacity, material, labor, maintenance" accent="amber" />
         <StatCard label="Planning Accuracy" value="91%" helper="Forecast versus actual orders" accent="emerald" />
       </div>
-      <PlanningFilterSidebar />
+      <PlanningFilterSidebar filters={filters} onChange={setFilters} />
       <div className="grid gap-5 xl:grid-cols-2">
-        <Panel title="Demand vs Production Plan" description="Demand quantity, planned production quantity, and gap." action={<button className="form-button-subtle" onClick={() => navigate('/planning/production')}>Open Production</button>}>
-          <PlanningTrendChart data={productionPlans.map((item) => ({ name: item.product, demand: item.forecastDemand, production: item.plannedProduction, gap: item.plannedProduction - item.forecastDemand }))} bars={['demand', 'production', 'gap']} />
+        <Panel title="Demand vs Production Plan" description="Demand quantity, planned production quantity, and gap." action={<button type="button" className="form-button-subtle" onClick={() => navigate('/planning/production')}>Open Production</button>}>
+          <PlanningTrendChart data={filteredProduction.map((item) => ({ name: item.product, demand: item.forecastDemand, production: item.plannedProduction, gap: item.plannedProduction - item.forecastDemand }))} bars={['demand', 'production', 'gap']} />
         </Panel>
-        <Panel title="Capacity Load" description="Available capacity, required capacity, and utilization." action={<button className="form-button-subtle" onClick={() => navigate('/planning/capacity')}>Open Capacity</button>}>
-          <PlanningTrendChart data={capacityPlans.map((item) => ({ name: item.workCenter, available: item.availableCapacity, required: item.requiredCapacity, utilization: item.utilization }))} bars={['available', 'required']} />
+        <Panel title="Capacity Load" description="Available capacity, required capacity, and utilization." action={<button type="button" className="form-button-subtle" onClick={() => navigate('/planning/capacity')}>Open Capacity</button>}>
+          <PlanningTrendChart data={filteredCapacity.map((item) => ({ name: item.workCenter, available: item.availableCapacity, required: item.requiredCapacity, utilization: item.utilization }))} bars={['available', 'required']} />
         </Panel>
-        <Panel title="Material Shortage Summary" description="Materials short against production requirements." action={<button className="form-button-subtle" onClick={() => navigate('/planning/materials')}>Open Materials</button>}>
-          <PlanningDataTable rows={materialRows().filter((row) => Number(row['Shortage Qty']) > 0)} />
+        <Panel title="Material Shortage Summary" description="Materials short against production requirements." action={<button type="button" className="form-button-subtle" onClick={() => navigate('/planning/materials')}>Open Materials</button>}>
+          <PlanningDataTable rows={materialRows(filteredMaterials).filter((row) => Number(row['Shortage Qty']) > 0)} />
         </Panel>
-        <Panel title="Inventory Coverage" description="Current stock versus forecast demand and coverage days." action={<button className="form-button-subtle" onClick={() => navigate('/planning/inventory')}>Open Inventory</button>}>
-          <PlanningDataTable rows={inventoryRows()} />
+        <Panel title="Inventory Coverage" description="Current stock versus forecast demand and coverage days." action={<button type="button" className="form-button-subtle" onClick={() => navigate('/planning/inventory')}>Open Inventory</button>}>
+          <PlanningDataTable rows={inventoryRows(filteredInventory)} />
         </Panel>
       </div>
       <Panel title="Planning Actions" description="Draft actions that require human approval before execution.">
@@ -263,9 +316,7 @@ function ReportsPanel() {
             <div key={report} className="rounded-xl border border-white/10 bg-slate-950/30 p-4">
               <p className="font-medium text-white">{report}</p>
               <p className="mt-2 text-sm text-slate-400">Supports preview, PDF, Excel, and CSV export.</p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {['Preview', 'PDF', 'Excel', 'CSV'].map((item) => <button key={item} className="form-button-subtle py-1 text-xs">{item}</button>)}
-              </div>
+              <ReportExportButtons reportName={report} />
             </div>
           ))}
         </div>
@@ -278,16 +329,21 @@ function AuditPanel() {
   return <Panel title="Planning Audit" description="Business-friendly audit history without raw backend IDs."><PlanningDataTable rows={auditEntries.map((item) => ({ Timestamp: item.timestamp, User: item.user, Action: item.action, 'Plan Type': item.planType, 'Plan ID': item.planId, 'Previous Value': item.previousValue, 'New Value': item.newValue, Reason: item.reason }))} /></Panel>;
 }
 
-function PlanningFilterSidebar() {
+function PlanningFilterSidebar({ filters = {}, onChange }: { filters?: ModuleFilterValues; onChange?: (next: ModuleFilterValues) => void }) {
+  function setFilter(key: string, value: string) {
+    onChange?.({ ...filters, [key]: value });
+  }
+
   return (
-    <Panel title="Planning Filters" description="Company context is fixed. No company or client filter is shown for Company Admin.">
-      <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
-        <Filter label="Plant" options={planningFilters.plants} />
-        <Filter label="Warehouse" options={planningFilters.warehouses} />
-        <Filter label="Product" options={planningFilters.products} />
-        <Filter label="Category" options={planningFilters.categories} />
-        <Filter label="Planner" options={planningFilters.planners} />
-        <Filter label="Status" options={planningFilters.statuses} />
+    <Panel title="Planning Filters" description="Company context is fixed. Filters refresh dashboard cards, charts, and tables below.">
+      <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-[repeat(6,minmax(0,1fr))_auto]">
+        <ModuleFilterSelect label="Plant" options={planningFilters.plants} value={filters.Plant ?? ''} onChange={(value) => setFilter('Plant', value)} />
+        <ModuleFilterSelect label="Warehouse" options={planningFilters.warehouses} value={filters.Warehouse ?? ''} onChange={(value) => setFilter('Warehouse', value)} />
+        <ModuleFilterSelect label="Product" options={planningFilters.products} value={filters.Product ?? ''} onChange={(value) => setFilter('Product', value)} />
+        <ModuleFilterSelect label="Category" options={planningFilters.categories} value={filters.Category ?? ''} onChange={(value) => setFilter('Category', value)} />
+        <ModuleFilterSelect label="Planner" options={planningFilters.planners} value={filters.Planner ?? ''} onChange={(value) => setFilter('Planner', value)} />
+        <ModuleFilterSelect label="Status" options={planningFilters.statuses} value={filters.Status ?? ''} onChange={(value) => setFilter('Status', value)} />
+        {onChange ? <button type="button" className="form-button-subtle self-end" onClick={() => onChange({})}>Clear</button> : null}
       </div>
     </Panel>
   );
@@ -423,10 +479,6 @@ function CompanyContext({ company }: { company: { clientName: string; clientId: 
   );
 }
 
-function Filter({ label, options }: { label: string; options: string[] }) {
-  return <label className="text-sm text-slate-300">{label}<select className="form-input mt-1 w-full"><option>All {label.toLowerCase()}</option>{options.map((item) => <option key={item}>{item}</option>)}</select></label>;
-}
-
 function Field({ label, children, className = '' }: { label: string; children: ReactNode; className?: string }) {
   return <label className={`text-sm text-slate-300 ${className}`}>{label}{children}</label>;
 }
@@ -440,14 +492,10 @@ function planningLinkClass(active: boolean) {
 }
 
 function demandRows() { return demandPlans.map((item) => ({ 'Demand Plan ID': item.id, Product: item.product, Customer: item.customer, Region: item.region, Market: item.market, 'Forecast Period': item.period, 'Forecast Qty': item.forecastQty, 'Confirmed Orders': item.confirmedOrders, Variance: item.variance, Status: item.status, Owner: item.owner, 'Last Updated': item.updated, Actions: <RowActions /> })); }
-function inventoryRows() { return inventoryPlans.map((item) => ({ 'Inventory Plan ID': item.id, Product: item.product, Plant: item.plant, Warehouse: item.warehouse, 'Current Stock': item.currentStock, 'Forecast Demand': item.forecastDemand, 'Safety Stock': item.safetyStock, 'Reorder Point': item.reorderPoint, 'Target Stock': item.targetStock, 'Coverage Days': item.coverageDays, Status: item.status, Owner: item.owner, Actions: <RowActions /> })); }
+function inventoryRows(source = inventoryPlans) { return source.map((item) => ({ 'Inventory Plan ID': item.id, Product: item.product, Plant: item.plant, Warehouse: item.warehouse, 'Current Stock': item.currentStock, 'Forecast Demand': item.forecastDemand, 'Safety Stock': item.safetyStock, 'Reorder Point': item.reorderPoint, 'Target Stock': item.targetStock, 'Coverage Days': item.coverageDays, Status: item.status, Owner: item.owner, Actions: <RowActions recordId={item.id} recordTitle={item.product} recordDetails={{ ID: item.id, Product: item.product, Plant: item.plant, Warehouse: item.warehouse, Status: item.status }} /> })); }
 function productionRows() { return productionPlans.map((item) => ({ 'Production Plan ID': item.id, Product: item.product, 'Forecast Demand': item.forecastDemand, 'Current Stock': item.currentStock, 'Required Production': item.requiredProduction, 'Planned Production': item.plannedProduction, Plant: item.plant, Line: item.line, 'Start Date': item.startDate, 'End Date': item.endDate, Status: item.status, Owner: item.owner, Actions: <RowActions /> })); }
 function capacityRows() { return capacityPlans.map((item) => ({ 'Capacity Plan ID': item.id, Plant: item.plant, Line: item.line, 'Work Center': item.workCenter, 'Available Capacity': item.availableCapacity, 'Required Capacity': item.requiredCapacity, 'Utilization %': `${item.utilization}%`, 'Capacity Gap': item.capacityGap, Status: item.status, Owner: item.owner, Actions: <RowActions /> })); }
-function materialRows() { return materialRequirements.map((item) => ({ 'MRP ID': item.id, Material: item.material, Product: item.product, 'Required Qty': item.requiredQty, 'Available Qty': item.availableQty, 'On Order Qty': item.onOrderQty, 'Shortage Qty': item.shortageQty, 'Required Date': item.requiredDate, Supplier: item.supplier, Status: item.status, Actions: <RowActions labels={['Create PR', 'View BOM', 'Export']} /> })); }
+function materialRows(source = materialRequirements) { return source.map((item) => ({ 'MRP ID': item.id, Material: item.material, Product: item.product, 'Required Qty': item.requiredQty, 'Available Qty': item.availableQty, 'On Order Qty': item.onOrderQty, 'Shortage Qty': item.shortageQty, 'Required Date': item.requiredDate, Supplier: item.supplier, Status: item.status, Actions: <RowActions labels={['Create PR', 'View BOM', 'Export']} recordId={item.id} recordTitle={item.material} recordDetails={{ ID: item.id, Material: item.material, Product: item.product, Supplier: item.supplier, Status: item.status }} /> })); }
 function procurementRows() { return procurementPlans.map((item) => ({ 'Procurement Plan ID': item.id, Material: item.material, Supplier: item.supplier, 'Required Qty': item.requiredQty, 'Purchase Qty': item.purchaseQty, 'Lead Time': `${item.leadTime} days`, 'Required Date': item.requiredDate, 'Suggested PO Date': item.suggestedPoDate, Status: item.status, Owner: item.owner, Actions: <RowActions labels={['Generate PR', 'Approve', 'Export']} /> })); }
 function workforceRows() { return workforcePlans.map((item) => ({ 'Workforce Plan ID': item.id, Plant: item.plant, Line: item.line, Shift: item.shift, 'Required Workers': item.requiredWorkers, 'Available Workers': item.availableWorkers, Gap: item.gap, 'Overtime Hours': item.overtimeHours, Status: item.status, Owner: item.owner, Actions: <RowActions /> })); }
 function maintenanceRows() { return maintenancePlans.map((item) => ({ 'Maintenance Plan ID': item.id, Asset: item.asset, Plant: item.plant, Line: item.line, 'Maintenance Type': item.type, 'Planned Date': item.plannedDate, 'Production Impact': item.productionImpact, 'Downtime Hours': item.downtimeHours, Status: item.status, Owner: item.owner, Actions: <RowActions /> })); }
-
-function RowActions({ labels = ['View', 'Edit', 'Submit'] }: { labels?: string[] }) {
-  return <div className="flex gap-2">{labels.map((label) => <button key={label} className="form-button-subtle py-1 text-xs">{label}</button>)}</div>;
-}
