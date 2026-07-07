@@ -5,6 +5,8 @@ import {
   Activity,
   BadgeCheck,
   Boxes,
+  ChevronDown,
+  ChevronRight,
   DatabaseZap,
   FileText,
   Factory,
@@ -200,6 +202,7 @@ function AuthenticatedApp({ user, onLogout }: { user: RuntimeUser; onLogout: () 
   const { state, selectedClientId, selectedClient, isPlatformContext, canSelectPlatform, selectClient, platformUser } = usePlatform();
   const location = useLocation();
   const navigate = useNavigate();
+  const [modulesExpanded, setModulesExpanded] = useState(false);
   const allowedNavItems = isPlatformContext
     ? platformNavItems
     : navItems.filter((item) => {
@@ -208,6 +211,10 @@ function AuthenticatedApp({ user, onLogout }: { user: RuntimeUser; onLogout: () 
           && (!moduleName || selectedClient?.enabledModules.includes(moduleName))
           && (!moduleName || platformUser.assignedModules.includes(moduleName));
       });
+  const primaryNavItems = allowedNavItems.filter((item) => !('moduleName' in item));
+  const moduleNavItems = allowedNavItems.filter((item) => 'moduleName' in item);
+  const activeModuleItem = moduleNavItems.find((item) => location.pathname === item.to || location.pathname.startsWith(`${item.to}/`));
+  const shouldShowModuleGroup = moduleNavItems.length > 0;
 
   return (
     <div className="app-shell min-h-screen bg-background text-white">
@@ -233,7 +240,7 @@ function AuthenticatedApp({ user, onLogout }: { user: RuntimeUser; onLogout: () 
           </div>
         </div>
         <nav className="space-y-1 p-3">
-          {allowedNavItems.map((item) => (
+          {primaryNavItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
@@ -250,6 +257,50 @@ function AuthenticatedApp({ user, onLogout }: { user: RuntimeUser; onLogout: () 
               {item.label}
             </NavLink>
           ))}
+          {shouldShowModuleGroup ? (
+            <div className="pt-1">
+              <button
+                type="button"
+                className={`group flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-sm font-medium transition ${
+                  activeModuleItem
+                    ? 'border border-cyan-300/20 bg-cyan-400/10 text-white'
+                    : 'text-slate-400 hover:bg-white/[0.06] hover:text-white'
+                }`}
+                aria-expanded={modulesExpanded}
+                onClick={() => setModulesExpanded((value) => !value)}
+              >
+                <span className="flex min-w-0 items-center gap-3">
+                  <Boxes className="h-4 w-4" />
+                  <span>Modules</span>
+                </span>
+                <span className="flex items-center gap-2 text-xs text-slate-500 group-hover:text-slate-300">
+                  {!modulesExpanded && activeModuleItem ? <span className="max-w-24 truncate">{activeModuleItem.label}</span> : null}
+                  {modulesExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                </span>
+              </button>
+              {modulesExpanded ? (
+                <div className="mt-1 space-y-1 pl-3">
+                  {moduleNavItems.map((item) => (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      end={item.to === '/'}
+                      className={({ isActive }) =>
+                        `group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
+                          isActive
+                            ? 'border border-cyan-300/20 bg-cyan-400/10 text-white'
+                            : 'text-slate-400 hover:bg-white/[0.06] hover:text-white'
+                        }`
+                      }
+                    >
+                      <item.icon className="h-4 w-4" />
+                      {item.label}
+                    </NavLink>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </nav>
       </aside>
 
@@ -295,7 +346,7 @@ function AuthenticatedApp({ user, onLogout }: { user: RuntimeUser; onLogout: () 
             </div>
           </div>
           <nav className="flex gap-1 overflow-x-auto border-t border-white/10 px-3 py-2 xl:hidden">
-            {allowedNavItems.map((item) => (
+            {primaryNavItems.map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
@@ -310,6 +361,39 @@ function AuthenticatedApp({ user, onLogout }: { user: RuntimeUser; onLogout: () 
                 {item.label}
               </NavLink>
             ))}
+            {shouldShowModuleGroup ? (
+              <>
+                <button
+                  type="button"
+                  className={`flex min-w-max items-center gap-2 rounded-xl px-3 py-2 text-sm ${
+                    activeModuleItem ? 'border border-cyan-300/20 bg-cyan-400/10 text-white' : 'text-slate-400'
+                  }`}
+                  aria-expanded={modulesExpanded}
+                  onClick={() => setModulesExpanded((value) => !value)}
+                >
+                  <Boxes className="h-4 w-4" />
+                  Modules
+                  {modulesExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                </button>
+                {modulesExpanded
+                  ? moduleNavItems.map((item) => (
+                      <NavLink
+                        key={item.to}
+                        to={item.to}
+                        end={item.to === '/'}
+                        className={({ isActive }) =>
+                          `flex min-w-max items-center gap-2 rounded-xl px-3 py-2 text-sm ${
+                            isActive ? 'border border-cyan-300/20 bg-cyan-400/10 text-white' : 'text-slate-400'
+                          }`
+                        }
+                      >
+                        <item.icon className="h-4 w-4" />
+                        {item.label}
+                      </NavLink>
+                    ))
+                  : null}
+              </>
+            ) : null}
           </nav>
         </header>
 
