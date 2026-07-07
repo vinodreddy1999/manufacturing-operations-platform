@@ -6,6 +6,7 @@ import {
   BadgeCheck,
   Boxes,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   DatabaseZap,
   FileText,
@@ -202,6 +203,7 @@ function AuthenticatedApp({ user, onLogout }: { user: RuntimeUser; onLogout: () 
   const { state, selectedClientId, selectedClient, isPlatformContext, canSelectPlatform, selectClient, platformUser } = usePlatform();
   const location = useLocation();
   const navigate = useNavigate();
+  const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [modulesExpanded, setModulesExpanded] = useState(false);
   const allowedNavItems = isPlatformContext
     ? platformNavItems
@@ -218,27 +220,56 @@ function AuthenticatedApp({ user, onLogout }: { user: RuntimeUser; onLogout: () 
 
   return (
     <div className="app-shell min-h-screen bg-background text-white">
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-white/10 bg-slate-950/70 backdrop-blur-xl xl:block">
-        <div className="flex h-16 items-center gap-3 border-b border-white/10 px-5">
+      <aside
+        className={`fixed inset-y-0 left-0 z-30 hidden border-r border-white/10 bg-slate-950/70 backdrop-blur-xl transition-all duration-200 xl:block ${
+          sidebarExpanded ? 'w-64' : 'w-20'
+        }`}
+      >
+        <div className={`flex h-16 items-center border-b border-white/10 px-4 ${sidebarExpanded ? 'justify-between gap-3' : 'justify-center'}`}>
           <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-cyan-300/20 bg-cyan-400/10 text-cyan-100">
             <Boxes className="h-5 w-5" />
           </div>
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-200">METAM</p>
-            <p className="text-xs text-slate-400">Services</p>
-          </div>
+          {sidebarExpanded ? (
+            <>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-200">METAM</p>
+                <p className="text-xs text-slate-400">Services</p>
+              </div>
+              <button
+                type="button"
+                className="focus-ring rounded-xl border border-white/10 bg-white/8 p-2 text-slate-300 hover:bg-white/12 hover:text-white"
+                aria-label="Hide sidebar names"
+                onClick={() => setSidebarExpanded(false)}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+            </>
+          ) : null}
         </div>
-        <div className="px-4 pt-4">
-          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Signed in</p>
-            <p className="mt-2 truncate text-sm font-semibold text-white">{platformUser.fullName}</p>
-            <p className="mt-1 text-sm text-slate-300">{user.email}</p>
-            <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/8 px-3 py-1 text-xs font-semibold uppercase tracking-[0.1em] text-cyan-100">
-              <BadgeCheck className="h-3.5 w-3.5" />
-              {user.role.replace('_', ' ')}
+        {sidebarExpanded ? (
+          <div className="px-4 pt-4">
+            <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Signed in</p>
+              <p className="mt-2 truncate text-sm font-semibold text-white">{platformUser.fullName}</p>
+              <p className="mt-1 text-sm text-slate-300">{user.email}</p>
+              <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/8 px-3 py-1 text-xs font-semibold uppercase tracking-[0.1em] text-cyan-100">
+                <BadgeCheck className="h-3.5 w-3.5" />
+                {user.role.replace('_', ' ')}
+              </div>
             </div>
           </div>
-        </div>
+        ) : (
+          <div className="px-3 pt-4">
+            <button
+              type="button"
+              className="focus-ring flex w-full items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-cyan-100 hover:bg-white/8"
+              aria-label="Show sidebar names"
+              onClick={() => setSidebarExpanded(true)}
+            >
+              <ChevronRight className="h-5 w-5" />
+            </button>
+          </div>
+        )}
         <nav className="space-y-1 p-3">
           {primaryNavItems.map((item) => (
             <NavLink
@@ -246,39 +277,49 @@ function AuthenticatedApp({ user, onLogout }: { user: RuntimeUser; onLogout: () 
               to={item.to}
               end={item.to === '/'}
               className={({ isActive }) =>
-                `group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
+                `group flex items-center rounded-xl px-3 py-2.5 text-sm font-medium transition ${
                   isActive
                     ? 'border border-cyan-300/20 bg-cyan-400/10 text-white'
                     : 'text-slate-400 hover:bg-white/[0.06] hover:text-white'
-                }`
+                } ${sidebarExpanded ? 'gap-3 justify-start' : 'justify-center'}`
               }
+              title={sidebarExpanded ? undefined : item.label}
             >
               <item.icon className="h-4 w-4" />
-              {item.label}
+              {sidebarExpanded ? item.label : null}
             </NavLink>
           ))}
           {shouldShowModuleGroup ? (
             <div className="pt-1">
               <button
                 type="button"
-                className={`group flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-sm font-medium transition ${
+                className={`group flex w-full items-center rounded-xl px-3 py-2.5 text-sm font-medium transition ${
                   activeModuleItem
                     ? 'border border-cyan-300/20 bg-cyan-400/10 text-white'
                     : 'text-slate-400 hover:bg-white/[0.06] hover:text-white'
-                }`}
-                aria-expanded={modulesExpanded}
-                onClick={() => setModulesExpanded((value) => !value)}
+                } ${sidebarExpanded ? 'justify-between' : 'justify-center'}`}
+                aria-expanded={sidebarExpanded && modulesExpanded}
+                title={sidebarExpanded ? undefined : 'Modules'}
+                onClick={() => {
+                  if (!sidebarExpanded) {
+                    setSidebarExpanded(true);
+                    setModulesExpanded(true);
+                    return;
+                  }
+                  setModulesExpanded((value) => !value);
+                }}
               >
                 <span className="flex min-w-0 items-center gap-3">
                   <Boxes className="h-4 w-4" />
-                  <span>Modules</span>
+                  {sidebarExpanded ? <span>Modules</span> : null}
                 </span>
-                <span className="flex items-center gap-2 text-xs text-slate-500 group-hover:text-slate-300">
-                  {!modulesExpanded && activeModuleItem ? <span className="max-w-24 truncate">{activeModuleItem.label}</span> : null}
-                  {modulesExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                </span>
+                {sidebarExpanded ? (
+                  <span className="flex items-center gap-2 text-xs text-slate-500 group-hover:text-slate-300">
+                    {modulesExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  </span>
+                ) : null}
               </button>
-              {modulesExpanded ? (
+              {sidebarExpanded && modulesExpanded ? (
                 <div className="mt-1 space-y-1 pl-3">
                   {moduleNavItems.map((item) => (
                     <NavLink
@@ -304,7 +345,7 @@ function AuthenticatedApp({ user, onLogout }: { user: RuntimeUser; onLogout: () 
         </nav>
       </aside>
 
-      <div className="xl:pl-64">
+      <div className={`transition-all duration-200 ${sidebarExpanded ? 'xl:pl-64' : 'xl:pl-20'}`}>
         <header className="sticky top-0 z-20 border-b border-white/10 bg-slate-950/70 backdrop-blur-xl">
           <div className="flex h-16 items-center justify-between gap-4 px-4 sm:px-6">
             <div className="flex items-center gap-3">
