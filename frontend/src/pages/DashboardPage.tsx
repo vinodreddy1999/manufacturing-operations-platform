@@ -11,6 +11,7 @@ import { Panel } from '../components/Panel';
 import { StatCard } from '../components/StatCard';
 import { StatusBadge } from '../components/StatusBadge';
 import { formatCurrency, formatNumber, toTitle } from '../lib/format';
+import { canAccessModule, canAccessPage, canAccessSection } from '../lib/rbac';
 import { backend } from '../services/api';
 import type { ModuleRecord, RuntimeUser } from '../types';
 import { usePlatform } from '../platform/PlatformContext';
@@ -53,23 +54,41 @@ function moduleRoute(moduleKey: string) {
 
 export function DashboardPage({ user }: { user: RuntimeUser }) {
   const navigate = useNavigate();
-  const { currency, selectedClient } = usePlatform();
-  const admin = useQuery({ queryKey: ['admin-dashboard'], queryFn: backend.adminDashboard });
-  const inventory = useQuery({ queryKey: ['inventory-dashboard'], queryFn: backend.inventoryDashboard });
-  const analytics = useQuery({ queryKey: ['runtime-analytics'], queryFn: backend.analytics });
-  const systems = useQuery({ queryKey: ['connected-systems'], queryFn: backend.connectedSystems });
-  const uploads = useQuery({ queryKey: ['data-hub-uploads'], queryFn: backend.uploads });
-  const records = useQuery({ queryKey: ['runtime-records'], queryFn: () => backend.records() });
+  const { currency, selectedClient, platformUser, isPlatformContext } = usePlatform();
+  const permissionContext = { user, selectedClient, platformUser, isPlatformContext };
+  const canViewAdmin = canAccessSection(user, 'admin');
+  const canViewDataHub = canAccessSection(user, 'data-hub');
+  const canViewOperations = canAccessSection(user, 'operations');
+  const canViewInventory = canAccessModule(permissionContext, 'Inventory');
+  const canViewProduction = canAccessModule(permissionContext, 'Production');
+  const canViewMaintenance = canAccessModule(permissionContext, 'Maintenance');
+  const canViewQuality = canAccessModule(permissionContext, 'Quality');
+  const canViewProcurement = canAccessModule(permissionContext, 'Procurement');
 
-  const isLoading = admin.isLoading || inventory.isLoading || analytics.isLoading || systems.isLoading || uploads.isLoading || records.isLoading;
-  const firstError = admin.error ?? inventory.error ?? analytics.error ?? systems.error ?? uploads.error ?? records.error;
+  const admin = useQuery({ queryKey: ['admin-dashboard'], queryFn: backend.adminDashboard, enabled: canViewAdmin });
+  const inventory = useQuery({ queryKey: ['inventory-dashboard'], queryFn: backend.inventoryDashboard, enabled: canViewInventory });
+  const analytics = useQuery({ queryKey: ['runtime-analytics'], queryFn: backend.analytics, enabled: canViewOperations });
+  const systems = useQuery({ queryKey: ['connected-systems'], queryFn: backend.connectedSystems, enabled: canViewDataHub });
+  const uploads = useQuery({ queryKey: ['data-hub-uploads'], queryFn: backend.uploads, enabled: canViewDataHub });
+  const records = useQuery({ queryKey: ['runtime-records'], queryFn: () => backend.records(), enabled: canViewOperations });
+
+  const activeQueries = [
+    canViewAdmin ? admin : null,
+    canViewInventory ? inventory : null,
+    canViewOperations ? analytics : null,
+    canViewDataHub ? systems : null,
+    canViewDataHub ? uploads : null,
+    canViewOperations ? records : null,
+  ].filter(Boolean);
+  const isLoading = activeQueries.some((query) => query?.isLoading);
+  const firstError = activeQueries.map((query) => query?.error).find(Boolean);
 
   if (isLoading) {
     return <LoadingState label="Loading backend dashboard data" />;
   }
 
   if (firstError) {
-    return <ErrorState title="Dashboard backend data failed" error={firstError} />;
+    return <ErrorState title="Dashboard data unavailable" error={firstError} />;
   }
 
   const allRecords = records.data ?? [];
@@ -90,6 +109,7 @@ export function DashboardPage({ user }: { user: RuntimeUser }) {
       helper: `${formatNumber(admin.data?.user_count)} total users`,
       accent: 'emerald' as const,
       route: '/admin',
+      visible: canViewAdmin,
     },
     {
       label: 'Backend Records',
@@ -97,6 +117,7 @@ export function DashboardPage({ user }: { user: RuntimeUser }) {
       helper: 'All module records',
       accent: 'blue' as const,
       route: '/operations',
+      visible: canViewOperations,
     },
     {
       label: 'Inventory Value',
@@ -104,6 +125,7 @@ export function DashboardPage({ user }: { user: RuntimeUser }) {
       helper: `${formatNumber(analytics.data?.inventory_total_quantity)} units tracked`,
       accent: 'amber' as const,
       route: '/inventory',
+      visible: canViewInventory,
     },
     {
       label: 'Open Approvals',
@@ -111,6 +133,7 @@ export function DashboardPage({ user }: { user: RuntimeUser }) {
       helper: 'Waiting for action',
       accent: 'violet' as const,
       route: '/admin',
+      visible: canViewAdmin,
     },
     {
       label: 'Active Integrations',
@@ -118,37 +141,38 @@ export function DashboardPage({ user }: { user: RuntimeUser }) {
       helper: 'ERP, files, APIs, SFTP',
       accent: 'blue' as const,
       route: '/data-hub',
+      visible: canViewDataHub,
     },
-  ];
+  ].filter((metric) => metric.visible && canAccessPage(permissionContext, metric.route));
 
   const operationalStatus = [
-    { area: 'Production', status: 'Backend', value: productionScore, route: '/production' },
-    { area: 'Maintenance', status: 'Backend', value: maintenanceScore, route: '/maintenance' },
-    { area: 'Quality', status: 'Backend', value: qualityScore, route: '/quality' },
-    { area: 'Procurement', status: 'Backend', value: procurementScore, route: '/procurement' },
-    { area: 'Inventory', status: 'Backend', value: inventoryScore, route: '/inventory' },
-  ];
+    { area: 'Production', status: 'Backend', value: productionScore, route: '/production', visible: canViewProduction },
+    { area: 'Maintenance', status: 'Backend', value: maintenanceScore, route: '/maintenance', visible: canViewMaintenance },
+    { area: 'Quality', status: 'Backend', value: qualityScore, route: '/quality', visible: canViewQuality },
+    { area: 'Procurement', status: 'Backend', value: procurementScore, route: '/procurement', visible: canViewProcurement },
+    { area: 'Inventory', status: 'Backend', value: inventoryScore, route: '/inventory', visible: canViewInventory },
+  ].filter((item) => item.visible && canAccessPage(permissionContext, item.route));
 
   const notifications = [
-    ...lowStockItems.slice(0, 2).map((item) => ({
+    ...(canViewInventory ? lowStockItems.slice(0, 2).map((item) => ({
       title: `${item.name} is low stock`,
       owner: item.record_code,
       status: 'Review',
       route: '/inventory',
-    })),
-    {
+    })) : []),
+    ...(canViewAdmin ? [{
       title: `${formatNumber(admin.data?.pending_actions)} pending admin actions`,
       owner: 'Admin workflow',
       status: (admin.data?.pending_actions ?? 0) > 0 ? 'Pending' : 'Closed',
       route: '/admin',
-    },
-    {
+    }] : []),
+    ...(canViewDataHub ? [{
       title: `${formatNumber(fileUploads.length)} DataHub uploads available`,
       owner: 'DataHub',
       status: fileUploads.length ? 'Ready' : 'Open',
       route: '/data-hub',
-    },
-  ];
+    }] : []),
+  ].filter((item) => canAccessPage(permissionContext, item.route));
 
   const widgetRows = Object.entries(moduleCounts).map(([module, count]) => ({
     widget: `${toTitle(module)} Workspace`,
@@ -156,7 +180,7 @@ export function DashboardPage({ user }: { user: RuntimeUser }) {
     records: count,
     status: count > 0 ? 'Enabled' : 'Empty',
     route: moduleRoute(module),
-  }));
+  })).filter((row) => canAccessPage(permissionContext, row.route));
 
   return (
     <>
@@ -180,11 +204,13 @@ export function DashboardPage({ user }: { user: RuntimeUser }) {
       </div>
 
       <div className="mt-6 grid gap-4 xl:grid-cols-[1fr_0.9fr]">
-        <Panel title="Operational Status" description="High-level operational health across core business functions.">
-          <LazyBarChart data={operationalStatus.map((item) => ({ name: item.area, value: item.value }))} bars={['value']} height="h-80" showGrid={false} />
-        </Panel>
+        {operationalStatus.length ? (
+          <Panel title="Operational Status" description="High-level operational health across core business functions.">
+            <LazyBarChart data={operationalStatus.map((item) => ({ name: item.area, value: item.value }))} bars={['value']} height="h-80" showGrid={false} />
+          </Panel>
+        ) : null}
 
-        <Panel title="Open Notifications" description="Operational items that require review or action.">
+        {notifications.length ? <Panel title="Open Notifications" description="Operational items that require review or action.">
           <div className="space-y-3">
             {notifications.map((item) => (
               <button key={item.title} className="w-full rounded-xl border border-white/10 bg-slate-950/25 p-3 text-left transition hover:border-cyan-300/30 hover:bg-slate-900/50" onClick={() => navigate(item.route)}>
@@ -198,14 +224,14 @@ export function DashboardPage({ user }: { user: RuntimeUser }) {
               </button>
             ))}
           </div>
-        </Panel>
+        </Panel> : null}
       </div>
 
       <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Production Status" value={`${productionScore}%`} helper="Open production workspace" icon={<PackageCheck className="h-5 w-5" />} accent="blue" onClick={() => navigate('/production')} />
-        <StatCard label="Quality Status" value={`${qualityScore}%`} helper="Open quality workspace" icon={<CheckCircle2 className="h-5 w-5" />} accent="emerald" onClick={() => navigate('/quality')} />
-        <StatCard label="Procurement Status" value={`${procurementScore}%`} helper="Open procurement workspace" icon={<ShoppingCart className="h-5 w-5" />} accent="amber" onClick={() => navigate('/procurement')} />
-        <StatCard label="Inventory Status" value={`${inventoryScore}%`} helper="Open inventory workspace" icon={<Boxes className="h-5 w-5" />} accent="violet" onClick={() => navigate('/inventory')} />
+        {canViewProduction ? <StatCard label="Production Status" value={`${productionScore}%`} helper="Open production workspace" icon={<PackageCheck className="h-5 w-5" />} accent="blue" onClick={() => navigate('/production')} /> : null}
+        {canViewQuality ? <StatCard label="Quality Status" value={`${qualityScore}%`} helper="Open quality workspace" icon={<CheckCircle2 className="h-5 w-5" />} accent="emerald" onClick={() => navigate('/quality')} /> : null}
+        {canViewProcurement ? <StatCard label="Procurement Status" value={`${procurementScore}%`} helper="Open procurement workspace" icon={<ShoppingCart className="h-5 w-5" />} accent="amber" onClick={() => navigate('/procurement')} /> : null}
+        {canViewInventory ? <StatCard label="Inventory Status" value={`${inventoryScore}%`} helper="Open inventory workspace" icon={<Boxes className="h-5 w-5" />} accent="violet" onClick={() => navigate('/inventory')} /> : null}
       </div>
 
       <div className="mt-6 grid gap-4 xl:grid-cols-2">
@@ -233,10 +259,10 @@ export function DashboardPage({ user }: { user: RuntimeUser }) {
 
         <Panel title="Integration Snapshot" description="ERP, database, upload, REST API, and SFTP connection overview.">
           <div className="grid gap-3 sm:grid-cols-2">
-            <StatCard label="ERP Systems" value={formatNumber(connectedSystems.filter((system) => system.system_type.toLowerCase().includes('erp')).length)} helper="Open Data Hub connections" icon={<Link2 className="h-5 w-5" />} onClick={() => navigate('/data-hub')} />
-            <StatCard label="File Uploads" value={formatNumber(fileUploads.length)} helper="Open upload center" icon={<Activity className="h-5 w-5" />} accent="emerald" onClick={() => navigate('/data-hub')} />
-            <StatCard label="Open Alerts" value={formatNumber((admin.data?.pending_actions ?? 0) + (analytics.data?.inventory_low_stock_count ?? 0))} helper="Open admin and inventory queues" icon={<Bell className="h-5 w-5" />} accent="amber" onClick={() => navigate('/admin')} />
-            <StatCard label="REST APIs" value={formatNumber(connectedSystems.filter((system) => system.system_type.toLowerCase().includes('api')).length)} helper="Open Data Hub integrations" icon={<Link2 className="h-5 w-5" />} accent="violet" onClick={() => navigate('/data-hub')} />
+            {canViewDataHub ? <StatCard label="ERP Systems" value={formatNumber(connectedSystems.filter((system) => system.system_type.toLowerCase().includes('erp')).length)} helper="Open Data Hub connections" icon={<Link2 className="h-5 w-5" />} onClick={() => navigate('/data-hub')} /> : null}
+            {canViewDataHub ? <StatCard label="File Uploads" value={formatNumber(fileUploads.length)} helper="Open upload center" icon={<Activity className="h-5 w-5" />} accent="emerald" onClick={() => navigate('/data-hub')} /> : null}
+            {canViewAdmin ? <StatCard label="Open Alerts" value={formatNumber((admin.data?.pending_actions ?? 0) + (analytics.data?.inventory_low_stock_count ?? 0))} helper="Open admin and inventory queues" icon={<Bell className="h-5 w-5" />} accent="amber" onClick={() => navigate('/admin')} /> : null}
+            {canViewDataHub ? <StatCard label="REST APIs" value={formatNumber(connectedSystems.filter((system) => system.system_type.toLowerCase().includes('api')).length)} helper="Open Data Hub integrations" icon={<Link2 className="h-5 w-5" />} accent="violet" onClick={() => navigate('/data-hub')} /> : null}
           </div>
         </Panel>
       </div>

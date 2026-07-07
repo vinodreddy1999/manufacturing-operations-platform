@@ -19,10 +19,9 @@ import {
   Wrench,
 } from 'lucide-react';
 
-import { AccessDeniedState } from '../components/AccessDeniedState';
 import { LazyChunkBoundary } from '../components/LazyChunkBoundary';
 import { LoadingState } from '../components/LoadingState';
-import { canAccessSection } from '../lib/rbac';
+import { canAccessModule, canAccessPage, canAccessSection, firstAllowedPath } from '../lib/rbac';
 import { apiConfig, backend } from '../services/api';
 import type { RuntimeUser } from '../types';
 import { PlatformProvider, usePlatform } from '../platform/PlatformContext';
@@ -203,14 +202,11 @@ function AuthenticatedApp({ user, onLogout }: { user: RuntimeUser; onLogout: () 
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarExpanded, setSidebarExpanded] = useState(() => sessionStorage.getItem('metam-sidebar-expanded') === 'true');
+  const permissionContext = { user, selectedClient, platformUser, isPlatformContext };
   const allowedNavItems = isPlatformContext
-    ? platformNavItems
-    : navItems.filter((item) => {
-        const moduleName = 'moduleName' in item ? item.moduleName : undefined;
-        return canAccessSection(user, item.section)
-          && (!moduleName || selectedClient?.enabledModules.includes(moduleName))
-          && (!moduleName || platformUser.assignedModules.includes(moduleName));
-      });
+    ? platformNavItems.filter((item) => canAccessPage(permissionContext, item.to))
+    : navItems.filter((item) => canAccessPage(permissionContext, item.to));
+  const allowedFallbackPath = allowedNavItems[0]?.to ?? firstAllowedPath(permissionContext, [...platformNavItems.map((item) => item.to), ...navItems.map((item) => item.to)]);
 
   useEffect(() => {
     sessionStorage.setItem('metam-sidebar-expanded', String(sidebarExpanded));
@@ -356,8 +352,8 @@ function AuthenticatedApp({ user, onLogout }: { user: RuntimeUser; onLogout: () 
             <Suspense fallback={<LoadingState label="Loading workspace view" />}>
               <Routes>
               <Route path="/" element={isPlatformContext ? <PlatformDashboardPage /> : <DashboardPage user={user} />} />
-              <Route path="/platform" element={<PlatformOnly user={user}>{isPlatformContext ? <PlatformDashboardPage /> : <DashboardPage user={user} />}</PlatformOnly>} />
-              <Route path="/platform/modules/:moduleName" element={<PlatformOnly user={user}><PlatformModulePage /></PlatformOnly>} />
+              <Route path="/platform" element={<PlatformOnly user={user} fallbackPath={allowedFallbackPath}>{isPlatformContext ? <PlatformDashboardPage /> : <DashboardPage user={user} />}</PlatformOnly>} />
+              <Route path="/platform/modules/:moduleName" element={<PlatformOnly user={user} fallbackPath={allowedFallbackPath}><PlatformModulePage /></PlatformOnly>} />
               <Route path="/platform/widgets" element={<Navigate to="/platform?workspace=modules" replace />} />
               <Route path="/admin/clients" element={<Navigate to="/platform?workspace=clients" replace />} />
               <Route path="/admin/clients/create" element={<Navigate to="/platform?workspace=clients" replace />} />
@@ -366,36 +362,36 @@ function AuthenticatedApp({ user, onLogout }: { user: RuntimeUser; onLogout: () 
               <Route path="/admin/users" element={<Navigate to="/platform?workspace=users" replace />} />
               <Route path="/admin/users/create" element={<Navigate to="/platform?workspace=users" replace />} />
               <Route path="/dashboard/:focus" element={<DashboardPage user={user} />} />
-              <Route path="/admin" element={<ProtectedRoute user={user} section="admin"><Navigate to="/admin/company" replace /></ProtectedRoute>} />
-              <Route path="/admin/company" element={<ProtectedRoute user={user} section="admin"><AdminCenterPage section="company" user={user} /></ProtectedRoute>} />
-              <Route path="/admin/roles" element={<ProtectedRoute user={user} section="admin"><AdminCenterPage section="roles" user={user} /></ProtectedRoute>} />
-              <Route path="/admin/access" element={<ProtectedRoute user={user} section="admin"><AdminCenterPage section="access" user={user} /></ProtectedRoute>} />
-              <Route path="/admin/modules" element={<ProtectedRoute user={user} section="admin"><AdminCenterPage section="modules" user={user} /></ProtectedRoute>} />
-              <Route path="/admin/dashboards" element={<ProtectedRoute user={user} section="admin"><AdminCenterPage section="dashboards" user={user} /></ProtectedRoute>} />
-              <Route path="/admin/data-scope" element={<ProtectedRoute user={user} section="admin"><AdminCenterPage section="data-scope" user={user} /></ProtectedRoute>} />
-              <Route path="/admin/audit" element={<ProtectedRoute user={user} section="admin"><AdminCenterPage section="audit" user={user} /></ProtectedRoute>} />
-              <Route path="/admin/business-impact" element={<ProtectedRoute user={user} section="admin"><AdminCenterPage section="business-impact" user={user} /></ProtectedRoute>} />
-              <Route path="/admin/recommendations" element={<ProtectedRoute user={user} section="admin"><AdminCenterPage section="recommendations" user={user} /></ProtectedRoute>} />
-              <Route path="/admin/settings" element={<ProtectedRoute user={user} section="admin"><AdminCenterPage section="settings" user={user} /></ProtectedRoute>} />
-              <Route path="/admin/performance" element={<ProtectedRoute user={user} section="admin"><PerformancePage /></ProtectedRoute>} />
-              <Route path="/data-hub" element={<ProtectedRoute user={user} section="data-hub"><DataHubPage user={user} /></ProtectedRoute>} />
-              <Route path="/operations" element={<ProtectedRoute user={user} section="operations"><OperationsPage user={user} /></ProtectedRoute>} />
-              <Route path="/intelligence" element={<ProtectedRoute user={user} section="intelligence"><IntelligencePage /></ProtectedRoute>} />
-              <Route path="/planning/*" element={<ProtectedRoute user={user} section="operations"><PlanningModulePage user={user} /></ProtectedRoute>} />
-              <Route path="/inventory/*" element={<ProtectedRoute user={user} section="operations"><InventoryModulePage user={user} /></ProtectedRoute>} />
-              <Route path="/warehouse/*" element={<ProtectedRoute user={user} section="operations"><WarehouseModulePage user={user} /></ProtectedRoute>} />
-              <Route path="/production/*" element={<ProtectedRoute user={user} section="operations"><ProductionModulePage user={user} /></ProtectedRoute>} />
-              <Route path="/maintenance/*" element={<ProtectedRoute user={user} section="operations"><MaintenanceModulePage user={user} /></ProtectedRoute>} />
-              <Route path="/quality" element={<ProtectedRoute user={user} section="operations"><ModuleWorkspacePage moduleKey="quality" user={user} /></ProtectedRoute>} />
-              <Route path="/procurement" element={<ProtectedRoute user={user} section="operations"><ModuleWorkspacePage moduleKey="procurement" user={user} /></ProtectedRoute>} />
-              <Route path="/sales" element={<ProtectedRoute user={user} section="operations"><ModuleWorkspacePage moduleKey="sales" user={user} /></ProtectedRoute>} />
-              <Route path="/costing" element={<ProtectedRoute user={user} section="operations"><ModuleWorkspacePage moduleKey="costing" user={user} /></ProtectedRoute>} />
-              <Route path="/compliance" element={<ProtectedRoute user={user} section="operations"><ModuleWorkspacePage moduleKey="compliance" user={user} /></ProtectedRoute>} />
-              <Route path="/customer-portal" element={<ProtectedRoute user={user} section="operations"><ModuleWorkspacePage moduleKey="customer-portal" user={user} /></ProtectedRoute>} />
-              <Route path="/supplier-portal" element={<ProtectedRoute user={user} section="operations"><ModuleWorkspacePage moduleKey="supplier-portal" user={user} /></ProtectedRoute>} />
-              <Route path="/reports" element={<ProtectedRoute user={user} section="operations"><BusinessImpactDashboard /></ProtectedRoute>} />
-              <Route path="/documents" element={<ProtectedRoute user={user} section="operations"><ModuleWorkspacePage moduleKey="documents" user={user} /></ProtectedRoute>} />
-              <Route path="/impact/:module/:metric" element={<ProtectedRoute user={user} section="operations"><ImpactDrilldownPage /></ProtectedRoute>} />
+              <Route path="/admin" element={<ProtectedRoute user={user} section="admin" fallbackPath={allowedFallbackPath}><Navigate to="/admin/company" replace /></ProtectedRoute>} />
+              <Route path="/admin/company" element={<ProtectedRoute user={user} section="admin" fallbackPath={allowedFallbackPath}><AdminCenterPage section="company" user={user} /></ProtectedRoute>} />
+              <Route path="/admin/roles" element={<ProtectedRoute user={user} section="admin" fallbackPath={allowedFallbackPath}><AdminCenterPage section="roles" user={user} /></ProtectedRoute>} />
+              <Route path="/admin/access" element={<ProtectedRoute user={user} section="admin" fallbackPath={allowedFallbackPath}><AdminCenterPage section="access" user={user} /></ProtectedRoute>} />
+              <Route path="/admin/modules" element={<ProtectedRoute user={user} section="admin" fallbackPath={allowedFallbackPath}><AdminCenterPage section="modules" user={user} /></ProtectedRoute>} />
+              <Route path="/admin/dashboards" element={<ProtectedRoute user={user} section="admin" fallbackPath={allowedFallbackPath}><AdminCenterPage section="dashboards" user={user} /></ProtectedRoute>} />
+              <Route path="/admin/data-scope" element={<ProtectedRoute user={user} section="admin" fallbackPath={allowedFallbackPath}><AdminCenterPage section="data-scope" user={user} /></ProtectedRoute>} />
+              <Route path="/admin/audit" element={<ProtectedRoute user={user} section="admin" fallbackPath={allowedFallbackPath}><AdminCenterPage section="audit" user={user} /></ProtectedRoute>} />
+              <Route path="/admin/business-impact" element={<ProtectedRoute user={user} section="admin" fallbackPath={allowedFallbackPath}><AdminCenterPage section="business-impact" user={user} /></ProtectedRoute>} />
+              <Route path="/admin/recommendations" element={<ProtectedRoute user={user} section="admin" fallbackPath={allowedFallbackPath}><AdminCenterPage section="recommendations" user={user} /></ProtectedRoute>} />
+              <Route path="/admin/settings" element={<ProtectedRoute user={user} section="admin" fallbackPath={allowedFallbackPath}><AdminCenterPage section="settings" user={user} /></ProtectedRoute>} />
+              <Route path="/admin/performance" element={<ProtectedRoute user={user} section="admin" fallbackPath={allowedFallbackPath}><PerformancePage /></ProtectedRoute>} />
+              <Route path="/data-hub" element={<ProtectedRoute user={user} section="data-hub" fallbackPath={allowedFallbackPath}><DataHubPage user={user} /></ProtectedRoute>} />
+              <Route path="/operations" element={<ProtectedRoute user={user} section="operations" fallbackPath={allowedFallbackPath}><OperationsPage user={user} /></ProtectedRoute>} />
+              <Route path="/intelligence" element={<ProtectedRoute user={user} section="intelligence" fallbackPath={allowedFallbackPath}><IntelligencePage /></ProtectedRoute>} />
+              <Route path="/planning/*" element={<ModuleRoute user={user} moduleName="Planning" fallbackPath={allowedFallbackPath}><PlanningModulePage user={user} /></ModuleRoute>} />
+              <Route path="/inventory/*" element={<ModuleRoute user={user} moduleName="Inventory" fallbackPath={allowedFallbackPath}><InventoryModulePage user={user} /></ModuleRoute>} />
+              <Route path="/warehouse/*" element={<ModuleRoute user={user} moduleName="Warehouse" fallbackPath={allowedFallbackPath}><WarehouseModulePage user={user} /></ModuleRoute>} />
+              <Route path="/production/*" element={<ModuleRoute user={user} moduleName="Production" fallbackPath={allowedFallbackPath}><ProductionModulePage user={user} /></ModuleRoute>} />
+              <Route path="/maintenance/*" element={<ModuleRoute user={user} moduleName="Maintenance" fallbackPath={allowedFallbackPath}><MaintenanceModulePage user={user} /></ModuleRoute>} />
+              <Route path="/quality" element={<ModuleRoute user={user} moduleName="Quality" fallbackPath={allowedFallbackPath}><ModuleWorkspacePage moduleKey="quality" user={user} /></ModuleRoute>} />
+              <Route path="/procurement" element={<ModuleRoute user={user} moduleName="Procurement" fallbackPath={allowedFallbackPath}><ModuleWorkspacePage moduleKey="procurement" user={user} /></ModuleRoute>} />
+              <Route path="/sales" element={<ModuleRoute user={user} moduleName="Sales & Distribution" fallbackPath={allowedFallbackPath}><ModuleWorkspacePage moduleKey="sales" user={user} /></ModuleRoute>} />
+              <Route path="/costing" element={<ModuleRoute user={user} moduleName="Costing & Profitability" fallbackPath={allowedFallbackPath}><ModuleWorkspacePage moduleKey="costing" user={user} /></ModuleRoute>} />
+              <Route path="/compliance" element={<ModuleRoute user={user} moduleName="Compliance" fallbackPath={allowedFallbackPath}><ModuleWorkspacePage moduleKey="compliance" user={user} /></ModuleRoute>} />
+              <Route path="/customer-portal" element={<ModuleRoute user={user} moduleName="Customer Portal" fallbackPath={allowedFallbackPath}><ModuleWorkspacePage moduleKey="customer-portal" user={user} /></ModuleRoute>} />
+              <Route path="/supplier-portal" element={<ModuleRoute user={user} moduleName="Supplier Portal" fallbackPath={allowedFallbackPath}><ModuleWorkspacePage moduleKey="supplier-portal" user={user} /></ModuleRoute>} />
+              <Route path="/reports" element={<ModuleRoute user={user} moduleName="Reports & Analytics" fallbackPath={allowedFallbackPath}><BusinessImpactDashboard /></ModuleRoute>} />
+              <Route path="/documents" element={<ModuleRoute user={user} moduleName="Document Management" fallbackPath={allowedFallbackPath}><ModuleWorkspacePage moduleKey="documents" user={user} /></ModuleRoute>} />
+              <Route path="/impact/:module/:metric" element={<ProtectedRoute user={user} section="operations" fallbackPath={allowedFallbackPath}><ImpactDrilldownPage /></ProtectedRoute>} />
               </Routes>
             </Suspense>
           </LazyChunkBoundary>
@@ -408,32 +404,34 @@ function AuthenticatedApp({ user, onLogout }: { user: RuntimeUser; onLogout: () 
 function ProtectedRoute({
   user,
   section,
+  fallbackPath,
   children,
 }: {
   user: RuntimeUser;
   section: 'admin' | 'data-hub' | 'operations' | 'intelligence';
+  fallbackPath: string;
   children: ReactNode;
 }) {
   if (!canAccessSection(user, section)) {
-    return (
-      <AccessDeniedState
-        title="This workspace is not enabled for your role"
-        description={`Your ${user.role.replace('_', ' ')} account is active, but it does not include the ${section.replace('-', ' ')} workspace.`}
-      />
-    );
+    return <Navigate to={fallbackPath} replace />;
   }
 
   return children;
 }
 
-function PlatformOnly({ user, children }: { user: RuntimeUser; children: ReactNode }) {
+function ModuleRoute({ user, moduleName, fallbackPath, children }: { user: RuntimeUser; moduleName: string; fallbackPath: string; children: ReactNode }) {
+  const { selectedClient, platformUser, isPlatformContext } = usePlatform();
+
+  if (!canAccessModule({ user, selectedClient, platformUser, isPlatformContext }, moduleName)) {
+    return <Navigate to={fallbackPath} replace />;
+  }
+
+  return children;
+}
+
+function PlatformOnly({ user, fallbackPath, children }: { user: RuntimeUser; fallbackPath: string; children: ReactNode }) {
   if (user.role !== 'super_admin') {
-    return (
-      <AccessDeniedState
-        title="Platform administration is restricted"
-        description="Only a Super Admin can access cross-client platform controls."
-      />
-    );
+    return <Navigate to={fallbackPath} replace />;
   }
 
   return children;

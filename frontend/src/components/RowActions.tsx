@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { ActionNotice } from './ActionNotice';
+import { actionKeyFromLabel, canPerformAction } from '../lib/rbac';
+import { usePlatform } from '../platform/PlatformContext';
 
 type RowActionsProps = {
   labels?: string[];
@@ -55,11 +57,13 @@ export function RowActions({
   recordDetails,
   onAction,
 }: RowActionsProps) {
+  const { runtimeUser } = usePlatform();
   const [viewOpen, setViewOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [notice, setNotice] = useState('');
   const [noticeTone, setNoticeTone] = useState<'success' | 'error' | 'info'>('info');
   const recordLabel = recordTitle ?? recordId ?? 'record';
+  const allowedLabels = labels.filter((label) => canPerformAction(runtimeUser, actionKeyFromLabel(label)));
 
   function showNotice(message: string, tone: 'success' | 'error' | 'info' = 'info') {
     setNotice(message);
@@ -102,7 +106,7 @@ export function RowActions({
     <>
       {notice ? <ActionNotice message={notice} tone={noticeTone} onDismiss={() => setNotice('')} /> : null}
       <div className="flex flex-wrap gap-2">
-        {labels.map((label) => (
+        {allowedLabels.map((label) => (
           <button key={label} type="button" className="form-button-subtle py-1 text-xs" onClick={() => handleClick(label)}>
             {label}
           </button>
