@@ -5,6 +5,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { LazyBarChart, LazyLineChart } from '../components/LazyCharts';
 import { PageHeader } from '../components/PageHeader';
 import { Panel } from '../components/Panel';
+import { RowActions } from '../components/RowActions';
 import { ScrollableTableFrame } from '../components/ScrollableTableFrame';
 import { StatCard } from '../components/StatCard';
 import { StatusBadge } from '../components/StatusBadge';
@@ -369,10 +370,6 @@ function Detail({ label, value }: { label: string; value: ReactNode }) {
 
 function linkClass(active: boolean) {
   return `flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm transition ${active ? 'border border-cyan-300/20 bg-cyan-400/10 text-white' : 'text-slate-400 hover:bg-white/[0.05] hover:text-white'}`;
-}
-
-function RowActions({ labels = ['View', 'Edit', 'Submit'] }: { labels?: string[] }) {
-  return <div className="flex gap-2">{labels.map((label) => <button key={label} className="form-button-subtle py-1 text-xs">{label}</button>)}</div>;
 }
 
 function orderRows() { return productionOrders.map((item) => ({ 'Production Order Number': item.orderNo, Product: item.product, 'Planned Quantity': item.plannedQty, 'Produced Quantity': item.producedQty, 'Remaining Quantity': item.plannedQty - item.producedQty, Plant: item.plant, Line: item.line, 'Start Date': item.startDate, 'End Date': item.endDate, Priority: item.priority, Status: item.status, Actions: <RowActions labels={['Edit', 'Release', 'Close']} /> })); }

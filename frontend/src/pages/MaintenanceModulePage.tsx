@@ -5,6 +5,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { LazyBarChart, LazyLineChart } from '../components/LazyCharts';
 import { PageHeader } from '../components/PageHeader';
 import { Panel } from '../components/Panel';
+import { RowActions } from '../components/RowActions';
 import { ScrollableTableFrame } from '../components/ScrollableTableFrame';
 import { StatCard } from '../components/StatCard';
 import { StatusBadge } from '../components/StatusBadge';
@@ -378,10 +379,6 @@ function Detail({ label, value }: { label: string; value: ReactNode }) {
 
 function linkClass(active: boolean) {
   return `flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm transition ${active ? 'border border-cyan-300/20 bg-cyan-400/10 text-white' : 'text-slate-400 hover:bg-white/[0.05] hover:text-white'}`;
-}
-
-function RowActions({ labels = ['View', 'Edit', 'Export'] }: { labels?: string[] }) {
-  return <div className="flex gap-2">{labels.map((label) => <button key={label} className="form-button-subtle py-1 text-xs">{label}</button>)}</div>;
 }
 
 function assetRows() { return assets.map((item) => ({ 'Asset ID': item.id, 'Asset Name': item.name, 'Asset Category': item.category, Plant: item.plant, Department: item.department, 'Production Line': item.line, Machine: item.machine, Manufacturer: item.manufacturer, Model: item.model, 'Serial Number': item.serial, Criticality: item.criticality, Status: item.status, 'Health Score': `${item.healthScore}%`, 'Last Maintenance Date': item.lastMaintenance, 'Next Maintenance Date': item.nextMaintenance, Owner: item.owner, Actions: <RowActions labels={['View', 'Edit', 'History']} /> })); }
