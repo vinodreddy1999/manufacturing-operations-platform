@@ -38,6 +38,16 @@ function normalizeRecord(moduleKey: string, row: { code: string; name: string; s
   };
 }
 
+function generatedRecordCode(moduleKey: string, name: string) {
+  const suffix = name
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 24);
+  return `${moduleKey.toUpperCase().replace(/[^A-Z0-9]+/g, '-')}-${suffix || 'NEW'}-${new Date().toISOString().slice(0, 10).replaceAll('-', '')}`;
+}
+
 export function ModuleWorkspacePage({ moduleKey, user }: { moduleKey: string; user: RuntimeUser }) {
   const queryClient = useQueryClient();
   const definition = getModuleDefinition(moduleKey);
@@ -111,7 +121,7 @@ export function ModuleWorkspacePage({ moduleKey, user }: { moduleKey: string; us
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canWrite) return;
-    createRecord.mutate(normalizeRecord(moduleKey, draft));
+    createRecord.mutate(normalizeRecord(moduleKey, { ...draft, code: generatedRecordCode(moduleKey, draft.name) }));
   }
 
   return (
@@ -133,7 +143,7 @@ export function ModuleWorkspacePage({ moduleKey, user }: { moduleKey: string; us
       <div className="mt-6 grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
         <Panel title="Create Backend Record" description="Writes to the shared backend database through the runtime records API.">
           <form className="grid gap-3 md:grid-cols-2" onSubmit={submit}>
-            <input className="form-input" placeholder="Code" value={draft.code} onChange={(event) => setDraft({ ...draft, code: event.target.value })} required disabled={!canWrite} />
+            <input className="form-input disabled:cursor-not-allowed disabled:opacity-70" placeholder="System ID" value={generatedRecordCode(moduleKey, draft.name)} readOnly disabled />
             <input className="form-input" placeholder="Name" value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} required disabled={!canWrite} />
             <select className="form-input" value={draft.status} onChange={(event) => setDraft({ ...draft, status: event.target.value })} disabled={!canWrite}>
               <option value="Open">Open</option>
@@ -198,7 +208,14 @@ export function ModuleWorkspacePage({ moduleKey, user }: { moduleKey: string; us
                 key: 'id',
                 label: 'Action',
                 render: (value) => usingBackendRows && canWrite ? (
-                  <button className="rounded-xl border border-red-300/20 bg-red-400/10 px-2 py-1 text-xs text-red-100 hover:bg-red-400/20" onClick={() => deleteRecord.mutate(String(value))}>
+                  <button
+                    className="rounded-xl border border-red-300/20 bg-red-400/10 px-2 py-1 text-xs text-red-100 hover:bg-red-400/20"
+                    onClick={() => {
+                      if (window.confirm('Delete this backend record? This will refresh the table immediately.')) {
+                        deleteRecord.mutate(String(value));
+                      }
+                    }}
+                  >
                     <Trash2 className="mr-1 inline h-3 w-3" />
                     Delete
                   </button>

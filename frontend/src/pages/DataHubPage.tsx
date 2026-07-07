@@ -2325,7 +2325,11 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
           onSelectSavedConnection={setSelectedGetDataConnectionId}
           onRunRefresh={runSelectedRefresh}
           onValidateMapping={validateSelectedMapping}
-          onDeleteSavedConnection={(connectionId) => deleteGetDataConnection.mutate(connectionId)}
+          onDeleteSavedConnection={(connectionId) => {
+            if (window.confirm('Delete this saved Get Data connection? Refresh history and catalog views will update immediately.')) {
+              deleteGetDataConnection.mutate(connectionId);
+            }
+          }}
         />
       ) : null}
 
@@ -2379,7 +2383,11 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
               { key: 'system_type', label: 'Type / Source / Auth' },
               { key: 'connection_status', label: 'Status', render: (value, row) => <input className="w-28 rounded-xl border border-white/10 bg-white/10 px-2 py-1 text-xs text-white" value={String(value)} onChange={(event) => updateConnection.mutate({ id: String(row.id), payload: { ...(row as ConnectedSystem), company_id: String(row.company_id), connection_status: event.target.value } })} /> },
               { key: 'health_score', label: 'Health', render: (value, row) => <input className="w-20 rounded-xl border border-white/10 bg-white/10 px-2 py-1 text-xs text-white" type="number" value={Number(value)} onChange={(event) => updateConnection.mutate({ id: String(row.id), payload: { ...(row as ConnectedSystem), company_id: String(row.company_id), health_score: Number(event.target.value) } })} /> },
-              { key: 'id', label: 'Action', render: (value) => <button className="rounded-xl border border-red-300/20 bg-red-400/10 px-2 py-1 text-xs text-red-100 hover:bg-red-400/20" onClick={() => deleteConnection.mutate(String(value))}><Trash2 className="mr-1 inline h-3 w-3" />Delete</button> },
+              { key: 'id', label: 'Action', render: (value) => <button className="rounded-xl border border-red-300/20 bg-red-400/10 px-2 py-1 text-xs text-red-100 hover:bg-red-400/20" onClick={() => {
+                if (window.confirm('Delete this connected system? DataHub tables will refresh immediately.')) {
+                  deleteConnection.mutate(String(value));
+                }
+              }}><Trash2 className="mr-1 inline h-3 w-3" />Delete</button> },
             ]}
           />
         </Panel>
@@ -2530,7 +2538,11 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
               { key: 'lineage', label: 'Route', render: (value) => <span>{String((value as Record<string, unknown>)?.routing_target ?? 'DataHub')}</span> },
               { key: 'quality_score', label: 'Quality', render: (value, row) => <input className="w-20 rounded-xl border border-white/10 bg-white/10 px-2 py-1 text-xs text-white" type="number" value={Number(value)} onChange={(event) => updateCatalog.mutate({ id: String(row.id), payload: { ...(row as DataCatalogEntry), company_id: String(row.company_id), quality_score: Number(event.target.value) } })} /> },
               { key: 'ai_ready', label: 'AI Ready', render: (value, row) => <button className="rounded-xl border border-white/10 bg-white/10 px-2 py-1 text-xs text-white" onClick={() => updateCatalog.mutate({ id: String(row.id), payload: { ...(row as DataCatalogEntry), company_id: String(row.company_id), ai_ready: !value } })}>{value ? 'Enabled' : 'Disabled'}</button> },
-              { key: 'id', label: 'Action', render: (value) => <button className="rounded-xl border border-red-300/20 bg-red-400/10 px-2 py-1 text-xs text-red-100 hover:bg-red-400/20" onClick={() => deleteCatalog.mutate(String(value))}><Trash2 className="mr-1 inline h-3 w-3" />Delete</button> },
+              { key: 'id', label: 'Action', render: (value) => <button className="rounded-xl border border-red-300/20 bg-red-400/10 px-2 py-1 text-xs text-red-100 hover:bg-red-400/20" onClick={() => {
+                if (window.confirm('Delete this catalog entry? Data quality and AI readiness will refresh immediately.')) {
+                  deleteCatalog.mutate(String(value));
+                }
+              }}><Trash2 className="mr-1 inline h-3 w-3" />Delete</button> },
             ]}
           />
         </Panel>
@@ -2594,7 +2606,11 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
                   <StatusBadge status={`${Math.round(Number(value) * 100)}%`} />
                 </div>
               ) },
-              { key: 'id', label: 'Action', render: (value) => <button className="rounded-xl border border-red-300/20 bg-red-400/10 px-2 py-1 text-xs text-red-100 hover:bg-red-400/20" onClick={() => deleteMapping.mutate(String(value))}><Trash2 className="mr-1 inline h-3 w-3" />Delete</button> },
+              { key: 'id', label: 'Action', render: (value) => <button className="rounded-xl border border-red-300/20 bg-red-400/10 px-2 py-1 text-xs text-red-100 hover:bg-red-400/20" onClick={() => {
+                if (window.confirm('Delete this mapping rule? Mapping and validation views will refresh immediately.')) {
+                  deleteMapping.mutate(String(value));
+                }
+              }}><Trash2 className="mr-1 inline h-3 w-3" />Delete</button> },
             ]}
           />
         </Panel>

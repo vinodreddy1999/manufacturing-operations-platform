@@ -43,6 +43,16 @@ function moduleRoute(moduleKey: string) {
   return routeMap[moduleKey] ?? '/operations';
 }
 
+function generatedRecordCode(moduleKey: string, name: string) {
+  const suffix = name
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 24);
+  return `${moduleKey.toUpperCase().replace(/[^A-Z0-9]+/g, '-')}-${suffix || 'NEW'}-${new Date().toISOString().slice(0, 10).replaceAll('-', '')}`;
+}
+
 export function OperationsPage({ user }: { user: RuntimeUser }) {
   const { currency } = usePlatform();
   const queryClient = useQueryClient();
@@ -130,7 +140,7 @@ export function OperationsPage({ user }: { user: RuntimeUser }) {
 
   function submitRecord(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    createRecord.mutate(newRecord);
+    createRecord.mutate({ ...newRecord, record_code: generatedRecordCode(newRecord.module_key, newRecord.name) });
   }
 
   return (
@@ -165,7 +175,7 @@ export function OperationsPage({ user }: { user: RuntimeUser }) {
               <option value="procurement">Procurement</option>
             </select>
             <input className="rounded-md border border-border px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60" placeholder="Record type" value={newRecord.record_type} onChange={(event) => setNewRecord({ ...newRecord, record_type: event.target.value })} required disabled={!canWrite} />
-            <input className="rounded-md border border-border px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60" placeholder="Code" value={newRecord.record_code} onChange={(event) => setNewRecord({ ...newRecord, record_code: event.target.value })} required disabled={!canWrite} />
+            <input className="rounded-md border border-border px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60" placeholder="System ID" value={generatedRecordCode(newRecord.module_key, newRecord.name)} readOnly disabled />
             <input className="rounded-md border border-border px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60" placeholder="Name" value={newRecord.name} onChange={(event) => setNewRecord({ ...newRecord, name: event.target.value })} required disabled={!canWrite} />
             <select className="rounded-md border border-border px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60" value={newRecord.status} onChange={(event) => setNewRecord({ ...newRecord, status: event.target.value })} disabled={!canWrite}>
               <option value="AVAILABLE">Available</option>
@@ -210,7 +220,15 @@ export function OperationsPage({ user }: { user: RuntimeUser }) {
               ) },
               { key: 'record_type', label: 'Type', render: (value) => <StatusBadge status={String(value)} /> },
               { key: 'id', label: 'Action', render: (value) => (
-                <button className="rounded-md border border-red-200 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60" onClick={() => deleteRecord.mutate(String(value))} disabled={!canWrite}>
+                <button
+                  className="rounded-md border border-red-200 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  onClick={() => {
+                    if (window.confirm('Delete this database record? This will refresh tables and analytics immediately.')) {
+                      deleteRecord.mutate(String(value));
+                    }
+                  }}
+                  disabled={!canWrite}
+                >
                   <Trash2 className="mr-1 inline h-3 w-3" />
                   {canWrite ? 'Delete' : 'Locked'}
                 </button>

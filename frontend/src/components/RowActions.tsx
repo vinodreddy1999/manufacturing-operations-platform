@@ -26,6 +26,28 @@ function isDestructiveAction(label: string) {
   return ['delete', 'reject', 'cancel', 'dispose', 'disable', 'close', 'short pick'].some((term) => normalized.includes(term));
 }
 
+function isExportAction(label: string) {
+  return label.toLowerCase().includes('export') || label.toLowerCase().includes('download');
+}
+
+function isIdentifierField(label: string) {
+  return /(^id$| id$|_id$|number$|code$)/i.test(label);
+}
+
+function downloadRecord(recordLabel: string, details: Record<string, string | number>) {
+  const lines = Object.entries(details).map(([key, value]) => `${key},${String(value).replaceAll('"', '""')}`);
+  const csv = `Field,Value\n${lines.join('\n')}`;
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `${recordLabel.replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'record'}-export.csv`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 export function RowActions({
   labels = ['View', 'Edit', 'Export'],
   recordId,
@@ -63,6 +85,13 @@ export function RowActions({
         showNotice(`${label} cancelled for ${recordLabel}.`, 'info');
         return;
       }
+    }
+
+    if (isExportAction(label)) {
+      downloadRecord(recordLabel, recordDetails ?? { ID: recordId ?? 'N/A', Name: recordTitle ?? 'Record' });
+      showNotice(`${label} downloaded for ${recordLabel}.`, 'success');
+      onAction?.(label, recordId);
+      return;
     }
 
     showNotice(`${label} queued for ${recordLabel}. Draft action saved for approval.`, 'success');
@@ -168,7 +197,7 @@ function RecordEditModal({
           {Object.entries(details).slice(0, 6).map(([label, value]) => (
             <label key={label} className="text-sm text-slate-300">
               {label}
-              <input className="form-input mt-1 w-full" defaultValue={String(value)} />
+              <input className="form-input mt-1 w-full disabled:cursor-not-allowed disabled:opacity-70" defaultValue={String(value)} disabled={isIdentifierField(label)} />
             </label>
           ))}
           <label className="text-sm text-slate-300">

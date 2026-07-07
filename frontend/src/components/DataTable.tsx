@@ -11,9 +11,17 @@ type DataTableProps<T extends Record<string, unknown>> = {
     render?: (value: T[keyof T], row: T) => ReactNode;
   }>;
   emptyTitle: string;
+  getRowKey?: (row: T, index: number) => string;
 };
 
-export function DataTable<T extends Record<string, unknown>>({ rows, columns, emptyTitle }: DataTableProps<T>) {
+function stableRowKey<T extends Record<string, unknown>>(row: T, index: number) {
+  const preferredKeys = ['id', 'ID', 'code', 'Code', 'clientId', 'client_id', 'item_code', 'connection_id', 'name', 'Name'];
+  const matchedKey = preferredKeys.find((key) => row[key] !== undefined && row[key] !== null && String(row[key]).trim().length > 0);
+  if (matchedKey) return `${matchedKey}:${String(row[matchedKey])}`;
+  return `row:${index}:${Object.values(row).slice(0, 4).map((value) => String(value ?? '')).join('|')}`;
+}
+
+export function DataTable<T extends Record<string, unknown>>({ rows, columns, emptyTitle, getRowKey }: DataTableProps<T>) {
   const [scrollPosition, setScrollPosition] = useState(1);
   const [hoverPosition, setHoverPosition] = useState<number | null>(null);
   const shouldVirtualize = rows.length > 80;
@@ -47,7 +55,7 @@ export function DataTable<T extends Record<string, unknown>>({ rows, columns, em
           <tbody className="divide-y divide-white/10" style={shouldVirtualize ? { display: 'block', height: virtual.totalHeight, position: 'relative' } : undefined}>
             {visibleRows.map((row, rowIndex) => (
               <tr
-                key={startIndex + rowIndex}
+                key={getRowKey ? getRowKey(row, startIndex + rowIndex) : stableRowKey(row, startIndex + rowIndex)}
                 className="h-[54px] transition hover:bg-white/[0.04]"
                 onMouseEnter={() => setHoverPosition(startIndex + rowIndex + 1)}
                 onMouseLeave={() => setHoverPosition(null)}
