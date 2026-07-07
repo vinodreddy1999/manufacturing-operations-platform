@@ -142,6 +142,25 @@ services:
     networks:
       - metam-network
 
+  vinod-live-data-stream:
+    image: vinodreddy1999/metam-services-fullstack:latest
+    build: .
+    command: python scripts/run_vinod_live_stream.py
+    restart: unless-stopped
+    environment:
+      PYTHONPATH: /app
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-metam}:${POSTGRES_PASSWORD:-metam}@postgres:5432/${POSTGRES_DB:-metam}
+      VINOD_LIVE_DURATION_HOURS: ${VINOD_LIVE_DURATION_HOURS:-48}
+      VINOD_LIVE_INTERVAL_SECONDS: ${VINOD_LIVE_INTERVAL_SECONDS:-10}
+      VINOD_LIVE_BATCH_SIZE: ${VINOD_LIVE_BATCH_SIZE:-50}
+      VINOD_LIVE_AUDIT_EVERY_BATCHES: ${VINOD_LIVE_AUDIT_EVERY_BATCHES:-12}
+      VINOD_LIVE_HOLD_AFTER_COMPLETE: ${VINOD_LIVE_HOLD_AFTER_COMPLETE:-true}
+    depends_on:
+      platform-api:
+        condition: service_healthy
+    networks:
+      - metam-network
+
   nginx:
     image: nginx:1.27-alpine
     restart: unless-stopped

@@ -6,6 +6,7 @@ Company ID: `company-vinod`
 Docker service tested: `metam-services-platform-api-1`  
 Database: PostgreSQL container from Docker Compose  
 Seed script: `scripts/seed_vinod_scale_data.py`
+Continuous stream script: `scripts/run_vinod_live_stream.py`
 
 ## 1. What Was Created
 
@@ -280,7 +281,123 @@ Then select:
 2. Data Hub to see saved source connections and catalog entries.
 3. Inventory / Production / Warehouse modules to test paginated operational records.
 
-## 14. Final Findings
+## 14. Two-Day Continuous Data Stream
+
+The application now includes a dedicated Docker Compose service named:
+
+`vinod-live-data-stream`
+
+This service keeps adding live Vinod records for **48 hours**. It is not a one-time seed. It is a long-running stream that writes new operational data into PostgreSQL while the application is running.
+
+Default stream settings:
+
+| Setting | Default |
+|---|---:|
+| Duration | 48 hours |
+| Batch size | 50 rows |
+| Interval | 10 seconds |
+| Rows per minute | 300 |
+| Rows per hour | 18,000 |
+| Estimated rows over 48 hours | 864,000 |
+
+The stream writes across these modules:
+
+- Inventory
+- Warehouse
+- Production
+- Maintenance
+- Quality
+- Procurement
+- Planning
+- Reports
+
+The stream rotates across the three Vinod plants:
+
+- `plant-vinod-main`
+- `plant-vinod-assembly`
+- `plant-vinod-distribution`
+
+### 14.1 Start The Two-Day Stream
+
+Start the full application and the stream:
+
+```bash
+docker compose up -d --build
+```
+
+Or start only the stream after the API is already healthy:
+
+```bash
+docker compose up -d --build vinod-live-data-stream
+```
+
+### 14.2 Watch Live Inserts
+
+```bash
+docker logs -f metam-services-vinod-live-data-stream-1
+```
+
+Expected log pattern:
+
+```text
+Vinod live batch 1 inserted 50 rows in 0.01s; stream_total=50; db_live_rows=50; last=VINOD-LIVE-48H-000000000050
+Vinod live batch 2 inserted 50 rows in 0.01s; stream_total=100; db_live_rows=100; last=VINOD-LIVE-48H-000000000100
+```
+
+### 14.3 Verify The Count In PostgreSQL
+
+```bash
+docker exec -e PYTHONPATH=/app metam-services-platform-api-1 python -c "from app.database import SessionLocal; from app.platform_models import ModuleRecord; from sqlalchemy import func; db=SessionLocal(); print(db.query(func.count(ModuleRecord.id)).filter(ModuleRecord.company_id=='company-vinod', ModuleRecord.record_code.like('VINOD-LIVE-48H-%')).scalar()); db.close()"
+```
+
+Run the command twice, at least 10 seconds apart. The count should increase by about 50 rows each interval.
+
+### 14.4 Verify Stream State
+
+The stream progress is persisted in the `app_metadata` table using category:
+
+`live_stream_state`
+
+Record key:
+
+`vinod-48h-live-stream`
+
+This is what makes the stream restart-safe. If the container restarts during the 48-hour window, it reads the previous sequence number and continues instead of starting from zero.
+
+### 14.5 Refresh And Audit Evidence
+
+Every 12 batches, the stream also writes:
+
+- `datahub_refresh_runs`
+- `datahub_audit_events`
+
+This gives Data Hub visible evidence that continuous refresh batches are happening.
+
+### 14.6 Tuning The Stream
+
+You can change the stream rate with environment variables:
+
+```bash
+VINOD_LIVE_BATCH_SIZE=100 VINOD_LIVE_INTERVAL_SECONDS=5 docker compose up -d vinod-live-data-stream
+```
+
+Example rates:
+
+| Batch Size | Interval | Rows Per Hour | Rows In 48 Hours |
+|---:|---:|---:|---:|
+| 50 | 10 sec | 18,000 | 864,000 |
+| 100 | 10 sec | 36,000 | 1,728,000 |
+| 100 | 5 sec | 72,000 | 3,456,000 |
+
+### 14.7 Frontend Reflection
+
+The database receives each batch immediately after commit. Frontend visibility depends on the page behavior:
+
+- If the page has polling enabled, the new rows appear on the next polling cycle.
+- If the page does not poll, refresh the browser or reselect the client/module.
+- For future production-grade live dashboards, the best next upgrade is Server-Sent Events or WebSocket push for selected live widgets.
+
+## 15. Final Findings
 
 The platform can store and page through 100k+ Vinod records successfully.
 
@@ -298,4 +415,3 @@ What needs optimization:
 - Frontend continuous refresh should be explicit per widget/module.
 - For very large visuals, charts should consume aggregate endpoints, not raw row payloads.
 - Data Hub import should eventually write to dedicated typed module tables for each module instead of relying only on generic `module_records`.
-
