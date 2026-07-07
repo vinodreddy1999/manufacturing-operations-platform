@@ -351,7 +351,7 @@ function AuthenticatedApp({ user, onLogout }: { user: RuntimeUser; onLogout: () 
           </nav>
         </header>
 
-        <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
+        <main className="mx-auto w-full max-w-[1920px] px-4 py-6 sm:px-6 2xl:px-8">
           <LazyChunkBoundary label="Workspace view">
             <Suspense fallback={<LoadingState label="Loading workspace view" />}>
               <Routes>
