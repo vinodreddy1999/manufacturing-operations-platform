@@ -1,10 +1,10 @@
 import { ArrowRightLeft, BarChart3, ClipboardCheck, FileText, History, PackageCheck, PackagePlus, Search, ShieldCheck, Truck, Users, Warehouse } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 
 import { LazyBarChart, LazyLineChart } from '../components/LazyCharts';
 import { ModuleFilterSelect } from '../components/ModuleFilterSelect';
-import { PageHeader } from '../components/PageHeader';
+import { ModuleNavigationTabs } from '../components/ModuleNavigationTabs';
 import { Panel } from '../components/Panel';
 import { ReportExportButtons } from '../components/ReportExportButtons';
 import { RowActions } from '../components/RowActions';
@@ -58,7 +58,6 @@ export function WarehouseModulePage({ user }: { user: RuntimeUser }) {
   const { selectedClient, platformUser } = usePlatform();
   const location = useLocation();
   const section = sectionByPath[location.pathname] ?? 'dashboard';
-  const company = selectedClient ?? warehouseCompany;
   const warehouseAllowed = platformUser.assignedModules.includes('Warehouse') && (!selectedClient || selectedClient.enabledModules.includes('Warehouse'));
 
   if (!warehouseAllowed) {
@@ -72,30 +71,9 @@ export function WarehouseModulePage({ user }: { user: RuntimeUser }) {
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        eyebrow="Company Admin Warehouse"
-        title={section === 'dashboard' ? 'Warehouse Control Tower' : warehouseNav.find((item) => item.section === section)?.label ?? 'Warehouse'}
-        description="Company-level warehouse execution view for receiving, putaway, storage, picking, packing, dispatch, utilization, labor, and warehouse risks."
-      />
-      <CompanyContext company={company} />
-      <div className="grid gap-5 xl:grid-cols-[260px_minmax(0,1fr)]">
-        <aside className="h-fit rounded-2xl border border-white/10 bg-slate-950/35 p-2 xl:sticky xl:top-24">
-          <div className="mb-2 rounded-xl border border-white/10 bg-white/[0.04] p-3">
-            <p className="text-sm font-semibold text-white">Warehouse Module</p>
-            <p className="text-xs text-slate-500">Company context fixed</p>
-          </div>
-          <nav className="grid gap-1 sm:grid-cols-2 xl:grid-cols-1">
-            {warehouseNav.map((item) => (
-              <NavLink key={item.path} to={item.path} end={item.path === '/warehouse'} className={({ isActive }) => linkClass(isActive)}>
-                <item.icon className="h-4 w-4" />
-                {item.label}
-              </NavLink>
-            ))}
-          </nav>
-        </aside>
-        <section className="min-w-0"><WarehouseSectionContent section={section} /></section>
-      </div>
+    <div className="space-y-4">
+      <ModuleNavigationTabs items={warehouseNav} dashboardPath="/warehouse" />
+      <WarehouseSectionContent section={section} />
     </div>
   );
 }
@@ -465,27 +443,12 @@ function WarehouseImpactCard({ item }: { item: typeof impactMetrics[number] }) {
   );
 }
 
-function CompanyContext({ company }: { company: { clientName: string; clientId: string; currency: string; region: string; market: string } }) {
-  return (
-    <div className="grid gap-3 rounded-2xl border border-white/10 bg-slate-950/35 p-4 md:grid-cols-4">
-      <Detail label="Company" value={company.clientName} />
-      <Detail label="Client ID" value={company.clientId} />
-      <Detail label="Currency" value={company.currency} />
-      <Detail label="Region / Market" value={`${company.region} / ${company.market}`} />
-    </div>
-  );
-}
-
 function Field({ label, children, className = '' }: { label: string; children: ReactNode; className?: string }) {
   return <label className={`text-sm text-slate-300 ${className}`}>{label}{children}</label>;
 }
 
 function Detail({ label, value }: { label: string; value: ReactNode }) {
   return <div><p className="text-xs uppercase tracking-[0.12em] text-slate-500">{label}</p><p className="mt-1 font-medium text-white">{value}</p></div>;
-}
-
-function linkClass(active: boolean) {
-  return `flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm transition ${active ? 'border border-cyan-300/20 bg-cyan-400/10 text-white' : 'text-slate-400 hover:bg-white/[0.05] hover:text-white'}`;
 }
 
 function receivingStatusChart(source = receivingRecords) {

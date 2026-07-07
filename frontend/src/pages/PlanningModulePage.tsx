@@ -1,10 +1,10 @@
 import { ClipboardCheck, Factory, FileText, Gauge, GitBranch, Hammer, PackageSearch, Search, ShoppingCart, UsersRound, Warehouse } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
-import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 import { LazyBarChart, LazyLineChart } from '../components/LazyCharts';
 import { ModuleFilterSelect } from '../components/ModuleFilterSelect';
-import { PageHeader } from '../components/PageHeader';
+import { ModuleNavigationTabs } from '../components/ModuleNavigationTabs';
 import { Panel } from '../components/Panel';
 import { ReportExportButtons } from '../components/ReportExportButtons';
 import { RowActions } from '../components/RowActions';
@@ -86,7 +86,6 @@ export function PlanningModulePage({ user }: { user: RuntimeUser }) {
   const { selectedClient, platformUser } = usePlatform();
   const location = useLocation();
   const section = sectionByPath[location.pathname] ?? 'dashboard';
-  const company = selectedClient ?? planningCompany;
   const planningAllowed = platformUser.assignedModules.includes('Planning') && (!selectedClient || selectedClient.enabledModules.includes('Planning'));
 
   if (!planningAllowed) {
@@ -100,32 +99,9 @@ export function PlanningModulePage({ user }: { user: RuntimeUser }) {
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        eyebrow="Company Admin Planning"
-        title={section === 'dashboard' ? 'Planning Control Tower' : planningNav.find((item) => item.section === section)?.label ?? 'Planning'}
-        description="Company-level planning view for demand, production, materials, capacity, workforce, and maintenance risks."
-      />
-      <CompanyContext company={company} />
-      <div className="grid gap-5 xl:grid-cols-[260px_minmax(0,1fr)]">
-        <aside className="h-fit rounded-2xl border border-white/10 bg-slate-950/35 p-2 xl:sticky xl:top-24">
-          <div className="mb-2 rounded-xl border border-white/10 bg-white/[0.04] p-3">
-            <p className="text-sm font-semibold text-white">Planning Module</p>
-            <p className="text-xs text-slate-500">Company context fixed</p>
-          </div>
-          <nav className="grid gap-1 sm:grid-cols-2 xl:grid-cols-1">
-            {planningNav.map((item) => (
-              <NavLink key={item.path} to={item.path} end={item.path === '/planning'} className={({ isActive }) => planningLinkClass(isActive)}>
-                <item.icon className="h-4 w-4" />
-                {item.label}
-              </NavLink>
-            ))}
-          </nav>
-        </aside>
-        <section className="min-w-0">
-          <PlanningSectionContent section={section} user={user} />
-        </section>
-      </div>
+    <div className="space-y-4">
+      <ModuleNavigationTabs items={planningNav} dashboardPath="/planning" />
+      <PlanningSectionContent section={section} user={user} />
     </div>
   );
 }
@@ -468,27 +444,12 @@ function CapacityWidgets() {
   return <Panel title="Overloaded Lines" description="Capacity utilization by work center."><PlanningTrendChart data={capacityPlans.map((item) => ({ name: item.workCenter, utilization: item.utilization }))} bars={['utilization']} /></Panel>;
 }
 
-function CompanyContext({ company }: { company: { clientName: string; clientId: string; currency: string; region: string; market: string } }) {
-  return (
-    <div className="grid gap-3 rounded-2xl border border-white/10 bg-slate-950/35 p-4 md:grid-cols-4">
-      <Detail label="Company" value={company.clientName} />
-      <Detail label="Client ID" value={company.clientId} />
-      <Detail label="Currency" value={company.currency} />
-      <Detail label="Region / Market" value={`${company.region} / ${company.market}`} />
-    </div>
-  );
-}
-
 function Field({ label, children, className = '' }: { label: string; children: ReactNode; className?: string }) {
   return <label className={`text-sm text-slate-300 ${className}`}>{label}{children}</label>;
 }
 
 function Detail({ label, value }: { label: string; value: ReactNode }) {
   return <div><p className="text-xs uppercase tracking-[0.12em] text-slate-500">{label}</p><p className="mt-1 font-medium text-white">{value}</p></div>;
-}
-
-function planningLinkClass(active: boolean) {
-  return `flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm transition ${active ? 'border border-cyan-300/20 bg-cyan-400/10 text-white' : 'text-slate-400 hover:bg-white/[0.05] hover:text-white'}`;
 }
 
 function demandRows() { return demandPlans.map((item) => ({ 'Demand Plan ID': item.id, Product: item.product, Customer: item.customer, Region: item.region, Market: item.market, 'Forecast Period': item.period, 'Forecast Qty': item.forecastQty, 'Confirmed Orders': item.confirmedOrders, Variance: item.variance, Status: item.status, Owner: item.owner, 'Last Updated': item.updated, Actions: <RowActions /> })); }

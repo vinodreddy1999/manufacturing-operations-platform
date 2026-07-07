@@ -1,5 +1,5 @@
 import { Children, Suspense, lazy, useState, type ReactNode } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { BarChart3, Building2, Check, FileCheck2, KeyRound, LayoutDashboard, Lightbulb, LockKeyhole, Search, Settings, ShieldCheck, SlidersHorizontal } from 'lucide-react';
 
 import { accessResources, adminPermissions, dashboardDefinitions, dataScopes, recommendations, roleDefinitions } from '../admin/data';
@@ -9,7 +9,7 @@ import { usePlatform } from '../platform/PlatformContext';
 import type { PlatformClient } from '../platform/types';
 import type { RuntimeUser } from '../types';
 import { LazyImpactSummary } from '../components/LazyImpactSummary';
-import { PageHeader } from '../components/PageHeader';
+import { ModuleNavigationTabs } from '../components/ModuleNavigationTabs';
 import { Panel } from '../components/Panel';
 import { StatCard } from '../components/StatCard';
 import { StatusBadge } from '../components/StatusBadge';
@@ -34,26 +34,11 @@ const adminNavigation: Array<{ section: AdminSection; label: string; icon: typeo
 
 export function AdminCenterPage({ section, user }: { section: AdminSection; user: RuntimeUser }) {
   return (
-    <div className="space-y-6">
-      <PageHeader eyebrow="Administration Center" title={adminNavigation.find((item) => item.section === section)?.label ?? 'Administration'} description="Governance, access, accountability, and business value for the active client context." />
-      <div className="grid gap-5 xl:grid-cols-[245px_minmax(0,1fr)]">
-        <aside className="h-fit rounded-2xl border border-white/10 bg-slate-950/35 p-2 xl:sticky xl:top-24">
-          <div className="mb-2 flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] p-3">
-            <div className="rounded-lg bg-cyan-400/10 p-2 text-cyan-100"><ShieldCheck className="h-4 w-4" /></div>
-            <div><p className="text-sm font-semibold text-white">Admin Workspace</p><p className="text-xs text-slate-500">Permission-aware</p></div>
-          </div>
-          <nav className="grid gap-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-1">
-            {adminNavigation.map((item) => <NavLink key={item.section} to={`/admin/${item.section}`} className={({ isActive }) => adminLinkClass(isActive)}><item.icon className="h-4 w-4" />{item.label}</NavLink>)}
-          </nav>
-        </aside>
-        <section className="min-w-0"><AdminSectionContent section={section} user={user} /></section>
-      </div>
+    <div className="space-y-4">
+      <ModuleNavigationTabs items={adminNavigation.map((item) => ({ ...item, path: `/admin/${item.section}` }))} dashboardPath="/admin/company" />
+      <AdminSectionContent section={section} user={user} />
     </div>
   );
-}
-
-function adminLinkClass(active: boolean) {
-  return `flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm transition ${active ? 'border border-cyan-300/20 bg-cyan-400/10 text-white' : 'text-slate-400 hover:bg-white/[0.05] hover:text-white'}`;
 }
 
 function AdminSectionContent({ section, user }: { section: AdminSection; user: RuntimeUser }) {

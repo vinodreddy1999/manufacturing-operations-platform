@@ -1,10 +1,10 @@
 import { Archive, ArrowRightLeft, BarChart3, ClipboardCheck, FileText, History, PackageCheck, PackagePlus, Search, ShieldCheck, TimerReset, Warehouse } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 
 import { LazyBarChart, LazyLineChart } from '../components/LazyCharts';
 import { ModuleFilterSelect } from '../components/ModuleFilterSelect';
-import { PageHeader } from '../components/PageHeader';
+import { ModuleNavigationTabs } from '../components/ModuleNavigationTabs';
 import { Panel } from '../components/Panel';
 import { ReportExportButtons } from '../components/ReportExportButtons';
 import { RowActions } from '../components/RowActions';
@@ -66,7 +66,6 @@ export function InventoryModulePage({ user }: { user: RuntimeUser }) {
   const { selectedClient, platformUser } = usePlatform();
   const location = useLocation();
   const section = sectionByPath[location.pathname] ?? 'dashboard';
-  const company = selectedClient ?? inventoryCompany;
   const inventoryAllowed = platformUser.assignedModules.includes('Inventory') && (!selectedClient || selectedClient.enabledModules.includes('Inventory'));
 
   if (!inventoryAllowed) {
@@ -78,21 +77,9 @@ export function InventoryModulePage({ user }: { user: RuntimeUser }) {
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader eyebrow="Company Admin Inventory" title={section === 'dashboard' ? 'Inventory Control Tower' : inventoryNav.find((item) => item.section === section)?.label ?? 'Inventory'} description="Company-level stock, valuation, movement, traceability, risk, and working-capital control." />
-      <CompanyContext company={company} />
-      <div className="grid gap-5 xl:grid-cols-[260px_minmax(0,1fr)]">
-        <aside className="h-fit rounded-2xl border border-white/10 bg-slate-950/35 p-2 xl:sticky xl:top-24">
-          <div className="mb-2 rounded-xl border border-white/10 bg-white/[0.04] p-3">
-            <p className="text-sm font-semibold text-white">Inventory Module</p>
-            <p className="text-xs text-slate-500">Company context fixed</p>
-          </div>
-          <nav className="grid gap-1 sm:grid-cols-2 xl:grid-cols-1">
-            {inventoryNav.map((item) => <NavLink key={item.path} to={item.path} end={item.path === '/inventory'} className={({ isActive }) => linkClass(isActive)}><item.icon className="h-4 w-4" />{item.label}</NavLink>)}
-          </nav>
-        </aside>
-        <section className="min-w-0"><InventorySectionContent section={section} /></section>
-      </div>
+    <div className="space-y-4">
+      <ModuleNavigationTabs items={inventoryNav} dashboardPath="/inventory" />
+      <InventorySectionContent section={section} />
     </div>
   );
 }
@@ -291,20 +278,12 @@ function InventoryFormDrawer({ title, onClose }: { title: string; onClose: () =>
   );
 }
 
-function CompanyContext({ company }: { company: { clientName: string; clientId: string; currency: string; region: string; market: string } }) {
-  return <div className="grid gap-3 rounded-2xl border border-white/10 bg-slate-950/35 p-4 md:grid-cols-4"><Detail label="Company" value={company.clientName} /><Detail label="Client ID" value={company.clientId} /><Detail label="Currency" value={company.currency} /><Detail label="Region / Market" value={`${company.region} / ${company.market}`} /></div>;
-}
-
 function Field({ label, children, className = '' }: { label: string; children: ReactNode; className?: string }) {
   return <label className={`text-sm text-slate-300 ${className}`}>{label}{children}</label>;
 }
 
 function Detail({ label, value }: { label: string; value: ReactNode }) {
   return <div><p className="text-xs uppercase tracking-[0.12em] text-slate-500">{label}</p><p className="mt-1 font-medium text-white">{value}</p></div>;
-}
-
-function linkClass(active: boolean) {
-  return `flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm transition ${active ? 'border border-cyan-300/20 bg-cyan-400/10 text-white' : 'text-slate-400 hover:bg-white/[0.05] hover:text-white'}`;
 }
 
 function overviewRows() { return inventoryItems.map((item) => ({ 'Item Code': item.code, 'Item Name': item.name, Category: item.category, Plant: item.plant, Warehouse: item.warehouse, 'Available Qty': item.availableQty, 'Reserved Qty': item.reservedQty, 'Blocked Qty': item.blockedQty, 'In Transit Qty': item.inTransitQty, UOM: item.uom, 'Inventory Value': formatCurrency(item.value, inventoryCompany.currency), Status: item.status, Actions: <RowActions labels={['View', 'History', 'Transfer', 'Reserve', 'Export']} recordId={item.code} recordTitle={item.name} recordDetails={{ Code: item.code, Name: item.name, Plant: item.plant, Warehouse: item.warehouse, Status: item.status }} /> })); }

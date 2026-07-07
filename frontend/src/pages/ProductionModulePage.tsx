@@ -1,9 +1,9 @@
 import { Activity, BarChart3, ClipboardCheck, Factory, FileText, Gauge, History, MonitorCog, Search, TimerReset, Users } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 
 import { LazyBarChart, LazyLineChart } from '../components/LazyCharts';
-import { PageHeader } from '../components/PageHeader';
+import { ModuleNavigationTabs } from '../components/ModuleNavigationTabs';
 import { Panel } from '../components/Panel';
 import { RowActions } from '../components/RowActions';
 import { ScrollableTableFrame } from '../components/ScrollableTableFrame';
@@ -56,7 +56,6 @@ export function ProductionModulePage({ user }: { user: RuntimeUser }) {
   const { selectedClient, platformUser } = usePlatform();
   const location = useLocation();
   const section = sectionByPath[location.pathname] ?? 'dashboard';
-  const company = selectedClient ?? productionCompany;
   const productionAllowed = platformUser.assignedModules.includes('Production') && (!selectedClient || selectedClient.enabledModules.includes('Production'));
 
   if (!productionAllowed) {
@@ -70,30 +69,9 @@ export function ProductionModulePage({ user }: { user: RuntimeUser }) {
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        eyebrow="Company Admin Production"
-        title={section === 'dashboard' ? 'Production Control Tower' : productionNav.find((item) => item.section === section)?.label ?? 'Production'}
-        description="Company-level manufacturing execution view for production orders, schedules, shifts, lines, machines, downtime, OEE, yield, scrap, and cost impact."
-      />
-      <CompanyContext company={company} />
-      <div className="grid gap-5 xl:grid-cols-[260px_minmax(0,1fr)]">
-        <aside className="h-fit rounded-2xl border border-white/10 bg-slate-950/35 p-2 xl:sticky xl:top-24">
-          <div className="mb-2 rounded-xl border border-white/10 bg-white/[0.04] p-3">
-            <p className="text-sm font-semibold text-white">Production Module</p>
-            <p className="text-xs text-slate-500">Company context fixed</p>
-          </div>
-          <nav className="grid gap-1 sm:grid-cols-2 xl:grid-cols-1">
-            {productionNav.map((item) => (
-              <NavLink key={item.path} to={item.path} end={item.path === '/production'} className={({ isActive }) => linkClass(isActive)}>
-                <item.icon className="h-4 w-4" />
-                {item.label}
-              </NavLink>
-            ))}
-          </nav>
-        </aside>
-        <section className="min-w-0"><ProductionSectionContent section={section} /></section>
-      </div>
+    <div className="space-y-4">
+      <ModuleNavigationTabs items={productionNav} dashboardPath="/production" />
+      <ProductionSectionContent section={section} />
     </div>
   );
 }
@@ -345,17 +323,6 @@ function ProductionImpactCard({ item }: { item: typeof impactMetrics[number] }) 
   );
 }
 
-function CompanyContext({ company }: { company: { clientName: string; clientId: string; currency: string; region: string; market: string } }) {
-  return (
-    <div className="grid gap-3 rounded-2xl border border-white/10 bg-slate-950/35 p-4 md:grid-cols-4">
-      <Detail label="Company" value={company.clientName} />
-      <Detail label="Client ID" value={company.clientId} />
-      <Detail label="Currency" value={company.currency} />
-      <Detail label="Region / Market" value={`${company.region} / ${company.market}`} />
-    </div>
-  );
-}
-
 function Filter({ label, options }: { label: string; options: string[] }) {
   return <label className="text-sm text-slate-300">{label}<select className="form-input mt-1 w-full"><option>All {label.toLowerCase()}</option>{options.map((item) => <option key={item}>{item}</option>)}</select></label>;
 }
@@ -366,10 +333,6 @@ function Field({ label, children, className = '' }: { label: string; children: R
 
 function Detail({ label, value }: { label: string; value: ReactNode }) {
   return <div><p className="text-xs uppercase tracking-[0.12em] text-slate-500">{label}</p><p className="mt-1 font-medium text-white">{value}</p></div>;
-}
-
-function linkClass(active: boolean) {
-  return `flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm transition ${active ? 'border border-cyan-300/20 bg-cyan-400/10 text-white' : 'text-slate-400 hover:bg-white/[0.05] hover:text-white'}`;
 }
 
 function orderRows() { return productionOrders.map((item) => ({ 'Production Order Number': item.orderNo, Product: item.product, 'Planned Quantity': item.plannedQty, 'Produced Quantity': item.producedQty, 'Remaining Quantity': item.plannedQty - item.producedQty, Plant: item.plant, Line: item.line, 'Start Date': item.startDate, 'End Date': item.endDate, Priority: item.priority, Status: item.status, Actions: <RowActions labels={['Edit', 'Release', 'Close']} /> })); }

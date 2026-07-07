@@ -1,11 +1,10 @@
-import { FormEvent, Suspense, lazy, useMemo, useState, type ReactNode } from 'react';
+import { FormEvent, Suspense, lazy, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Navigate, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import {
   Activity,
   BadgeCheck,
   Boxes,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   DatabaseZap,
@@ -203,8 +202,7 @@ function AuthenticatedApp({ user, onLogout }: { user: RuntimeUser; onLogout: () 
   const { state, selectedClientId, selectedClient, isPlatformContext, canSelectPlatform, selectClient, platformUser } = usePlatform();
   const location = useLocation();
   const navigate = useNavigate();
-  const [sidebarExpanded, setSidebarExpanded] = useState(false);
-  const [modulesExpanded, setModulesExpanded] = useState(false);
+  const [sidebarExpanded, setSidebarExpanded] = useState(() => sessionStorage.getItem('metam-sidebar-expanded') === 'true');
   const allowedNavItems = isPlatformContext
     ? platformNavItems
     : navItems.filter((item) => {
@@ -213,10 +211,10 @@ function AuthenticatedApp({ user, onLogout }: { user: RuntimeUser; onLogout: () 
           && (!moduleName || selectedClient?.enabledModules.includes(moduleName))
           && (!moduleName || platformUser.assignedModules.includes(moduleName));
       });
-  const primaryNavItems = allowedNavItems.filter((item) => !('moduleName' in item));
-  const moduleNavItems = allowedNavItems.filter((item) => 'moduleName' in item);
-  const activeModuleItem = moduleNavItems.find((item) => location.pathname === item.to || location.pathname.startsWith(`${item.to}/`));
-  const shouldShowModuleGroup = moduleNavItems.length > 0;
+
+  useEffect(() => {
+    sessionStorage.setItem('metam-sidebar-expanded', String(sidebarExpanded));
+  }, [sidebarExpanded]);
 
   return (
     <div className="app-shell min-h-screen bg-background text-white">
@@ -271,11 +269,12 @@ function AuthenticatedApp({ user, onLogout }: { user: RuntimeUser; onLogout: () 
           </div>
         )}
         <nav className="space-y-1 p-3">
-          {primaryNavItems.map((item) => (
+          {allowedNavItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
               end={item.to === '/'}
+              onClick={() => setSidebarExpanded(false)}
               className={({ isActive }) =>
                 `group flex items-center rounded-xl px-3 py-2.5 text-sm font-medium transition ${
                   isActive
@@ -289,59 +288,6 @@ function AuthenticatedApp({ user, onLogout }: { user: RuntimeUser; onLogout: () 
               {sidebarExpanded ? item.label : null}
             </NavLink>
           ))}
-          {shouldShowModuleGroup ? (
-            <div className="pt-1">
-              <button
-                type="button"
-                className={`group flex w-full items-center rounded-xl px-3 py-2.5 text-sm font-medium transition ${
-                  activeModuleItem
-                    ? 'border border-cyan-300/20 bg-cyan-400/10 text-white'
-                    : 'text-slate-400 hover:bg-white/[0.06] hover:text-white'
-                } ${sidebarExpanded ? 'justify-between' : 'justify-center'}`}
-                aria-expanded={sidebarExpanded && modulesExpanded}
-                title={sidebarExpanded ? undefined : 'Modules'}
-                onClick={() => {
-                  if (!sidebarExpanded) {
-                    setSidebarExpanded(true);
-                    setModulesExpanded(true);
-                    return;
-                  }
-                  setModulesExpanded((value) => !value);
-                }}
-              >
-                <span className="flex min-w-0 items-center gap-3">
-                  <Boxes className="h-4 w-4" />
-                  {sidebarExpanded ? <span>Modules</span> : null}
-                </span>
-                {sidebarExpanded ? (
-                  <span className="flex items-center gap-2 text-xs text-slate-500 group-hover:text-slate-300">
-                    {modulesExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                  </span>
-                ) : null}
-              </button>
-              {sidebarExpanded && modulesExpanded ? (
-                <div className="mt-1 space-y-1 pl-3">
-                  {moduleNavItems.map((item) => (
-                    <NavLink
-                      key={item.to}
-                      to={item.to}
-                      end={item.to === '/'}
-                      className={({ isActive }) =>
-                        `group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
-                          isActive
-                            ? 'border border-cyan-300/20 bg-cyan-400/10 text-white'
-                            : 'text-slate-400 hover:bg-white/[0.06] hover:text-white'
-                        }`
-                      }
-                    >
-                      <item.icon className="h-4 w-4" />
-                      {item.label}
-                    </NavLink>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
         </nav>
       </aside>
 
@@ -387,7 +333,7 @@ function AuthenticatedApp({ user, onLogout }: { user: RuntimeUser; onLogout: () 
             </div>
           </div>
           <nav className="flex gap-1 overflow-x-auto border-t border-white/10 px-3 py-2 xl:hidden">
-            {primaryNavItems.map((item) => (
+            {allowedNavItems.map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
@@ -402,39 +348,6 @@ function AuthenticatedApp({ user, onLogout }: { user: RuntimeUser; onLogout: () 
                 {item.label}
               </NavLink>
             ))}
-            {shouldShowModuleGroup ? (
-              <>
-                <button
-                  type="button"
-                  className={`flex min-w-max items-center gap-2 rounded-xl px-3 py-2 text-sm ${
-                    activeModuleItem ? 'border border-cyan-300/20 bg-cyan-400/10 text-white' : 'text-slate-400'
-                  }`}
-                  aria-expanded={modulesExpanded}
-                  onClick={() => setModulesExpanded((value) => !value)}
-                >
-                  <Boxes className="h-4 w-4" />
-                  Modules
-                  {modulesExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                </button>
-                {modulesExpanded
-                  ? moduleNavItems.map((item) => (
-                      <NavLink
-                        key={item.to}
-                        to={item.to}
-                        end={item.to === '/'}
-                        className={({ isActive }) =>
-                          `flex min-w-max items-center gap-2 rounded-xl px-3 py-2 text-sm ${
-                            isActive ? 'border border-cyan-300/20 bg-cyan-400/10 text-white' : 'text-slate-400'
-                          }`
-                        }
-                      >
-                        <item.icon className="h-4 w-4" />
-                        {item.label}
-                      </NavLink>
-                    ))
-                  : null}
-              </>
-            ) : null}
           </nav>
         </header>
 
