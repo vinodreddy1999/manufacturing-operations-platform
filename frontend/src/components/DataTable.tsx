@@ -32,6 +32,8 @@ export function DataTable<T extends Record<string, unknown>>({ rows, columns, em
 
   const visibleRows = shouldVirtualize ? virtual.visibleRows : rows;
   const startIndex = shouldVirtualize ? virtual.startIndex : 0;
+  const topSpacerHeight = shouldVirtualize ? virtual.startIndex * 54 : 0;
+  const bottomSpacerHeight = shouldVirtualize ? Math.max(0, virtual.totalHeight - topSpacerHeight - visibleRows.length * 54) : 0;
 
   return (
     <div className="enterprise-table-frame">
@@ -42,7 +44,7 @@ export function DataTable<T extends Record<string, unknown>>({ rows, columns, em
           if (shouldVirtualize) virtual.onScroll(event);
         }}
       >
-        <table className="min-w-full divide-y divide-border text-body-sm">
+        <table className="min-w-[760px] w-full table-fixed divide-y divide-border text-body-sm">
           <thead className="enterprise-sticky-header">
             <tr>
               {columns.map((column) => (
@@ -52,22 +54,33 @@ export function DataTable<T extends Record<string, unknown>>({ rows, columns, em
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-white/10" style={shouldVirtualize ? { display: 'block', height: virtual.totalHeight, position: 'relative' } : undefined}>
+          <tbody className="divide-y divide-white/10">
+            {topSpacerHeight > 0 ? (
+              <tr aria-hidden="true">
+                <td colSpan={columns.length} style={{ height: topSpacerHeight, padding: 0 }} />
+              </tr>
+            ) : null}
             {visibleRows.map((row, rowIndex) => (
               <tr
                 key={getRowKey ? getRowKey(row, startIndex + rowIndex) : stableRowKey(row, startIndex + rowIndex)}
                 className="h-[54px] transition hover:bg-white/[0.04]"
                 onMouseEnter={() => setHoverPosition(startIndex + rowIndex + 1)}
                 onMouseLeave={() => setHoverPosition(null)}
-                style={shouldVirtualize ? { display: 'table', tableLayout: 'fixed', transform: `translateY(${virtual.translateY}px)`, width: '100%' } : undefined}
               >
                 {columns.map((column) => (
-                  <td key={String(column.key)} className="whitespace-nowrap px-4 py-3 text-body-sm text-slate-200">
-                    {column.render ? column.render(row[column.key], row) : String(row[column.key] ?? '')}
+                  <td key={String(column.key)} className="max-w-0 align-middle px-4 py-3 text-body-sm text-slate-200">
+                    <div className="truncate" title={String(row[column.key] ?? '')}>
+                      {column.render ? column.render(row[column.key], row) : String(row[column.key] ?? '')}
+                    </div>
                   </td>
                 ))}
               </tr>
             ))}
+            {bottomSpacerHeight > 0 ? (
+              <tr aria-hidden="true">
+                <td colSpan={columns.length} style={{ height: bottomSpacerHeight, padding: 0 }} />
+              </tr>
+            ) : null}
           </tbody>
         </table>
       </div>
