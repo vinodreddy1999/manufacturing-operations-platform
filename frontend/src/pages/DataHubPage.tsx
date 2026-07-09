@@ -2216,81 +2216,88 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
 
   return (
     <>
-      <section className="rounded-[32px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.16),transparent_34%),linear-gradient(135deg,rgba(15,23,42,0.96),rgba(2,6,23,0.9))] p-5 shadow-[0_24px_90px_rgba(0,0,0,0.28)] md:p-7">
-        <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+      <section className="rounded-[28px] border border-white/10 bg-slate-950/55 p-4 shadow-[0_18px_70px_rgba(0,0,0,0.22)] backdrop-blur md:p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-100">Data Hub</p>
-            <h1 className="mt-4 max-w-3xl text-3xl font-semibold tracking-[-0.03em] text-white md:text-5xl">Bring data in. Clean it. Send it to the right module.</h1>
-            <p className="mt-4 max-w-3xl text-base leading-7 text-slate-300">
-              A simpler Power BI-style intake flow for ERP exports, databases, APIs, cloud sheets, machine data, and manual uploads. Start with the client and plant, then test the source before anything is imported.
-            </p>
-            <div className="mt-6 flex flex-wrap gap-3">
-              <button type="button" className="rounded-2xl border border-cyan-300/30 bg-cyan-400/18 px-5 py-3 text-sm font-semibold text-cyan-50 shadow-[0_0_30px_rgba(34,211,238,0.14)]" onClick={() => setActiveView('get-data')}>
-                Start Get Data
-              </button>
-              <button type="button" className="rounded-2xl border border-white/10 bg-white/8 px-5 py-3 text-sm font-semibold text-slate-100 hover:bg-white/12" onClick={testSelectedGetDataConnection}>
-                Test selected source
-              </button>
-            </div>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-100">Data Hub</p>
+            <h1 className="mt-1 text-xl font-semibold tracking-[-0.02em] text-white">Get Data Workspace</h1>
           </div>
-
-          <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-            {[
-              ['1', 'Scope', targetCompany?.name ?? targetCompanyId, targetPlant?.plantName ?? 'All plants'],
-              ['2', 'Source', selectedPowerSource.label, selectedPowerSource.group],
-              ['3', 'Destination', selectedDestination, connectionTested ? 'Connection ready' : 'Test connection first'],
-            ].map(([step, label, value, helper]) => (
-              <div key={label} className="rounded-3xl border border-white/10 bg-white/[0.06] p-4 backdrop-blur">
-                <div className="flex items-center gap-3">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-2xl border border-cyan-300/25 bg-cyan-400/12 text-sm font-semibold text-cyan-100">{step}</span>
-                  <div className="min-w-0">
-                    <p className="text-xs uppercase tracking-[0.18em] text-slate-500">{label}</p>
-                    <p className="truncate text-base font-semibold text-white">{value}</p>
-                    <p className="truncate text-xs text-slate-400">{helper}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
+          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-300">
+            <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2">{rows.length} systems</span>
+            <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2">{scopedQualityScore}% quality</span>
+            <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2">{scopedAiReadinessScore}% AI ready</span>
           </div>
         </div>
-      </section>
 
-      <div className="mt-5 grid gap-4 xl:grid-cols-[1.25fr_0.95fr]">
-        <Panel title="Setup" description="Choose where this data belongs before connecting a source.">
-          <div className="grid gap-4 lg:grid-cols-2">
-            <CompanySelector companies={companyRows} selectedCompanyId={targetCompanyId} user={user} onChange={changeTargetCompany} />
-            <PlantSelector plants={targetPlantOptions} selectedPlantId={targetPlant?.plantId ?? ''} onChange={setSelectedPlantId} />
-          </div>
-        </Panel>
-
-        <Panel title="Health" description="Live readiness for the selected client and plant.">
-          <div className="grid gap-3 sm:grid-cols-3">
-            {[
-              ['Systems', rows.length, 'Connected'],
-              ['Quality', `${scopedQualityScore}%`, `${catalogRows.length} catalog rows`],
-              ['AI Ready', `${scopedAiReadinessScore}%`, 'Mapped data'],
-            ].map(([label, value, helper]) => (
-              <div key={label} className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-slate-500">{label}</p>
-                <p className="mt-3 text-3xl font-semibold tracking-[-0.03em] text-white">{value}</p>
-                <p className="mt-2 text-xs text-slate-400">{helper}</p>
-              </div>
-            ))}
-          </div>
-          <label className="mt-4 block text-sm font-medium text-slate-300">
-            Destination module
-            <select className={`${selectClass} mt-2 w-full`} value={selectedModuleFilter} onChange={(event) => setSelectedModuleFilter(event.target.value)}>
-              <option value="">All destination modules</option>
+        <div className="mt-4 grid gap-3 xl:grid-cols-[1.1fr_1fr_0.8fr_0.8fr]">
+          <CompanySelector companies={companyRows} selectedCompanyId={targetCompanyId} user={user} onChange={changeTargetCompany} />
+          <PlantSelector plants={targetPlantOptions} selectedPlantId={targetPlant?.plantId ?? ''} onChange={setSelectedPlantId} />
+          <label className="block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+            Source
+            <select className={`${selectClass} mt-2 w-full`} value={selectedSourceValue} onChange={(event) => {
+              setSelectedSourceValue(event.target.value);
+              setConnectionTested(false);
+              setActiveView('get-data');
+            }}>
+              {flatPowerBiSources.map((source) => <option key={source.value} value={source.value}>{source.label}</option>)}
+            </select>
+          </label>
+          <label className="block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+            Destination
+            <select className={`${selectClass} mt-2 w-full`} value={selectedDestination} onChange={(event) => setSelectedDestination(event.target.value)}>
               {destinationModules.map((module) => <option key={module}>{module}</option>)}
             </select>
           </label>
-        </Panel>
-      </div>
+        </div>
 
-      <div className="mt-4 rounded-2xl border border-cyan-300/15 bg-cyan-400/8 p-4 text-sm leading-6 text-slate-200">
-        <ShieldCheck className="mr-2 inline h-4 w-4 text-cyan-100" />
-        Safe by default: credentials stay masked, database sources are read-only, and critical imports create approval drafts before module data is changed.
-      </div>
+        <div className="mt-3 grid gap-3 xl:grid-cols-[1fr_0.75fr_0.75fr_0.75fr]">
+          <label className="block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+            Connector group
+            <select className={`${selectClass} mt-2 w-full`} value={selectedPowerSource.group} onChange={(event) => {
+              const nextSource = flatPowerBiSources.find((source) => source.group === event.target.value) ?? selectedPowerSource;
+              setSelectedSourceValue(nextSource.value);
+              setConnectionTested(false);
+            }}>
+              {powerBiSourceGroups.map((group) => <option key={group.group}>{group.group}</option>)}
+            </select>
+          </label>
+          <label className="block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+            Refresh
+            <select className={`${selectClass} mt-2 w-full`} value={selectedRefresh} onChange={(event) => setSelectedRefresh(event.target.value)}>
+              {refreshOptions.map((option) => <option key={option}>{option}</option>)}
+            </select>
+          </label>
+          <label className="block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+            Filter
+            <select className={`${selectClass} mt-2 w-full`} value={selectedModuleFilter} onChange={(event) => setSelectedModuleFilter(event.target.value)}>
+              <option value="">All modules</option>
+              {destinationModules.map((module) => <option key={module}>{module}</option>)}
+            </select>
+          </label>
+          <div className="flex items-end gap-2">
+            <button type="button" className="h-[42px] flex-1 rounded-2xl border border-cyan-300/30 bg-cyan-400/15 px-4 text-sm font-semibold text-cyan-50 hover:bg-cyan-400/20" onClick={() => setActiveView('get-data')}>
+              Get Data
+            </button>
+            <button type="button" className="h-[42px] flex-1 rounded-2xl border border-white/10 bg-white/[0.06] px-4 text-sm font-semibold text-slate-100 hover:bg-white/10" onClick={testSelectedGetDataConnection}>
+              Test
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-2 md:grid-cols-4">
+          {[
+            ['Client', targetCompany?.name ?? targetCompanyId],
+            ['Plant', targetPlant?.plantName ?? 'All plants'],
+            ['Source', selectedPowerSource.label],
+            ['Status', connectionTested ? 'Connection ready' : 'Not tested'],
+          ].map(([label, value]) => (
+            <div key={label} className="rounded-2xl border border-white/10 bg-white/[0.035] px-3 py-2">
+              <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">{label}</p>
+              <p className="mt-1 truncate text-sm font-semibold text-white">{value}</p>
+            </div>
+          ))}
+        </div>
+      </section>
 
       <div className="mt-6 flex flex-wrap gap-2 rounded-[24px] border border-white/10 bg-slate-950/45 p-2">
         {[
