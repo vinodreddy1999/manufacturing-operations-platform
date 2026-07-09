@@ -1,14 +1,12 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query';
-import { Cable, CheckCircle2, Database, Gauge, KeyRound, RadioTower, Route, ShieldCheck, Trash2, UploadCloud } from 'lucide-react';
+import { Cable, CheckCircle2, Database, Route, ShieldCheck, Trash2, UploadCloud } from 'lucide-react';
 
 import { DataTable } from '../components/DataTable';
 import { ErrorState } from '../components/ErrorState';
 import { LazyImpactSummary } from '../components/LazyImpactSummary';
 import { LoadingState } from '../components/LoadingState';
-import { PageHeader } from '../components/PageHeader';
 import { Panel } from '../components/Panel';
-import { StatCard } from '../components/StatCard';
 import { StatusBadge } from '../components/StatusBadge';
 import { canManagePlatform, canPerformAction, canUseDataHubUploads } from '../lib/rbac';
 import { usePlatform } from '../platform/PlatformContext';
@@ -2218,52 +2216,83 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
 
   return (
     <>
-      <PageHeader
-        eyebrow="Data Integration Hub"
-        title="Get data, transform it, and send it to modules"
-        description={`Target client: ${targetCompany?.name ?? targetCompanyId}; plant: ${targetPlant?.plantName ?? 'All plants'}. Use one guided flow to connect, preview, clean, map, validate, and create an approval-safe import draft.`}
-      />
-
-      <div className="mb-5 grid gap-3 md:grid-cols-5">
-        {[
-          ['Choose client', targetCompany?.name ?? targetCompanyId],
-          ['Choose plant', targetPlant?.plantName ?? 'Select plant'],
-          ['Pick source', selectedPowerSource.label],
-          ['Route to module', selectedDestination],
-          ['Approval safety', connectionTested ? 'Ready for draft' : 'Test connection first'],
-        ].map(([label, value]) => (
-          <div key={label} className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-            <p className="text-xs uppercase tracking-[0.16em] text-slate-500">{label}</p>
-            <p className="mt-2 truncate font-semibold text-white">{value}</p>
+      <section className="rounded-[32px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.16),transparent_34%),linear-gradient(135deg,rgba(15,23,42,0.96),rgba(2,6,23,0.9))] p-5 shadow-[0_24px_90px_rgba(0,0,0,0.28)] md:p-7">
+        <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-100">Data Hub</p>
+            <h1 className="mt-4 max-w-3xl text-3xl font-semibold tracking-[-0.03em] text-white md:text-5xl">Bring data in. Clean it. Send it to the right module.</h1>
+            <p className="mt-4 max-w-3xl text-base leading-7 text-slate-300">
+              A simpler Power BI-style intake flow for ERP exports, databases, APIs, cloud sheets, machine data, and manual uploads. Start with the client and plant, then test the source before anything is imported.
+            </p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <button type="button" className="rounded-2xl border border-cyan-300/30 bg-cyan-400/18 px-5 py-3 text-sm font-semibold text-cyan-50 shadow-[0_0_30px_rgba(34,211,238,0.14)]" onClick={() => setActiveView('get-data')}>
+                Start Get Data
+              </button>
+              <button type="button" className="rounded-2xl border border-white/10 bg-white/8 px-5 py-3 text-sm font-semibold text-slate-100 hover:bg-white/12" onClick={testSelectedGetDataConnection}>
+                Test selected source
+              </button>
+            </div>
           </div>
-        ))}
-      </div>
 
-      <div className="grid gap-4 xl:grid-cols-[0.9fr_0.75fr_1.1fr]">
-        <CompanySelector companies={companyRows} selectedCompanyId={targetCompanyId} user={user} onChange={changeTargetCompany} />
-        <PlantSelector plants={targetPlantOptions} selectedPlantId={targetPlant?.plantId ?? ''} onChange={setSelectedPlantId} />
-        <div className="grid gap-4 md:grid-cols-3">
-          <StatCard label="Connected Systems" value={rows.length} helper="Persisted company integrations" icon={<Database className="h-5 w-5" />} accent="blue" />
-          <StatCard label="Data Quality" value={`${scopedQualityScore}%`} helper={`Computed from ${catalogRows.length} selected plant catalog entries`} icon={<Gauge className="h-5 w-5" />} accent="amber" />
-          <StatCard label="AI Readiness" value={`${scopedAiReadinessScore}%`} helper="Selected plant catalog readiness score" icon={<RadioTower className="h-5 w-5" />} accent="violet" />
+          <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+            {[
+              ['1', 'Scope', targetCompany?.name ?? targetCompanyId, targetPlant?.plantName ?? 'All plants'],
+              ['2', 'Source', selectedPowerSource.label, selectedPowerSource.group],
+              ['3', 'Destination', selectedDestination, connectionTested ? 'Connection ready' : 'Test connection first'],
+            ].map(([step, label, value, helper]) => (
+              <div key={label} className="rounded-3xl border border-white/10 bg-white/[0.06] p-4 backdrop-blur">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-2xl border border-cyan-300/25 bg-cyan-400/12 text-sm font-semibold text-cyan-100">{step}</span>
+                  <div className="min-w-0">
+                    <p className="text-xs uppercase tracking-[0.18em] text-slate-500">{label}</p>
+                    <p className="truncate text-base font-semibold text-white">{value}</p>
+                    <p className="truncate text-xs text-slate-400">{helper}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
+      </section>
+
+      <div className="mt-5 grid gap-4 xl:grid-cols-[1.25fr_0.95fr]">
+        <Panel title="Setup" description="Choose where this data belongs before connecting a source.">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <CompanySelector companies={companyRows} selectedCompanyId={targetCompanyId} user={user} onChange={changeTargetCompany} />
+            <PlantSelector plants={targetPlantOptions} selectedPlantId={targetPlant?.plantId ?? ''} onChange={setSelectedPlantId} />
+          </div>
+        </Panel>
+
+        <Panel title="Health" description="Live readiness for the selected client and plant.">
+          <div className="grid gap-3 sm:grid-cols-3">
+            {[
+              ['Systems', rows.length, 'Connected'],
+              ['Quality', `${scopedQualityScore}%`, `${catalogRows.length} catalog rows`],
+              ['AI Ready', `${scopedAiReadinessScore}%`, 'Mapped data'],
+            ].map(([label, value, helper]) => (
+              <div key={label} className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
+                <p className="text-xs uppercase tracking-[0.18em] text-slate-500">{label}</p>
+                <p className="mt-3 text-3xl font-semibold tracking-[-0.03em] text-white">{value}</p>
+                <p className="mt-2 text-xs text-slate-400">{helper}</p>
+              </div>
+            ))}
+          </div>
+          <label className="mt-4 block text-sm font-medium text-slate-300">
+            Destination module
+            <select className={`${selectClass} mt-2 w-full`} value={selectedModuleFilter} onChange={(event) => setSelectedModuleFilter(event.target.value)}>
+              <option value="">All destination modules</option>
+              {destinationModules.map((module) => <option key={module}>{module}</option>)}
+            </select>
+          </label>
+        </Panel>
       </div>
 
-      <div className="mt-4 grid gap-3 md:grid-cols-[1fr_260px]">
-        <div className="rounded-2xl border border-white/10 bg-white/6 p-4 text-sm text-slate-300">
-          <KeyRound className="mr-2 inline h-4 w-4 text-cyan-200" />
-          Credentials are masked in the UI, stored as connection metadata only, and critical imports remain approval-first. Database connections are presented as read-only.
-        </div>
-        <label className="rounded-2xl border border-white/10 bg-white/6 p-3 text-sm font-medium text-slate-300">
-          Destination filter
-          <select className={`${selectClass} mt-2 w-full`} value={selectedModuleFilter} onChange={(event) => setSelectedModuleFilter(event.target.value)}>
-            <option value="">All destination modules</option>
-            {destinationModules.map((module) => <option key={module}>{module}</option>)}
-          </select>
-        </label>
+      <div className="mt-4 rounded-2xl border border-cyan-300/15 bg-cyan-400/8 p-4 text-sm leading-6 text-slate-200">
+        <ShieldCheck className="mr-2 inline h-4 w-4 text-cyan-100" />
+        Safe by default: credentials stay masked, database sources are read-only, and critical imports create approval drafts before module data is changed.
       </div>
 
-      <div className="mt-6 flex flex-wrap gap-2 rounded-2xl border border-white/10 bg-slate-900/45 p-2">
+      <div className="mt-6 flex flex-wrap gap-2 rounded-[24px] border border-white/10 bg-slate-950/45 p-2">
         {[
           { key: 'get-data', label: 'Get Data' },
           { key: 'sources', label: 'Source Connectors' },
