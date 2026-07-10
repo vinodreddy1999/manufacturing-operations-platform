@@ -1,6 +1,6 @@
 import { Children, Suspense, lazy, useState, type ReactNode } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { BarChart3, Building2, Check, FileCheck2, KeyRound, LayoutDashboard, Lightbulb, LockKeyhole, Search, Settings, ShieldCheck, SlidersHorizontal } from 'lucide-react';
+import { Building2, Check, FileCheck2, KeyRound, LayoutDashboard, Lightbulb, LockKeyhole, Search, Settings, ShieldCheck, SlidersHorizontal } from 'lucide-react';
 
 import { accessResources, adminPermissions, dashboardDefinitions, dataScopes, recommendations, roleDefinitions } from '../admin/data';
 import { formatCurrency } from '../lib/format';
@@ -9,7 +9,6 @@ import { platformApplications, platformModules } from '../platform/data';
 import { usePlatform } from '../platform/PlatformContext';
 import type { PlatformClient } from '../platform/types';
 import type { RuntimeUser } from '../types';
-import { LazyImpactSummary } from '../components/LazyImpactSummary';
 import { ModuleNavigationTabs } from '../components/ModuleNavigationTabs';
 import { Panel } from '../components/Panel';
 import { StatCard } from '../components/StatCard';
@@ -18,7 +17,7 @@ import { ScrollableTableFrame } from '../components/ScrollableTableFrame';
 
 const LazyMultiSelectAccessGrid = lazy(() => import('../components/MultiSelectAccessGrid').then((module) => ({ default: module.MultiSelectAccessGrid })));
 
-export type AdminSection = 'company' | 'roles' | 'access' | 'modules' | 'dashboards' | 'data-scope' | 'audit' | 'business-impact' | 'recommendations' | 'settings';
+export type AdminSection = 'company' | 'roles' | 'access' | 'modules' | 'dashboards' | 'data-scope' | 'audit' | 'recommendations' | 'settings';
 
 const adminNavigation: Array<{ section: AdminSection; label: string; icon: typeof Building2 }> = [
   { section: 'company', label: 'Company Profile', icon: Building2 },
@@ -28,7 +27,6 @@ const adminNavigation: Array<{ section: AdminSection; label: string; icon: typeo
   { section: 'dashboards', label: 'Dashboard Management', icon: LayoutDashboard },
   { section: 'data-scope', label: 'Data Scope Management', icon: LockKeyhole },
   { section: 'audit', label: 'Audit & Compliance', icon: FileCheck2 },
-  { section: 'business-impact', label: 'Business Impact', icon: BarChart3 },
   { section: 'recommendations', label: 'Recommendations Center', icon: Lightbulb },
   { section: 'settings', label: 'Settings', icon: Settings },
 ];
@@ -50,7 +48,7 @@ export function AdminCenterPage({ section, user }: { section: AdminSection; user
 function canViewAdminSection(user: RuntimeUser, section: AdminSection) {
   if (user.role === 'super_admin') return true;
   if (section === 'audit') return canReadAuditLogs(user);
-  if (section === 'business-impact' || section === 'recommendations') return ['account_owner', 'organization_admin', 'admin', 'team_manager'].includes(user.role);
+  if (section === 'recommendations') return ['account_owner', 'organization_admin', 'admin', 'team_manager'].includes(user.role);
   if (section === 'settings' || section === 'data-scope') return ['account_owner', 'organization_admin', 'admin'].includes(user.role);
   return true;
 }
@@ -63,7 +61,6 @@ function AdminSectionContent({ section, user }: { section: AdminSection; user: R
   if (section === 'dashboards') return <DashboardManagement />;
   if (section === 'data-scope') return <DataScopeManagement />;
   if (section === 'audit') return <AuditCompliance />;
-  if (section === 'business-impact') return <BusinessImpact />;
   if (section === 'recommendations') return <RecommendationsCenter />;
   return <AdminSettings />;
 }
@@ -127,11 +124,6 @@ function AuditCompliance() {
   const [search, setSearch] = useState(''); const [module, setModule] = useState(''); const [action, setAction] = useState('');
   const logs = state.auditLogs.filter((log) => (!selectedClient || log.clientId === selectedClient.clientId) && (!search || `${log.userId} ${log.description ?? ''}`.toLowerCase().includes(search.toLowerCase())) && (!module || log.moduleName === module) && (!action || log.action === action));
   return <Panel title="Business Audit History" description="Readable governance history without internal record identifiers."><div className="mb-4 grid gap-3 md:grid-cols-3"><input className="form-input" placeholder="Search user or description..." value={search} onChange={(event) => setSearch(event.target.value)} /><select className="form-input" value={module} onChange={(event) => setModule(event.target.value)}><option value="">All modules</option>{[...new Set(state.auditLogs.map((log) => log.moduleName))].map((item) => <option key={item}>{item}</option>)}</select><select className="form-input" value={action} onChange={(event) => setAction(event.target.value)}><option value="">All actions</option>{[...new Set(state.auditLogs.map((log) => log.action))].map((item) => <option key={item}>{item}</option>)}</select></div><AdminTable headers={['Date','User','Action','Module','Description','Client','Status']}>{logs.map((log) => <tr key={log.logId} className="border-b border-white/10"><Cell>{log.timestamp}</Cell><Cell strong>{state.users.find((user) => user.userId === log.userId)?.fullName ?? 'Administrator'}</Cell><Cell>{log.action}</Cell><Cell>{log.moduleName}</Cell><Cell>{log.description ?? `${log.action} was completed.`}</Cell><Cell>{log.clientName}</Cell><Cell><StatusBadge status={log.status ?? 'Completed'} /></Cell></tr>)}</AdminTable></Panel>;
-}
-
-function BusinessImpact() {
-  const { currency } = usePlatform();
-  return <div className="space-y-5"><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><StatCard label="Financial Impact" value={formatCurrency(1248000, currency)} helper="Validated savings" /><StatCard label="Cost Avoided" value={formatCurrency(486000, currency)} helper="Prevented exposure" /><StatCard label="Time Saved" value="1,284 hrs" helper="Across completed improvements" /><StatCard label="Business Health" value="91%" helper="7% above prior period" /><StatCard label="Efficiency Gain" value="12.4%" helper="Current versus previous" /><StatCard label="Completed Improvements" value="28" helper="Owner validated" /><StatCard label="Open Opportunities" value="9" helper="Potential future value" /><StatCard label="Adoption Rate" value="84%" helper="Active users and workflows" /></div><LazyImpactSummary moduleKey="admin" /></div>;
 }
 
 function RecommendationsCenter() {

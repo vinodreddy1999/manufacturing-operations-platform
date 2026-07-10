@@ -11,7 +11,6 @@ import { RowActions } from '../components/RowActions';
 import { ScrollableTableFrame } from '../components/ScrollableTableFrame';
 import { StatCard } from '../components/StatCard';
 import { StatusBadge } from '../components/StatusBadge';
-import { formatCurrency } from '../lib/format';
 import { applyModuleFilters, type ModuleFilterValues } from '../lib/moduleFilters';
 import { usePlatform } from '../platform/PlatformContext';
 import type { RuntimeUser } from '../types';
@@ -19,7 +18,6 @@ import {
   auditEntries,
   cycleCounts,
   dispatchRecords,
-  impactMetrics,
   internalMovements,
   laborRecords,
   packingRecords,
@@ -234,7 +232,6 @@ function WarehouseDashboard() {
         <Panel title="Dispatch Readiness" description="Packed and pending items by dispatch date."><WarehouseDataTable rows={dispatchRows(filteredDispatch).slice(0, 6)} /></Panel>
         <Panel title="Warehouse Performance Trend" description="Handling time and readiness trend."><WarehouseLineChart data={[{ name: 'Jan', value: 70 }, { name: 'Feb', value: 74 }, { name: 'Mar', value: 79 }, { name: 'Apr', value: 83 }, { name: 'May', value: 86 }, { name: 'Jun', value: 88 }]} /></Panel>
       </div>
-      <WarehouseImpactGrid />
     </div>
   );
 }
@@ -415,40 +412,8 @@ function WarehouseLineChart({ data }: { data: Array<Record<string, string | numb
   return <LazyLineChart data={data} />;
 }
 
-function WarehouseImpactGrid() {
-  return (
-    <Panel title="Warehouse Business Impact" description="Measurable operational and financial impact from warehouse execution improvements.">
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {impactMetrics.map((item) => <WarehouseImpactCard key={item.metric} item={item} />)}
-      </div>
-    </Panel>
-  );
-}
-
-function WarehouseImpactCard({ item }: { item: typeof impactMetrics[number] }) {
-  return (
-    <div className="rounded-xl border border-white/10 bg-slate-950/30 p-4">
-      <div className="flex items-start justify-between gap-3">
-        <p className="font-medium text-white">{item.metric}</p>
-        <StatusBadge status={item.status} />
-      </div>
-      <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-        <Detail label="Previous" value={item.previous} />
-        <Detail label="Current" value={item.current} />
-        <Detail label="Difference" value={item.difference} />
-        <Detail label="Impact" value={formatCurrency(item.financialImpact, warehouseCompany.currency)} />
-      </div>
-      <p className="mt-3 text-xs text-slate-500">Owner: {item.owner}</p>
-    </div>
-  );
-}
-
 function Field({ label, children, className = '' }: { label: string; children: ReactNode; className?: string }) {
   return <label className={`text-sm text-slate-300 ${className}`}>{label}{children}</label>;
-}
-
-function Detail({ label, value }: { label: string; value: ReactNode }) {
-  return <div><p className="text-xs uppercase tracking-[0.12em] text-slate-500">{label}</p><p className="mt-1 font-medium text-white">{value}</p></div>;
 }
 
 function receivingStatusChart(source = receivingRecords) {

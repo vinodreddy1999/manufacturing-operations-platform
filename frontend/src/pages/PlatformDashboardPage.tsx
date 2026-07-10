@@ -28,7 +28,7 @@ function ColumnFilter({ label, active, children, width = 'w-64' }: { label: stri
   );
 }
 
-const platformWorkspaces: PlatformWorkspace[] = ['clients', 'markets', 'users', 'modules', 'subscriptions', 'integrations', 'audit', 'impact'];
+const platformWorkspaces: PlatformWorkspace[] = ['clients', 'markets', 'users', 'modules', 'subscriptions', 'integrations', 'audit'];
 
 function isPlatformWorkspace(value: string | null): value is PlatformWorkspace {
   return Boolean(value && platformWorkspaces.includes(value as PlatformWorkspace));
@@ -102,7 +102,7 @@ export function PlatformDashboardPage() {
     : [];
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Platform Context" title="Platform Management Services" description="A single embedded workspace for clients, users, modules, subscriptions, integrations, audit, and business impact." />
+      <PageHeader eyebrow="Platform Context" title="Platform Management Services" description="A single embedded workspace for clients, users, modules, subscriptions, integrations, and audit." />
       <Suspense fallback={<Panel title="Platform Management Services" description="Loading management workspace only when needed."><div className="rounded-2xl border border-white/10 bg-slate-950/30 p-6 text-sm text-slate-400">Loading platform workspace...</div></Panel>}>
         <PlatformEmbeddedWorkspace active={activeWorkspace} onChange={changeWorkspace} />
       </Suspense>

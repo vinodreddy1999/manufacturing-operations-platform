@@ -4,7 +4,6 @@ import { Cable, CheckCircle2, Database, Route, ShieldCheck, Trash2, UploadCloud 
 
 import { DataTable } from '../components/DataTable';
 import { ErrorState } from '../components/ErrorState';
-import { LazyImpactSummary } from '../components/LazyImpactSummary';
 import { LoadingState } from '../components/LoadingState';
 import { Panel } from '../components/Panel';
 import { StatusBadge } from '../components/StatusBadge';
@@ -2700,8 +2699,6 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
           </div>
         </div>
       </div>
-      <LazyImpactSummary moduleKey="integration-hub" />
-      <LazyImpactSummary moduleKey="data-hub" />
     </>
   );
 }

@@ -11,7 +11,7 @@ import { StatusBadge } from './StatusBadge';
 
 const LazyMultiSelectAccessGrid = lazy(() => import('./MultiSelectAccessGrid').then((module) => ({ default: module.MultiSelectAccessGrid })));
 
-export type PlatformWorkspace = 'clients' | 'markets' | 'users' | 'modules' | 'subscriptions' | 'integrations' | 'audit' | 'impact';
+export type PlatformWorkspace = 'clients' | 'markets' | 'users' | 'modules' | 'subscriptions' | 'integrations' | 'audit';
 
 const workspaceTabs: Array<[PlatformWorkspace, string]> = [
   ['clients', 'Clients'],
@@ -21,7 +21,6 @@ const workspaceTabs: Array<[PlatformWorkspace, string]> = [
   ['subscriptions', 'Subscriptions'],
   ['integrations', 'Integrations'],
   ['audit', 'Audit'],
-  ['impact', 'Business Impact'],
 ];
 
 const marketOptions = [
@@ -160,7 +159,6 @@ export function PlatformEmbeddedWorkspace({ active, onChange }: { active: Platfo
     subscriptions: state.clients.length,
     integrations: state.clients.length,
     audit: state.auditLogs.length,
-    impact: 4,
   };
 
   return (
@@ -180,7 +178,6 @@ export function PlatformEmbeddedWorkspace({ active, onChange }: { active: Platfo
       {active === 'subscriptions' && <SubscriptionsWorkspace />}
       {active === 'integrations' && <IntegrationsWorkspace />}
       {active === 'audit' && <AuditWorkspace />}
-      {active === 'impact' && <ImpactWorkspace />}
     </Panel>
   );
 }
@@ -1240,19 +1237,6 @@ function AuditWorkspace() {
           </tr>
         ))}
       </Table>
-    </div>
-  );
-}
-
-function ImpactWorkspace() {
-  const { state } = usePlatform();
-  const enabled = state.clients.reduce((sum, client) => sum + client.enabledModules.length, 0);
-  return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-      <Metric label="Enabled capabilities" value={enabled} />
-      <Metric label="Active users" value={state.users.filter((user) => user.status === 'Active').length} />
-      <Metric label="Governed actions" value={state.auditLogs.length} />
-      <Metric label="Estimated annual value" value="$4.8M" />
     </div>
   );
 }

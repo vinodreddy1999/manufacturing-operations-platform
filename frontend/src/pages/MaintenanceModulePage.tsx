@@ -19,7 +19,6 @@ import {
   correctiveRecords,
   costRecords,
   hierarchyRecords,
-  impactMetrics,
   maintenanceCompany,
   maintenanceReports,
   preventiveSchedules,
@@ -129,7 +128,6 @@ function MaintenanceDashboard() {
         <Panel title="Spare Parts Risk" description="Low-stock and stockout risks linked to maintenance assets."><MaintenanceDataTable rows={spareRows().filter((row) => ['Critical', 'Low Stock', 'Stockout'].includes(String(row.Status)))} /></Panel>
         <Panel title="Maintenance Cost Trend" description="Cost by maintenance category and work order."><MaintenanceBarChart data={costByType()} bars={['amount']} /></Panel>
       </div>
-      <MaintenanceImpactGrid />
     </div>
   );
 }
@@ -304,44 +302,12 @@ function MaintenanceLineChart({ data }: { data: Array<Record<string, string | nu
   return <LazyLineChart data={data} />;
 }
 
-function MaintenanceImpactGrid() {
-  return (
-    <Panel title="Maintenance Business Impact" description="Measured reliability and financial impact from reduced downtime and better PM execution.">
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {impactMetrics.map((item) => <MaintenanceImpactCard key={item.metric} item={item} />)}
-      </div>
-    </Panel>
-  );
-}
-
-function MaintenanceImpactCard({ item }: { item: typeof impactMetrics[number] }) {
-  return (
-    <div className="rounded-xl border border-white/10 bg-slate-950/30 p-4">
-      <div className="flex items-start justify-between gap-3">
-        <p className="font-medium text-white">{item.metric}</p>
-        <StatusBadge status={item.status} />
-      </div>
-      <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-        <Detail label="Previous" value={item.previous} />
-        <Detail label="Current" value={item.current} />
-        <Detail label="Difference" value={item.difference} />
-        <Detail label="Impact" value={formatCurrency(item.financialImpact, maintenanceCompany.currency)} />
-      </div>
-      <p className="mt-3 text-xs text-slate-500">Owner: {item.owner}</p>
-    </div>
-  );
-}
-
 function Filter({ label, options }: { label: string; options: string[] }) {
   return <label className="text-sm text-slate-300">{label}<select className="form-input mt-1 w-full"><option>All {label.toLowerCase()}</option>{options.map((item) => <option key={item}>{item}</option>)}</select></label>;
 }
 
 function Field({ label, children, className = '' }: { label: string; children: ReactNode; className?: string }) {
   return <label className={`text-sm text-slate-300 ${className}`}>{label}{children}</label>;
-}
-
-function Detail({ label, value }: { label: string; value: ReactNode }) {
-  return <div><p className="text-xs uppercase tracking-[0.12em] text-slate-500">{label}</p><p className="mt-1 font-medium text-white">{value}</p></div>;
 }
 
 function assetRows() { return assets.map((item) => ({ 'Asset ID': item.id, 'Asset Name': item.name, 'Asset Category': item.category, Plant: item.plant, Department: item.department, 'Production Line': item.line, Machine: item.machine, Manufacturer: item.manufacturer, Model: item.model, 'Serial Number': item.serial, Criticality: item.criticality, Status: item.status, 'Health Score': `${item.healthScore}%`, 'Last Maintenance Date': item.lastMaintenance, 'Next Maintenance Date': item.nextMaintenance, Owner: item.owner, Actions: <RowActions labels={['View', 'Edit', 'History']} /> })); }

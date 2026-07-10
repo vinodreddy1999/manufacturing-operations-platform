@@ -11,7 +11,6 @@ import { RowActions } from '../components/RowActions';
 import { ScrollableTableFrame } from '../components/ScrollableTableFrame';
 import { StatCard } from '../components/StatCard';
 import { StatusBadge } from '../components/StatusBadge';
-import { formatCurrency } from '../lib/format';
 import { applyModuleFilters, type ModuleFilterValues } from '../lib/moduleFilters';
 import { usePlatform } from '../platform/PlatformContext';
 import {
@@ -19,7 +18,6 @@ import {
   auditEntries,
   capacityPlans,
   demandPlans,
-  impactMetrics,
   inventoryPlans,
   maintenancePlans,
   materialRequirements,
@@ -212,7 +210,6 @@ function PlanningDashboard() {
           { Action: 'Approve cake demand plan', Module: 'Demand', Owner: 'Company Admin', Priority: 'Medium', 'Due Date': '2026-06-27', Status: <StatusBadge status="Pending Approval" /> },
         ]} />
       </Panel>
-      <PlanningImpactGrid />
     </div>
   );
 }
@@ -355,34 +352,6 @@ function PlanningLineChart({ data }: { data: Array<Record<string, string | numbe
   return <LazyLineChart data={data} />;
 }
 
-function PlanningImpactGrid() {
-  return (
-    <Panel title="Planning Business Impact" description="Measured impact delivered by planning improvements.">
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {impactMetrics.map((item) => <PlanningImpactCard key={item.metric} item={item} />)}
-      </div>
-    </Panel>
-  );
-}
-
-function PlanningImpactCard({ item }: { item: typeof impactMetrics[number] }) {
-  return (
-    <div className="rounded-xl border border-white/10 bg-slate-950/30 p-4">
-      <div className="flex items-start justify-between gap-3">
-        <p className="font-medium text-white">{item.metric}</p>
-        <StatusBadge status={item.status} />
-      </div>
-      <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-        <Detail label="Previous" value={item.previous} />
-        <Detail label="Current" value={item.current} />
-        <Detail label="Difference" value={item.difference} />
-        <Detail label="Impact" value={formatCurrency(item.financialImpact, planningCompany.currency)} />
-      </div>
-      <p className="mt-3 text-xs text-slate-500">Owner: {item.owner}</p>
-    </div>
-  );
-}
-
 function PlanningScenarioCard({ scenario }: { scenario: typeof scenarios[number] }) {
   return (
     <div className="rounded-xl border border-white/10 bg-slate-950/30 p-4">
@@ -446,10 +415,6 @@ function CapacityWidgets() {
 
 function Field({ label, children, className = '' }: { label: string; children: ReactNode; className?: string }) {
   return <label className={`text-sm text-slate-300 ${className}`}>{label}{children}</label>;
-}
-
-function Detail({ label, value }: { label: string; value: ReactNode }) {
-  return <div><p className="text-xs uppercase tracking-[0.12em] text-slate-500">{label}</p><p className="mt-1 font-medium text-white">{value}</p></div>;
 }
 
 function demandRows() { return demandPlans.map((item) => ({ 'Demand Plan ID': item.id, Product: item.product, Customer: item.customer, Region: item.region, Market: item.market, 'Forecast Period': item.period, 'Forecast Qty': item.forecastQty, 'Confirmed Orders': item.confirmedOrders, Variance: item.variance, Status: item.status, Owner: item.owner, 'Last Updated': item.updated, Actions: <RowActions /> })); }

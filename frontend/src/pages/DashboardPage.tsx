@@ -41,8 +41,8 @@ function moduleRoute(moduleKey: string) {
     'documents',
   ]);
   const routeMap: Record<string, string> = {
-    reporting: '/reports',
-    reports: '/reports',
+    reporting: '/dashboard/business-impact',
+    reports: '/dashboard/business-impact',
     integrations: '/data-hub',
     mobile: '/operations',
     ai_copilot: '/intelligence',

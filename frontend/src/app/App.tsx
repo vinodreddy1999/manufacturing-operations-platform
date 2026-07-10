@@ -361,6 +361,7 @@ function AuthenticatedApp({ user, onLogout }: { user: RuntimeUser; onLogout: () 
               <Route path="/admin/clients/:clientId/health" element={<Navigate to="/platform?workspace=clients" replace />} />
               <Route path="/admin/users" element={<Navigate to="/platform?workspace=users" replace />} />
               <Route path="/admin/users/create" element={<Navigate to="/platform?workspace=users" replace />} />
+              <Route path="/dashboard/business-impact" element={<ModuleRoute user={user} moduleName="Reports & Analytics" fallbackPath={allowedFallbackPath}><BusinessImpactDashboard /></ModuleRoute>} />
               <Route path="/dashboard/:focus" element={<DashboardPage user={user} />} />
               <Route path="/admin" element={<ProtectedRoute user={user} section="admin" fallbackPath={allowedFallbackPath}><Navigate to="/admin/company" replace /></ProtectedRoute>} />
               <Route path="/admin/company" element={<ProtectedRoute user={user} section="admin" fallbackPath={allowedFallbackPath}><AdminCenterPage section="company" user={user} /></ProtectedRoute>} />
@@ -370,7 +371,6 @@ function AuthenticatedApp({ user, onLogout }: { user: RuntimeUser; onLogout: () 
               <Route path="/admin/dashboards" element={<ProtectedRoute user={user} section="admin" fallbackPath={allowedFallbackPath}><AdminCenterPage section="dashboards" user={user} /></ProtectedRoute>} />
               <Route path="/admin/data-scope" element={<ProtectedRoute user={user} section="admin" fallbackPath={allowedFallbackPath}><AdminCenterPage section="data-scope" user={user} /></ProtectedRoute>} />
               <Route path="/admin/audit" element={<ProtectedRoute user={user} section="admin" fallbackPath={allowedFallbackPath}><AdminCenterPage section="audit" user={user} /></ProtectedRoute>} />
-              <Route path="/admin/business-impact" element={<ProtectedRoute user={user} section="admin" fallbackPath={allowedFallbackPath}><AdminCenterPage section="business-impact" user={user} /></ProtectedRoute>} />
               <Route path="/admin/recommendations" element={<ProtectedRoute user={user} section="admin" fallbackPath={allowedFallbackPath}><AdminCenterPage section="recommendations" user={user} /></ProtectedRoute>} />
               <Route path="/admin/settings" element={<ProtectedRoute user={user} section="admin" fallbackPath={allowedFallbackPath}><AdminCenterPage section="settings" user={user} /></ProtectedRoute>} />
               <Route path="/admin/performance" element={<ProtectedRoute user={user} section="admin" fallbackPath={allowedFallbackPath}><PerformancePage /></ProtectedRoute>} />
@@ -389,7 +389,7 @@ function AuthenticatedApp({ user, onLogout }: { user: RuntimeUser; onLogout: () 
               <Route path="/compliance" element={<ModuleRoute user={user} moduleName="Compliance" fallbackPath={allowedFallbackPath}><ModuleWorkspacePage moduleKey="compliance" user={user} /></ModuleRoute>} />
               <Route path="/customer-portal" element={<ModuleRoute user={user} moduleName="Customer Portal" fallbackPath={allowedFallbackPath}><ModuleWorkspacePage moduleKey="customer-portal" user={user} /></ModuleRoute>} />
               <Route path="/supplier-portal" element={<ModuleRoute user={user} moduleName="Supplier Portal" fallbackPath={allowedFallbackPath}><ModuleWorkspacePage moduleKey="supplier-portal" user={user} /></ModuleRoute>} />
-              <Route path="/reports" element={<ModuleRoute user={user} moduleName="Reports & Analytics" fallbackPath={allowedFallbackPath}><BusinessImpactDashboard /></ModuleRoute>} />
+              <Route path="/reports" element={<Navigate to="/dashboard/business-impact" replace />} />
               <Route path="/documents" element={<ModuleRoute user={user} moduleName="Document Management" fallbackPath={allowedFallbackPath}><ModuleWorkspacePage moduleKey="documents" user={user} /></ModuleRoute>} />
               <Route path="/impact/:module/:metric" element={<ProtectedRoute user={user} section="operations" fallbackPath={allowedFallbackPath}><ImpactDrilldownPage /></ProtectedRoute>} />
               </Routes>

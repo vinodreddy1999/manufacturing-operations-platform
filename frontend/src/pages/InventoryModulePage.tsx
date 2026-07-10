@@ -22,7 +22,6 @@ import {
   goodsReceipts,
   inventoryAudit,
   inventoryCompany,
-  inventoryImpact,
   inventoryItems,
   inventoryReports,
   lots,
@@ -155,7 +154,6 @@ function InventoryDashboard() {
         <Panel title="Dead Stock Summary" description="Items with no movement for 180+ days."><InventoryDataTable rows={deadStockRows(filteredDeadStock)} /></Panel>
         <Panel title="Slow Moving Inventory" description="Low movement count and high coverage days."><InventoryDataTable rows={slowMovingRows(filteredSlowMoving)} /></Panel>
       </div>
-      <InventoryImpactGrid />
     </div>
   );
 }
@@ -244,14 +242,6 @@ function InventoryFilters({ filters, onChange }: { filters: ModuleFilterValues; 
   );
 }
 
-function InventoryImpactGrid() {
-  return (
-    <Panel title="Inventory Business Impact" description="Working capital and savings impact from inventory improvements.">
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{inventoryImpact.map((item) => <div key={item.metric} className="rounded-xl border border-white/10 bg-slate-950/30 p-4"><div className="flex items-start justify-between gap-3"><p className="font-medium text-white">{item.metric}</p><StatusBadge status={item.status} /></div><div className="mt-4 grid grid-cols-2 gap-3 text-sm"><Detail label="Previous" value={item.previous} /><Detail label="Current" value={item.current} /><Detail label="Difference" value={item.difference} /><Detail label="Impact" value={formatCurrency(item.financialImpact, inventoryCompany.currency)} /></div><p className="mt-3 text-xs text-slate-500">Owner: {item.owner}</p></div>)}</div>
-    </Panel>
-  );
-}
-
 function InventoryLineChart({ data }: { data: Array<{ name: string; value: number }> }) {
   return <LazyLineChart data={data} />;
 }
@@ -280,10 +270,6 @@ function InventoryFormDrawer({ title, onClose }: { title: string; onClose: () =>
 
 function Field({ label, children, className = '' }: { label: string; children: ReactNode; className?: string }) {
   return <label className={`text-sm text-slate-300 ${className}`}>{label}{children}</label>;
-}
-
-function Detail({ label, value }: { label: string; value: ReactNode }) {
-  return <div><p className="text-xs uppercase tracking-[0.12em] text-slate-500">{label}</p><p className="mt-1 font-medium text-white">{value}</p></div>;
 }
 
 function overviewRows() { return inventoryItems.map((item) => ({ 'Item Code': item.code, 'Item Name': item.name, Category: item.category, Plant: item.plant, Warehouse: item.warehouse, 'Available Qty': item.availableQty, 'Reserved Qty': item.reservedQty, 'Blocked Qty': item.blockedQty, 'In Transit Qty': item.inTransitQty, UOM: item.uom, 'Inventory Value': formatCurrency(item.value, inventoryCompany.currency), Status: item.status, Actions: <RowActions labels={['View', 'History', 'Transfer', 'Reserve', 'Export']} recordId={item.code} recordTitle={item.name} recordDetails={{ Code: item.code, Name: item.name, Plant: item.plant, Warehouse: item.warehouse, Status: item.status }} /> })); }

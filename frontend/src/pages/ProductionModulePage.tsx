@@ -14,7 +14,6 @@ import { usePlatform } from '../platform/PlatformContext';
 import {
   auditEntries,
   downtimeRecords,
-  impactMetrics,
   lineRecords,
   machineRecords,
   oeeRecords,
@@ -127,7 +126,6 @@ function ProductionDashboard() {
         <Panel title="Downtime Analysis" description="Downtime duration by cause."><ProductionBarChart data={downtimeByCause()} bars={['hours']} /></Panel>
         <Panel title="Yield and Scrap Analysis" description="Yield percent and scrap cost risk."><ProductionDataTable rows={[...yieldRows().slice(0, 4), ...scrapRows().slice(0, 4)]} /></Panel>
       </div>
-      <ProductionImpactGrid />
     </div>
   );
 }
@@ -295,44 +293,12 @@ function ProductionLineChart({ data }: { data: Array<Record<string, string | num
   return <LazyLineChart data={data} />;
 }
 
-function ProductionImpactGrid() {
-  return (
-    <Panel title="Production Business Impact" description="Measurable operational and financial impact from manufacturing execution improvements.">
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {impactMetrics.map((item) => <ProductionImpactCard key={item.metric} item={item} />)}
-      </div>
-    </Panel>
-  );
-}
-
-function ProductionImpactCard({ item }: { item: typeof impactMetrics[number] }) {
-  return (
-    <div className="rounded-xl border border-white/10 bg-slate-950/30 p-4">
-      <div className="flex items-start justify-between gap-3">
-        <p className="font-medium text-white">{item.metric}</p>
-        <StatusBadge status={item.status} />
-      </div>
-      <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-        <Detail label="Previous" value={item.previous} />
-        <Detail label="Current" value={item.current} />
-        <Detail label="Difference" value={item.difference} />
-        <Detail label="Impact" value={formatCurrency(item.financialImpact, productionCompany.currency)} />
-      </div>
-      <p className="mt-3 text-xs text-slate-500">Owner: {item.owner}</p>
-    </div>
-  );
-}
-
 function Filter({ label, options }: { label: string; options: string[] }) {
   return <label className="text-sm text-slate-300">{label}<select className="form-input mt-1 w-full"><option>All {label.toLowerCase()}</option>{options.map((item) => <option key={item}>{item}</option>)}</select></label>;
 }
 
 function Field({ label, children, className = '' }: { label: string; children: ReactNode; className?: string }) {
   return <label className={`text-sm text-slate-300 ${className}`}>{label}{children}</label>;
-}
-
-function Detail({ label, value }: { label: string; value: ReactNode }) {
-  return <div><p className="text-xs uppercase tracking-[0.12em] text-slate-500">{label}</p><p className="mt-1 font-medium text-white">{value}</p></div>;
 }
 
 function orderRows() { return productionOrders.map((item) => ({ 'Production Order Number': item.orderNo, Product: item.product, 'Planned Quantity': item.plannedQty, 'Produced Quantity': item.producedQty, 'Remaining Quantity': item.plannedQty - item.producedQty, Plant: item.plant, Line: item.line, 'Start Date': item.startDate, 'End Date': item.endDate, Priority: item.priority, Status: item.status, Actions: <RowActions labels={['Edit', 'Release', 'Close']} /> })); }

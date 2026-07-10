@@ -5,7 +5,6 @@ import { Trash2 } from 'lucide-react';
 import { DataTable } from '../components/DataTable';
 import { ErrorState } from '../components/ErrorState';
 import { LazyBarChart } from '../components/LazyCharts';
-import { LazyImpactSummary } from '../components/LazyImpactSummary';
 import { LoadingState } from '../components/LoadingState';
 import { PageHeader } from '../components/PageHeader';
 import { Panel } from '../components/Panel';
@@ -229,7 +228,6 @@ export function ModuleWorkspacePage({ moduleKey, user }: { moduleKey: string; us
           <LazyBarChart data={chartRows} bars={['quantity']} showGrid={false} />
         </Panel>
       </div>
-      <LazyImpactSummary moduleKey={moduleKey} />
     </>
   );
 }
