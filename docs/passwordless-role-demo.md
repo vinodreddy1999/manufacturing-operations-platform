@@ -8,7 +8,7 @@ This mode lets reviewers document the real Version 1 navigation and data visibil
 
 - Local application: `http://localhost:8080`
 - Local API: `http://localhost:8000`
-- Docker images: `vinodreddy1999/metam-services-fullstack:0.6.0` and `vinodreddy1999/metam-services-frontend:0.6.0`
+- Docker images: `vinodreddy1999/metam-services-fullstack:0.7.34` and `vinodreddy1999/metam-services-frontend:0.7.34`
 
 Open the application, choose **Passwordless role preview**, and select a role. Use **Switch role** in the header to return to the role list.
 
