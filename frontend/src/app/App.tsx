@@ -44,11 +44,13 @@ const ImpactDrilldownPage = lazy(() => import('../pages/ImpactDrilldownPage').th
 const PlatformDashboardPage = lazy(() => import('../pages/PlatformDashboardPage').then((module) => ({ default: module.PlatformDashboardPage })));
 const PlatformModulePage = lazy(() => import('../pages/PlatformModulePage').then((module) => ({ default: module.PlatformModulePage })));
 const PerformancePage = lazy(() => import('../pages/PerformancePage').then((module) => ({ default: module.PerformancePage })));
+const FactoryPulsePage = lazy(() => import('../pages/FactoryPulsePage').then((module) => ({ default: module.FactoryPulsePage })));
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, section: 'dashboard' as const },
   { to: '/admin', label: 'Admin', icon: ShieldCheck, section: 'admin' as const },
   { to: '/data-hub', label: 'Data Hub', icon: DatabaseZap, section: 'data-hub' as const },
+  { to: '/factorypulse', label: 'FactoryPulse', icon: Factory, section: 'operations' as const },
   { to: '/planning', label: 'Planning', moduleName: 'Planning', icon: Gauge, section: 'operations' as const },
   { to: '/inventory', label: 'Inventory', moduleName: 'Inventory', icon: Boxes, section: 'operations' as const },
   { to: '/warehouse', label: 'Warehouse', moduleName: 'Warehouse', icon: Boxes, section: 'operations' as const },
@@ -69,6 +71,7 @@ const platformNavItems = [
   { to: '/platform', label: 'Platform', icon: LayoutDashboard },
   { to: '/admin', label: 'Admin', icon: ShieldCheck },
   { to: '/data-hub', label: 'Data Hub', icon: DatabaseZap },
+  { to: '/factorypulse', label: 'FactoryPulse', icon: Factory },
   { to: '/admin/performance', label: 'Performance', icon: Activity },
 ];
 
@@ -541,6 +544,7 @@ function AuthenticatedApp({
               <Route path="/admin/settings" element={<ProtectedRoute user={user} section="admin" fallbackPath={allowedFallbackPath}><AdminCenterPage section="settings" user={user} /></ProtectedRoute>} />
               <Route path="/admin/performance" element={<ProtectedRoute user={user} section="admin" fallbackPath={allowedFallbackPath}><PerformancePage /></ProtectedRoute>} />
               <Route path="/data-hub" element={<ProtectedRoute user={user} section="data-hub" fallbackPath={allowedFallbackPath}><DataHubPage user={user} /></ProtectedRoute>} />
+              <Route path="/factorypulse" element={<ProtectedRoute user={user} section="operations" fallbackPath={allowedFallbackPath}><FactoryPulsePage user={user} /></ProtectedRoute>} />
               <Route path="/operations" element={<ProtectedRoute user={user} section="operations" fallbackPath={allowedFallbackPath}><OperationsPage user={user} /></ProtectedRoute>} />
               <Route path="/intelligence" element={<ProtectedRoute user={user} section="intelligence" fallbackPath={allowedFallbackPath}><IntelligencePage /></ProtectedRoute>} />
               <Route path="/planning/*" element={<ModuleRoute user={user} moduleName="Planning" fallbackPath={allowedFallbackPath}><PlanningModulePage user={user} /></ModuleRoute>} />
