@@ -8,7 +8,7 @@ psycopg2-binary==2.9.10
 passlib[bcrypt]==1.7.4
 redis==5.2.1
 celery==5.4.0
-pandas==2.2.3
+pandas==3.0.5
 python-multipart==0.0.31
 pytest==9.0.3
 httpx==0.28.1
