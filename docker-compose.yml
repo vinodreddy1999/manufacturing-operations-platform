@@ -1,4 +1,18 @@
-name: metam-services
+name: manufacturing-platform-local
+
+x-backend-environment: &backend-environment
+  DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-metam}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}@postgres:5432/${POSTGRES_DB:-metam}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  ENABLE_PUBLIC_DEMO: ${ENABLE_PUBLIC_DEMO:-false}
+  PUBLIC_DEMO_TOKEN_MINUTES: ${PUBLIC_DEMO_TOKEN_MINUTES:-120}
+  ENABLE_STARTUP_SCHEMA_SYNC: ${ENABLE_STARTUP_SCHEMA_SYNC:-false}
+  ENABLE_STARTUP_PLATFORM_SEED: ${ENABLE_STARTUP_PLATFORM_SEED:-false}
+  JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env}
+  LEGACY_JWT_SECRET: ${LEGACY_JWT_SECRET:?LEGACY_JWT_SECRET must be set in .env}
+  CUSTOMER_PORTAL_JWT_SECRET: ${CUSTOMER_PORTAL_JWT_SECRET:?CUSTOMER_PORTAL_JWT_SECRET must be set in .env}
+  SUPPLIER_PORTAL_JWT_SECRET: ${SUPPLIER_PORTAL_JWT_SECRET:?SUPPLIER_PORTAL_JWT_SECRET must be set in .env}
+  MOBILE_JWT_SECRET: ${MOBILE_JWT_SECRET:?MOBILE_JWT_SECRET must be set in .env}
+  CORS_ORIGINS: ${CORS_ORIGINS:-http://127.0.0.1:5173,http://localhost:5173,http://127.0.0.1:8080,http://localhost:8080,http://127.0.0.1:8081,http://localhost:8081}
 
 services:
   postgres:
@@ -6,10 +20,8 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-metam}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-metam}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
       POSTGRES_DB: ${POSTGRES_DB:-metam}
-    ports:
-      - "5432:5432"
     volumes:
       - metam_postgres_data:/var/lib/postgresql/data
     networks:
@@ -23,8 +35,6 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    ports:
-      - "6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -38,9 +48,9 @@ services:
     restart: unless-stopped
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@metam.localhost.com}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-ChangeMe123!}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:?PGADMIN_DEFAULT_PASSWORD must be set in .env}
     ports:
-      - "5050:80"
+      - "${MOP_PGADMIN_PORT:-5050}:80"
     depends_on:
       postgres:
         condition: service_healthy
@@ -48,24 +58,35 @@ services:
       - metam_pgadmin_data:/var/lib/pgadmin
     networks:
       - metam-network
+    profiles: ["tools"]
+
+  migrate:
+    image: vinodreddy1999/manufacturing-operations-platform-fullstack:v3
+    command: alembic upgrade head
+    restart: "no"
+    environment:
+      <<: *backend-environment
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - metam-network
 
   platform-api:
-    image: vinodreddy1999/metam-services-fullstack:latest
-    build: .
+    image: vinodreddy1999/manufacturing-operations-platform-fullstack:v3
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-metam}:${POSTGRES_PASSWORD:-metam}@postgres:5432/${POSTGRES_DB:-metam}
-      LOG_LEVEL: ${LOG_LEVEL:-INFO}
-      ENABLE_PUBLIC_DEMO: ${ENABLE_PUBLIC_DEMO:-false}
-      PUBLIC_DEMO_TOKEN_MINUTES: ${PUBLIC_DEMO_TOKEN_MINUTES:-120}
+      <<: *backend-environment
     ports:
-      - "8000:8000"
+      - "${MOP_API_PORT:-8000}:8000"
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready').read()"]
       interval: 15s
@@ -75,16 +96,12 @@ services:
       - metam-network
 
   fullstack-app:
-    image: vinodreddy1999/metam-services-fullstack:latest
-    build: .
+    image: vinodreddy1999/manufacturing-operations-platform-fullstack:v3
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-metam}:${POSTGRES_PASSWORD:-metam}@postgres:5432/${POSTGRES_DB:-metam}
-      LOG_LEVEL: ${LOG_LEVEL:-INFO}
-      ENABLE_PUBLIC_DEMO: ${ENABLE_PUBLIC_DEMO:-false}
-      PUBLIC_DEMO_TOKEN_MINUTES: ${PUBLIC_DEMO_TOKEN_MINUTES:-120}
+      <<: *backend-environment
     ports:
-      - "8080:8080"
+      - "${MOP_APP_PORT:-8080}:8080"
     depends_on:
       postgres:
         condition: service_healthy
@@ -92,6 +109,8 @@ services:
         condition: service_healthy
       platform-api:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/ready').read()"]
       interval: 15s
@@ -105,23 +124,27 @@ services:
     build:
       context: ./frontend
       args:
-        VITE_API_BASE_URL: http://localhost:8000
+        VITE_API_BASE_URL: http://localhost:${MOP_API_PORT:-8000}
     restart: unless-stopped
     ports:
-      - "8081:8080"
+      - "${MOP_FRONTEND_PORT:-8081}:8080"
     depends_on:
       platform-api:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
     networks:
       - metam-network
 
   worker:
-    image: vinodreddy1999/metam-services-fullstack:latest
-    build: .
+    image: vinodreddy1999/manufacturing-operations-platform-fullstack:v3
     command: celery -A app.jobs.celery_app worker --loglevel=info
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-metam}:${POSTGRES_PASSWORD:-metam}@postgres:5432/${POSTGRES_DB:-metam}
+      <<: *backend-environment
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/1
     depends_on:
@@ -129,31 +152,32 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     networks:
       - metam-network
 
   seed-enterprise-data:
-    image: vinodreddy1999/metam-services-fullstack:latest
-    build: .
+    image: vinodreddy1999/manufacturing-operations-platform-fullstack:v3
     command: python scripts/seed_enterprise_data.py
     restart: "no"
     environment:
+      <<: *backend-environment
       BASE_URL: http://fullstack-app:8080
-      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-metam}:${POSTGRES_PASSWORD:-metam}@postgres:5432/${POSTGRES_DB:-metam}
     depends_on:
       fullstack-app:
         condition: service_healthy
     networks:
       - metam-network
+    profiles: ["seed"]
 
   vinod-live-data-stream:
-    image: vinodreddy1999/metam-services-fullstack:latest
-    build: .
+    image: vinodreddy1999/manufacturing-operations-platform-fullstack:v3
     command: python scripts/run_vinod_live_stream.py
     restart: unless-stopped
     environment:
+      <<: *backend-environment
       PYTHONPATH: /app
-      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-metam}:${POSTGRES_PASSWORD:-metam}@postgres:5432/${POSTGRES_DB:-metam}
       VINOD_LIVE_DURATION_HOURS: ${VINOD_LIVE_DURATION_HOURS:-48}
       VINOD_LIVE_INTERVAL_SECONDS: ${VINOD_LIVE_INTERVAL_SECONDS:-10}
       VINOD_LIVE_BATCH_SIZE: ${VINOD_LIVE_BATCH_SIZE:-50}
@@ -164,12 +188,13 @@ services:
         condition: service_healthy
     networks:
       - metam-network
+    profiles: ["live-data"]
 
   nginx:
     image: nginx:1.27-alpine
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "${MOP_PROXY_PORT:-80}:80"
     volumes:
       - ./deploy/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:

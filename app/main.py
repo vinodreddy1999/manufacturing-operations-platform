@@ -73,6 +73,14 @@ CORS_ORIGINS = [
     if origin.strip()
 ]
 
+
+def env_flag(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 app = FastAPI(
     title="Metam Services - Python Backend",
     version="0.2.6",
@@ -111,10 +119,13 @@ async def enforce_read_only_demo_sessions(request: Request, call_next):
             )
     return await call_next(request)
 
-Base.metadata.create_all(bind=engine)
-ensure_runtime_schema()
-with SessionLocal() as bootstrap_db:
-    seed_platform(bootstrap_db)
+if env_flag("ENABLE_STARTUP_SCHEMA_SYNC"):
+    Base.metadata.create_all(bind=engine)
+    ensure_runtime_schema()
+
+if env_flag("ENABLE_STARTUP_PLATFORM_SEED"):
+    with SessionLocal() as bootstrap_db:
+        seed_platform(bootstrap_db)
 
 app.include_router(auth_router)
 app.include_router(runtime_router)
