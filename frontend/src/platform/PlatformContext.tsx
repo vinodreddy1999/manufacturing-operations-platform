@@ -1,7 +1,7 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
 
 import type { RuntimeUser } from '../types';
-import { initialPlatformState, initialWidgets, platformModules } from './data';
+import { initialPlatformState, initialWidgets, platformApplications, platformModules } from './data';
 import type { PlatformAuditLog, PlatformClient, PlatformState, PlatformUser, WidgetConfig } from './types';
 
 const storageKey = 'metam.platform.demo.v1';
@@ -52,10 +52,43 @@ function nextId(prefix: string, values: string[]) {
   return `${prefix}-${String(next).padStart(6, '0')}`;
 }
 
+function roleLabel(role: RuntimeUser['role']) {
+  return role
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function runtimeUserToPlatformUser(runtimeUser: RuntimeUser, clients: PlatformClient[]): PlatformUser {
+  const client = runtimeUser.company_id ? clients.find((item) => item.clientId === runtimeUser.company_id) : undefined;
+  const [firstName = runtimeUser.name || runtimeUser.email, ...lastNameParts] = (runtimeUser.name || runtimeUser.email).split(' ');
+  return {
+    userId: runtimeUser.id,
+    firstName,
+    lastName: lastNameParts.join(' '),
+    fullName: runtimeUser.name || runtimeUser.email,
+    loginName: runtimeUser.email.split('@')[0],
+    email: runtimeUser.email,
+    clientId: client?.clientId ?? null,
+    clientName: client?.clientName ?? 'Platform',
+    region: client?.region ?? 'Global',
+    market: client?.market ?? 'Global',
+    department: runtimeUser.scope_department ?? (runtimeUser.role === 'super_admin' ? 'Platform Operations' : 'Operations'),
+    plant: runtimeUser.scope_plant_name ?? (runtimeUser.plant_id ? runtimeUser.plant_id : 'All Plants'),
+    warehouse: runtimeUser.scope_warehouse_name ?? 'All Warehouses',
+    roles: [roleLabel(runtimeUser.role)],
+    assignedApplications: runtimeUser.assigned_applications?.length ? runtimeUser.assigned_applications : platformApplications,
+    assignedModules: runtimeUser.assigned_modules?.length ? runtimeUser.assigned_modules : platformModules,
+    status: runtimeUser.is_active ? 'Active' : 'Disabled',
+    lastLogin: 'Current session',
+    createdDate: new Date().toISOString().slice(0, 10),
+  };
+}
+
 export function PlatformProvider({ runtimeUser, children }: { runtimeUser: RuntimeUser; children: ReactNode }) {
   const [state, setState] = useState<PlatformState>(loadState);
   const canSelectPlatform = runtimeUser.role === 'super_admin';
-  const matchedUser = state.users.find((user) => user.email.toLowerCase() === runtimeUser.email.toLowerCase()) ?? state.users.find((user) => user.email === 'user@metam.local')!;
+  const matchedUser = state.users.find((user) => user.email.toLowerCase() === runtimeUser.email.toLowerCase()) ?? runtimeUserToPlatformUser(runtimeUser, state.clients);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(() => canSelectPlatform ? null : matchedUser.clientId ?? state.clients[0].clientId);
   const selectedClient = state.clients.find((client) => client.clientId === selectedClientId);
 

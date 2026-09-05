@@ -37,6 +37,11 @@ import type {
 const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL as string | undefined;
 const apiBaseUrl = configuredBaseUrl?.replace(/\/$/, '') ?? '';
 const tokenStorageKey = 'metam.runtime.token';
+const platformStateStorageKey = 'metam.platform.demo.v1';
+
+function clearPlatformSessionState() {
+  window.localStorage.removeItem(platformStateStorageKey);
+}
 
 export const api = axios.create({
   baseURL: apiBaseUrl,
@@ -297,12 +302,14 @@ export const backend = {
     return response.data.data;
   },
   login: async (email: string, password: string) => {
+    clearPlatformSessionState();
     const response = await api.post<ApiEnvelope<RuntimeLoginResult>>('/runtime/auth/login', { email, password });
     window.localStorage.setItem(tokenStorageKey, response.data.data.access_token);
     return response.data.data;
   },
   demoConfig: () => getEnvelope<DemoConfig>('/runtime/auth/demo-config'),
   demoLogin: async (role: RuntimeUser['role']) => {
+    clearPlatformSessionState();
     const response = await api.post<ApiEnvelope<RuntimeLoginResult>>('/runtime/auth/demo-login', { role });
     window.localStorage.setItem(tokenStorageKey, response.data.data.access_token);
     return response.data.data;
@@ -326,6 +333,7 @@ export const backend = {
   },
   logout: () => {
     window.localStorage.removeItem(tokenStorageKey);
+    clearPlatformSessionState();
   },
   currentUser: () => getEnvelope<RuntimeUser>('/runtime/auth/me'),
   users: (query?: ListQuery) => getEnvelope<RuntimeUser[]>(withListQuery('/runtime/users', query)),
