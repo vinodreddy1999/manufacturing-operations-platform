@@ -693,7 +693,7 @@ def platform_management_overview() -> FrontendAdminApiResult:
 
 
 @data_hub_router.get("/get-data/connectors", response_model=FrontendAdminApiResult)
-def get_data_connectors(_: User = Depends(require_any("admin"))) -> FrontendAdminApiResult:
+def get_data_connectors(_: User = Depends(require_any("admin", "organization_admin"))) -> FrontendAdminApiResult:
     return result(
         "get_data_connectors",
         "Power BI-style connector catalog grouped by source category.",
@@ -708,7 +708,7 @@ def get_data_connectors(_: User = Depends(require_any("admin"))) -> FrontendAdmi
 
 @data_hub_router.get("/get-data/saved-connections", response_model=FrontendAdminApiResult)
 def get_data_saved_connections(
-    actor: User = Depends(require_any("admin")),
+    actor: User = Depends(require_any("admin", "organization_admin")),
     db: Session = Depends(get_db),
 ) -> FrontendAdminApiResult:
     query = db.query(frontend_admin_models.DataHubSavedConnection)
@@ -722,7 +722,7 @@ def get_data_saved_connections(
 @data_hub_router.post("/get-data/saved-connections", response_model=FrontendAdminApiResult)
 def create_get_data_saved_connection(
     request: GetDataConnectionRequest,
-    actor: User = Depends(require_any("admin")),
+    actor: User = Depends(require_any("admin", "organization_admin")),
     db: Session = Depends(get_db),
 ) -> FrontendAdminApiResult:
     payload = request.model_dump()
@@ -755,7 +755,7 @@ def create_get_data_saved_connection(
 @data_hub_router.delete("/get-data/saved-connections/{connection_id}", response_model=FrontendAdminApiResult)
 def delete_get_data_saved_connection(
     connection_id: str,
-    actor: User = Depends(require_any("admin")),
+    actor: User = Depends(require_any("admin", "organization_admin")),
     db: Session = Depends(get_db),
 ) -> FrontendAdminApiResult:
     row = db.get(frontend_admin_models.DataHubSavedConnection, connection_id)
@@ -773,7 +773,7 @@ def delete_get_data_saved_connection(
 @data_hub_router.post("/get-data/test-connection", response_model=FrontendAdminApiResult)
 def test_get_data_connection(
     request: GetDataTestConnectionRequest,
-    actor: User = Depends(require_any("admin")),
+    actor: User = Depends(require_any("admin", "organization_admin")),
     db: Session = Depends(get_db),
 ) -> FrontendAdminApiResult:
     payload = request.model_dump()
@@ -808,7 +808,7 @@ def test_get_data_connection(
 @data_hub_router.get("/get-data/connections/{connection_id}/metadata", response_model=FrontendAdminApiResult)
 def get_data_metadata(
     connection_id: str,
-    actor: User = Depends(require_any("admin")),
+    actor: User = Depends(require_any("admin", "organization_admin")),
     db: Session = Depends(get_db),
 ) -> FrontendAdminApiResult:
     row = db.get(frontend_admin_models.DataHubSavedConnection, connection_id)
@@ -823,7 +823,7 @@ def get_data_metadata(
 def save_get_data_selection(
     connection_id: str,
     request: GetDataSelectionRequest,
-    actor: User = Depends(require_any("admin")),
+    actor: User = Depends(require_any("admin", "organization_admin")),
     db: Session = Depends(get_db),
 ) -> FrontendAdminApiResult:
     row = db.get(frontend_admin_models.DataHubSavedConnection, connection_id)
@@ -842,7 +842,7 @@ def save_get_data_selection(
 @data_hub_router.get("/get-data/connections/{connection_id}/preview", response_model=FrontendAdminApiResult)
 def get_data_preview(
     connection_id: str,
-    actor: User = Depends(require_any("admin")),
+    actor: User = Depends(require_any("admin", "organization_admin")),
     db: Session = Depends(get_db),
 ) -> FrontendAdminApiResult:
     row = db.get(frontend_admin_models.DataHubSavedConnection, connection_id)
@@ -859,7 +859,7 @@ def get_data_preview(
 @data_hub_router.post("/get-data/transform-preview", response_model=FrontendAdminApiResult)
 def get_data_transform_preview(
     request: GetDataTransformRequest,
-    actor: User = Depends(require_any("admin")),
+    actor: User = Depends(require_any("admin", "organization_admin")),
     db: Session = Depends(get_db),
 ) -> FrontendAdminApiResult:
     payload = request.model_dump()
@@ -913,7 +913,7 @@ def resolve_module_columns(db: Session, destination_module: str, company_id: str
 def get_destination_module_columns(
     destination_module: str,
     company_id: str | None = None,
-    actor: User = Depends(require_any("admin")),
+    actor: User = Depends(require_any("admin", "organization_admin")),
     db: Session = Depends(get_db),
 ) -> FrontendAdminApiResult:
     if destination_module not in GET_DATA_DESTINATIONS:
@@ -927,7 +927,7 @@ def get_destination_module_columns(
 def download_destination_module_template(
     destination_module: str,
     company_id: str | None = None,
-    actor: User = Depends(require_any("admin")),
+    actor: User = Depends(require_any("admin", "organization_admin")),
     db: Session = Depends(get_db),
 ) -> Response:
     if destination_module not in GET_DATA_DESTINATIONS:
@@ -948,7 +948,7 @@ def download_destination_module_template(
 def set_destination_module_columns(
     destination_module: str,
     request: GetDataModuleColumnsRequest,
-    actor: User = Depends(require_any("admin")),
+    actor: User = Depends(require_any("admin", "organization_admin")),
     db: Session = Depends(get_db),
 ) -> FrontendAdminApiResult:
     if destination_module not in GET_DATA_DESTINATIONS:
@@ -984,7 +984,7 @@ def set_destination_module_columns(
 @data_hub_router.post("/get-data/field-mapping/validate", response_model=FrontendAdminApiResult)
 def validate_get_data_mapping(
     request: GetDataFieldMappingRequest,
-    actor: User = Depends(require_any("admin")),
+    actor: User = Depends(require_any("admin", "organization_admin")),
     db: Session = Depends(get_db),
 ) -> FrontendAdminApiResult:
     payload = request.model_dump()
@@ -1011,7 +1011,7 @@ def validate_get_data_mapping(
 @data_hub_router.post("/get-data/model/relationships", response_model=FrontendAdminApiResult)
 def create_get_data_relationship(
     request: GetDataRelationshipRequest,
-    actor: User = Depends(require_any("admin")),
+    actor: User = Depends(require_any("admin", "organization_admin")),
     db: Session = Depends(get_db),
 ) -> FrontendAdminApiResult:
     payload = request.model_dump()
@@ -1025,7 +1025,7 @@ def create_get_data_relationship(
 
 @data_hub_router.get("/get-data/model", response_model=FrontendAdminApiResult)
 def get_data_model(
-    actor: User = Depends(require_any("admin")),
+    actor: User = Depends(require_any("admin", "organization_admin")),
     db: Session = Depends(get_db),
 ) -> FrontendAdminApiResult:
     company_id = scoped_company_id(actor)
@@ -1076,7 +1076,7 @@ def get_data_model(
 @data_hub_router.post("/get-data/refresh", response_model=FrontendAdminApiResult)
 def run_get_data_refresh(
     request: GetDataRefreshRequest,
-    actor: User = Depends(require_any("admin")),
+    actor: User = Depends(require_any("admin", "organization_admin")),
     db: Session = Depends(get_db),
 ) -> FrontendAdminApiResult:
     connection = db.get(frontend_admin_models.DataHubSavedConnection, request.connection_id)
@@ -1120,7 +1120,7 @@ def run_get_data_refresh(
 
 @data_hub_router.get("/get-data/refresh-history", response_model=FrontendAdminApiResult)
 def get_data_refresh_history(
-    actor: User = Depends(require_any("admin")),
+    actor: User = Depends(require_any("admin", "organization_admin")),
     db: Session = Depends(get_db),
 ) -> FrontendAdminApiResult:
     query = db.query(frontend_admin_models.DataHubRefreshRun)
@@ -1150,7 +1150,7 @@ def get_data_refresh_history(
 
 @data_hub_router.get("/get-data/errors", response_model=FrontendAdminApiResult)
 def get_data_errors(
-    actor: User = Depends(require_any("admin")),
+    actor: User = Depends(require_any("admin", "organization_admin")),
     db: Session = Depends(get_db),
 ) -> FrontendAdminApiResult:
     query = db.query(frontend_admin_models.DataHubErrorLog)
@@ -1179,7 +1179,7 @@ def get_data_errors(
 
 @data_hub_router.get("/get-data/audit", response_model=FrontendAdminApiResult)
 def get_data_audit(
-    actor: User = Depends(require_any("admin")),
+    actor: User = Depends(require_any("admin", "organization_admin")),
     db: Session = Depends(get_db),
 ) -> FrontendAdminApiResult:
     query = db.query(frontend_admin_models.DataHubAuditEvent)
@@ -1208,7 +1208,7 @@ def get_data_audit(
 
 @data_hub_router.get("/connected-systems", response_model=FrontendAdminApiResult)
 def connected_systems(
-    actor: User = Depends(require_any("admin")),
+    actor: User = Depends(require_any("admin", "organization_admin")),
     db: Session = Depends(get_db),
 ) -> FrontendAdminApiResult:
     query = db.query(frontend_admin_models.ManufacturingDataConnection)
@@ -1224,7 +1224,7 @@ def connected_systems(
 @data_hub_router.post("/connected-systems", response_model=FrontendAdminApiResult)
 def create_connected_system(
     request: DataHubConnectionRequest,
-    actor: User = Depends(require_any("admin")),
+    actor: User = Depends(require_any("admin", "organization_admin")),
     db: Session = Depends(get_db),
 ) -> FrontendAdminApiResult:
     payload = request.model_dump()
@@ -1268,7 +1268,7 @@ def create_connected_system(
 def update_connected_system(
     connection_id: str,
     request: DataHubConnectionRequest,
-    actor: User = Depends(require_any("admin")),
+    actor: User = Depends(require_any("admin", "organization_admin")),
     db: Session = Depends(get_db),
 ) -> FrontendAdminApiResult:
     row = db.get(frontend_admin_models.ManufacturingDataConnection, connection_id)
@@ -1311,7 +1311,7 @@ def update_connected_system(
 @data_hub_router.delete("/connected-systems/{connection_id}", response_model=FrontendAdminApiResult)
 def delete_connected_system(
     connection_id: str,
-    actor: User = Depends(require_any("admin")),
+    actor: User = Depends(require_any("admin", "organization_admin")),
     db: Session = Depends(get_db),
 ) -> FrontendAdminApiResult:
     row = db.get(frontend_admin_models.ManufacturingDataConnection, connection_id)
@@ -1326,7 +1326,7 @@ def delete_connected_system(
 
 @data_hub_router.get("/catalog", response_model=FrontendAdminApiResult)
 def data_catalog(
-    actor: User = Depends(require_any("admin")),
+    actor: User = Depends(require_any("admin", "organization_admin")),
     db: Session = Depends(get_db),
 ) -> FrontendAdminApiResult:
     query = db.query(frontend_admin_models.DataCatalogEntry)
@@ -1341,7 +1341,7 @@ def data_catalog(
 @data_hub_router.post("/catalog", response_model=FrontendAdminApiResult)
 def create_data_catalog_entry(
     request: DataCatalogEntryRequest,
-    actor: User = Depends(require_any("admin")),
+    actor: User = Depends(require_any("admin", "organization_admin")),
     db: Session = Depends(get_db),
 ) -> FrontendAdminApiResult:
     payload = request.model_dump()
@@ -1361,7 +1361,7 @@ def create_data_catalog_entry(
 def update_data_catalog_entry(
     entry_id: str,
     request: DataCatalogEntryRequest,
-    actor: User = Depends(require_any("admin")),
+    actor: User = Depends(require_any("admin", "organization_admin")),
     db: Session = Depends(get_db),
 ) -> FrontendAdminApiResult:
     row = db.get(frontend_admin_models.DataCatalogEntry, entry_id)
@@ -1383,7 +1383,7 @@ def update_data_catalog_entry(
 @data_hub_router.delete("/catalog/{entry_id}", response_model=FrontendAdminApiResult)
 def delete_data_catalog_entry(
     entry_id: str,
-    actor: User = Depends(require_any("admin")),
+    actor: User = Depends(require_any("admin", "organization_admin")),
     db: Session = Depends(get_db),
 ) -> FrontendAdminApiResult:
     row = db.get(frontend_admin_models.DataCatalogEntry, entry_id)
@@ -1398,7 +1398,7 @@ def delete_data_catalog_entry(
 
 @data_hub_router.get("/mappings", response_model=FrontendAdminApiResult)
 def mappings(
-    actor: User = Depends(require_any("admin")),
+    actor: User = Depends(require_any("admin", "organization_admin")),
     db: Session = Depends(get_db),
 ) -> FrontendAdminApiResult:
     query = db.query(frontend_admin_models.DataMappingRule)
@@ -1413,7 +1413,7 @@ def mappings(
 @data_hub_router.post("/mappings", response_model=FrontendAdminApiResult)
 def create_mapping(
     request: DataMappingRuleRequest,
-    actor: User = Depends(require_any("admin")),
+    actor: User = Depends(require_any("admin", "organization_admin")),
     db: Session = Depends(get_db),
 ) -> FrontendAdminApiResult:
     payload = request.model_dump()
@@ -1433,7 +1433,7 @@ def create_mapping(
 def update_mapping(
     mapping_id: str,
     request: DataMappingRuleRequest,
-    actor: User = Depends(require_any("admin")),
+    actor: User = Depends(require_any("admin", "organization_admin")),
     db: Session = Depends(get_db),
 ) -> FrontendAdminApiResult:
     row = db.get(frontend_admin_models.DataMappingRule, mapping_id)
@@ -1455,7 +1455,7 @@ def update_mapping(
 @data_hub_router.delete("/mappings/{mapping_id}", response_model=FrontendAdminApiResult)
 def delete_mapping(
     mapping_id: str,
-    actor: User = Depends(require_any("admin")),
+    actor: User = Depends(require_any("admin", "organization_admin")),
     db: Session = Depends(get_db),
 ) -> FrontendAdminApiResult:
     row = db.get(frontend_admin_models.DataMappingRule, mapping_id)
@@ -1471,14 +1471,14 @@ def delete_mapping(
 @data_hub_router.post("/mappings/preview", response_model=FrontendAdminApiResult)
 def mapping_preview(
     request: DataMappingPreviewRequest,
-    _: User = Depends(require_any("admin")),
+    _: User = Depends(require_any("admin", "organization_admin")),
 ) -> FrontendAdminApiResult:
     return result("mapping_preview", "Field mapping preview with transform output.", frontend_admin_service.mapping_preview(request.model_dump()))
 
 
 @data_hub_router.get("/data-quality", response_model=FrontendAdminApiResult)
 def data_quality(
-    actor: User = Depends(require_any("admin")),
+    actor: User = Depends(require_any("admin", "organization_admin")),
     db: Session = Depends(get_db),
 ) -> FrontendAdminApiResult:
     query = db.query(frontend_admin_models.DataCatalogEntry)
@@ -1503,7 +1503,7 @@ def data_quality(
 
 @data_hub_router.get("/ai-readiness", response_model=FrontendAdminApiResult)
 def ai_readiness(
-    actor: User = Depends(require_any("admin")),
+    actor: User = Depends(require_any("admin", "organization_admin")),
     db: Session = Depends(get_db),
 ) -> FrontendAdminApiResult:
     return result("ai_readiness", "AI readiness center scores.", merged_ai_readiness(actor, db))
@@ -1535,7 +1535,7 @@ def update_ai_readiness(
 
 @data_hub_router.get("/uploads", response_model=FrontendAdminApiResult)
 def uploads(
-    actor: User = Depends(require_any("admin")),
+    actor: User = Depends(require_any("admin", "organization_admin")),
     db: Session = Depends(get_db),
 ) -> FrontendAdminApiResult:
     company_id = scoped_company_id(actor)
@@ -1633,7 +1633,7 @@ def create_cloud_source(
 
 @data_hub_router.get("/lineage", response_model=FrontendAdminApiResult)
 def lineage(
-    actor: User = Depends(require_any("admin")),
+    actor: User = Depends(require_any("admin", "organization_admin")),
     db: Session = Depends(get_db),
 ) -> FrontendAdminApiResult:
     query = db.query(frontend_admin_models.DataCatalogEntry)
@@ -1645,13 +1645,13 @@ def lineage(
 
 
 @data_hub_router.get("/event-streaming", response_model=FrontendAdminApiResult)
-def event_streaming(_: User = Depends(require_any("admin"))) -> FrontendAdminApiResult:
+def event_streaming(_: User = Depends(require_any("admin", "organization_admin"))) -> FrontendAdminApiResult:
     return result("event_streaming", "Event streaming hub sources.", {"sources": ["PLC", "MES", "IoT", "Sensors", "RFID"], "mode": "ingestion-ready"})
 
 
 @data_hub_router.get("/pending-updates", response_model=FrontendAdminApiResult)
 def pending_updates(
-    actor: User = Depends(require_any("admin")),
+    actor: User = Depends(require_any("admin", "organization_admin")),
     db: Session = Depends(get_db),
 ) -> FrontendAdminApiResult:
     query = db.query(frontend_admin_models.PendingErpUpdate)
@@ -1680,7 +1680,7 @@ def pending_updates(
 def pending_update_decision(
     update_id: str,
     request: PendingUpdateDecisionRequest,
-    actor: User = Depends(require_any("admin")),
+    actor: User = Depends(require_any("admin", "organization_admin")),
     db: Session = Depends(get_db),
 ) -> FrontendAdminApiResult:
     row = db.get(frontend_admin_models.PendingErpUpdate, update_id)
@@ -1711,22 +1711,22 @@ def pending_update_decision(
 
 
 @data_hub_router.get("/action-center", response_model=FrontendAdminApiResult)
-def action_center(_: User = Depends(require_any("admin"))) -> FrontendAdminApiResult:
+def action_center(_: User = Depends(require_any("admin", "organization_admin"))) -> FrontendAdminApiResult:
     return result("action_center", "Action center grouped by operational module.", frontend_admin_service.action_center())
 
 
 @data_hub_router.get("/erp-feedback", response_model=FrontendAdminApiResult)
-def erp_feedback(_: User = Depends(require_any("admin"))) -> FrontendAdminApiResult:
+def erp_feedback(_: User = Depends(require_any("admin", "organization_admin"))) -> FrontendAdminApiResult:
     return result("erp_feedback", "ERP feedback center.", frontend_admin_service.erp_feedback())
 
 
 @data_hub_router.get("/reconciliation", response_model=FrontendAdminApiResult)
-def reconciliation(_: User = Depends(require_any("admin"))) -> FrontendAdminApiResult:
+def reconciliation(_: User = Depends(require_any("admin", "organization_admin"))) -> FrontendAdminApiResult:
     return result("reconciliation", "ERP value vs platform recommendation reconciliation.", frontend_admin_service.reconciliation())
 
 
 @data_hub_router.get("/synchronization-dashboard", response_model=FrontendAdminApiResult)
-def synchronization_dashboard(_: User = Depends(require_any("admin"))) -> FrontendAdminApiResult:
+def synchronization_dashboard(_: User = Depends(require_any("admin", "organization_admin"))) -> FrontendAdminApiResult:
     return result("synchronization_dashboard", "Synchronization dashboard metrics and write modes.", frontend_admin_service.synchronization_dashboard())
 
 

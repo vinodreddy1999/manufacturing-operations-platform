@@ -2288,8 +2288,9 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
     setTemplateDownloadError('');
     setDownloadingTemplate(true);
     try {
-      const companyId = await ensureTargetCompanyExists();
-      await backend.downloadGetDataModuleTemplate(selectedDestination, companyId);
+      // Column templates are read from tenant/company-level defaults; no need to
+      // provision the target company first (that requires super admin access).
+      await backend.downloadGetDataModuleTemplate(selectedDestination, targetCompanyId || undefined);
     } catch (error) {
       setTemplateDownloadError(error instanceof Error ? error.message : 'Unable to download the column template.');
     } finally {
