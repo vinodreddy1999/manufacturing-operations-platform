@@ -3,8 +3,6 @@ name: manufacturing-platform-local
 x-backend-environment: &backend-environment
   DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-metam}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}@postgres:5432/${POSTGRES_DB:-metam}
   LOG_LEVEL: ${LOG_LEVEL:-INFO}
-  ENABLE_PUBLIC_DEMO: ${ENABLE_PUBLIC_DEMO:-false}
-  PUBLIC_DEMO_TOKEN_MINUTES: ${PUBLIC_DEMO_TOKEN_MINUTES:-120}
   ENABLE_STARTUP_SCHEMA_SYNC: ${ENABLE_STARTUP_SCHEMA_SYNC:-false}
   ENABLE_STARTUP_PLATFORM_SEED: ${ENABLE_STARTUP_PLATFORM_SEED:-false}
   JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env}

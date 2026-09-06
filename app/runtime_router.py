@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from .database import engine, get_db
 from .platform_models import AuditLog, ModuleRecord, User
 from .runtime_schemas import (
-    DemoLoginPayload,
+    ImpersonatePayload,
     LoginPayload,
     LoginResult,
     AdminResetPasswordPayload,
@@ -61,43 +61,6 @@ ROLE_PERMISSIONS = {
     "user": ["data.read"],
 }
 
-DEMO_ROLE_DETAILS = [
-    ("super_admin", "Super Admin", "Platform-wide administration and governance"),
-    ("account_owner", "Account Owner", "Account, organization, and team oversight"),
-    ("organization_admin", "Organization Admin", "Company administration and data management"),
-    ("admin", "Admin", "Company users, Data Hub, and operational administration"),
-    ("team_manager", "Team Manager", "Team work allocation and operational oversight"),
-    ("supervisor", "Supervisor", "Operational review and supervised updates"),
-    ("operator", "Operator", "Assigned operational screens and records"),
-    ("auditor", "Auditor", "Read-only operational and audit visibility"),
-    ("qa_tester", "QA Tester", "Quality workflows and operational verification"),
-    ("custom", "Custom User", "Custom assigned module visibility"),
-    ("user", "Standard User", "Standard assigned read-only workspace"),
-]
-DEMO_READ_PERMISSIONS = {"platform.super_admin", "platform.admin", "data.read", "audit.read"}
-
-
-def public_demo_enabled() -> bool:
-    return os.getenv("ENABLE_PUBLIC_DEMO", "false").strip().lower() in {"1", "true", "yes", "on"}
-
-
-def public_demo_minutes() -> int:
-    try:
-        return max(15, min(int(os.getenv("PUBLIC_DEMO_TOKEN_MINUTES", "120")), 240))
-    except ValueError:
-        return 120
-
-
-def public_demo_roles() -> list[str]:
-    configured = os.getenv("PUBLIC_DEMO_ROLES", "").strip()
-    allowed = {item.strip() for item in configured.split(",") if item.strip()} if configured else {item[0] for item in DEMO_ROLE_DETAILS}
-    return [role for role, _, _ in DEMO_ROLE_DETAILS if role in allowed]
-
-
-def demo_permissions_for(role: str) -> list[str]:
-    return [permission for permission in permissions_for(role) if permission in DEMO_READ_PERMISSIONS]
-
-
 def ensure_runtime_schema() -> None:
     inspector = inspect(engine)
     if "users" in inspector.get_table_names():
@@ -113,12 +76,18 @@ def ensure_runtime_schema() -> None:
                 "reset_token_hash": ("VARCHAR(300)", None),
                 "reset_token_expires_at": ("TIMESTAMP", None),
                 "force_password_change": ("BOOLEAN DEFAULT FALSE", None),
+                "can_impersonate": ("BOOLEAN DEFAULT FALSE", None),
             }
             for column, (ddl, backfill_sql) in schema_updates.items():
                 if column not in user_columns:
                     connection.execute(text(f"ALTER TABLE users ADD COLUMN {column} {ddl}"))
                     if backfill_sql:
                         connection.execute(text(backfill_sql))
+    if "audit_logs" in inspector.get_table_names():
+        audit_columns = {column["name"] for column in inspector.get_columns("audit_logs")}
+        if "impersonated_by_id" not in audit_columns:
+            with engine.begin() as connection:
+                connection.execute(text("ALTER TABLE audit_logs ADD COLUMN impersonated_by_id VARCHAR(80)"))
 
 
 def runtime_result(action: str, message: str, data: Any) -> RuntimeEnvelope:
@@ -133,9 +102,12 @@ def has_override_scope(user: User) -> bool:
     return (user.role or "user") in OVERRIDE_ROLES
 
 
+def can_impersonate_others(user: User) -> bool:
+    return user.role == "super_admin" or bool(getattr(user, "can_impersonate", False))
+
+
 def serialize_user(user: User) -> dict[str, Any]:
     role = user.role or "user"
-    demo_read_only = bool(getattr(user, "_demo_read_only", False))
     now = datetime.utcnow()
     expires_at = user.password_expires_at or (user.password_changed_at + timedelta(days=PASSWORD_EXPIRY_DAYS) if user.password_changed_at else None)
     days_to_expiry = (expires_at - now).days if expires_at else None
@@ -148,13 +120,15 @@ def serialize_user(user: User) -> dict[str, Any]:
         "name": user.name,
         "role": role,
         "is_active": user.is_active,
-        "permissions": demo_permissions_for(role) if demo_read_only else permissions_for(role),
+        "can_impersonate": can_impersonate_others(user),
+        "permissions": permissions_for(role),
         "password_expires_at": expires_at.isoformat() if expires_at else None,
         "password_days_to_expiry": days_to_expiry,
         "password_expiry_warning": days_to_expiry is not None and 0 <= days_to_expiry <= PASSWORD_EXPIRY_WARNING_DAYS,
         "force_password_change": bool(user.force_password_change),
-        "demo_read_only": demo_read_only,
-        "demo_role": getattr(user, "_demo_role", None),
+        "impersonated_by_id": getattr(user, "_impersonated_by_id", None),
+        "impersonated_by_name": getattr(user, "_impersonated_by_name", None),
+        "impersonated_by_email": getattr(user, "_impersonated_by_email", None),
     }
 
 
@@ -188,8 +162,9 @@ def current_user(request: Request, db: Session = Depends(get_db)) -> User:
     user = db.get(User, user_id)
     if not user or not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User is disabled or missing")
-    user._demo_read_only = bool(payload.get("demo_read_only", False))
-    user._demo_role = payload.get("demo_role")
+    user._impersonated_by_id = payload.get("impersonated_by")
+    user._impersonated_by_name = payload.get("impersonated_by_name")
+    user._impersonated_by_email = payload.get("impersonated_by_email")
     return user
 
 
@@ -210,6 +185,7 @@ def audit(db: Session, actor: User, action: str, entity_type: str, entity_id: st
             company_id=actor.company_id,
             plant_id=actor.plant_id,
             actor_id=actor.id,
+            impersonated_by_id=getattr(actor, "_impersonated_by_id", None),
             action=action,
             entity_type=entity_type,
             entity_id=entity_id,
@@ -262,59 +238,6 @@ def runtime_login(payload: LoginPayload, db: Session = Depends(get_db)) -> Runti
         user=SessionUser(**serialize_user(user)),
     )
     return runtime_result("login", "Authenticated user session.", result.model_dump())
-
-
-@router.get("/auth/demo-config", response_model=RuntimeEnvelope)
-def public_demo_config(db: Session = Depends(get_db)) -> RuntimeEnvelope:
-    enabled = public_demo_enabled()
-    roles: list[dict[str, Any]] = []
-    if enabled:
-        allowed_roles = public_demo_roles()
-        users = (
-            db.query(User)
-            .filter(User.tenant_id == TENANT_ID, User.is_active.is_(True), User.role.in_(allowed_roles))
-            .order_by(User.email)
-            .all()
-        )
-        users_by_role = {user.role: user for user in users}
-        for role, label, description in DEMO_ROLE_DETAILS:
-            user = users_by_role.get(role)
-            if role in allowed_roles and user:
-                roles.append({"role": role, "label": label, "description": description, "username": user.email})
-    return runtime_result(
-        "demo_config",
-        "Passwordless read-only demonstration configuration.",
-        {"enabled": enabled, "read_only": True, "session_minutes": public_demo_minutes(), "roles": roles},
-    )
-
-
-@router.post("/auth/demo-login", response_model=RuntimeEnvelope)
-def public_demo_login(payload: DemoLoginPayload, db: Session = Depends(get_db)) -> RuntimeEnvelope:
-    if not public_demo_enabled():
-        raise HTTPException(status_code=404, detail="Passwordless demo mode is not enabled")
-    if payload.role not in public_demo_roles():
-        raise HTTPException(status_code=403, detail="This role is not available in the public demo")
-    user = (
-        db.query(User)
-        .filter(User.tenant_id == TENANT_ID, User.role == payload.role, User.is_active.is_(True))
-        .order_by(User.email)
-        .first()
-    )
-    if not user:
-        raise HTTPException(status_code=404, detail="No active demo user is available for this role")
-    user._demo_read_only = True
-    user._demo_role = payload.role
-    result = LoginResult(
-        access_token=create_token(
-            user.id,
-            user.tenant_id,
-            demo_permissions_for(payload.role),
-            minutes=public_demo_minutes(),
-            claims={"demo_read_only": True, "demo_role": payload.role},
-        ),
-        user=SessionUser(**serialize_user(user)),
-    )
-    return runtime_result("demo_login", "Read-only demonstration session created.", result.model_dump())
 
 
 @router.get("/auth/password-policy", response_model=RuntimeEnvelope)
@@ -376,6 +299,55 @@ def me(user: User = Depends(current_user)) -> RuntimeEnvelope:
     return runtime_result("session", "Current authenticated user.", serialize_user(user))
 
 
+@router.post("/auth/impersonate", response_model=RuntimeEnvelope)
+def impersonate(payload: ImpersonatePayload, actor: User = Depends(current_user), db: Session = Depends(get_db)) -> RuntimeEnvelope:
+    if not can_impersonate_others(actor):
+        raise HTTPException(status_code=403, detail="Not authorized to impersonate other users")
+    if getattr(actor, "_impersonated_by_id", None):
+        raise HTTPException(status_code=403, detail="Cannot start a new impersonation from an already-impersonated session")
+    target = db.get(User, payload.user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+    if target.id == actor.id:
+        raise HTTPException(status_code=422, detail="Cannot impersonate yourself")
+    if not target.is_active:
+        raise HTTPException(status_code=403, detail="Cannot impersonate a disabled user")
+    db.add(
+        AuditLog(
+            id=f"audit-{uuid4()}",
+            tenant_id=actor.tenant_id,
+            company_id=actor.company_id,
+            plant_id=actor.plant_id,
+            actor_id=actor.id,
+            impersonated_by_id=None,
+            action="IMPERSONATE_START",
+            entity_type="user",
+            entity_id=target.id,
+            old_value=None,
+            new_value={"impersonated_email": target.email, "impersonated_name": target.name},
+        )
+    )
+    db.commit()
+    target._impersonated_by_id = actor.id
+    target._impersonated_by_name = actor.name
+    target._impersonated_by_email = actor.email
+    result = LoginResult(
+        access_token=create_token(
+            target.id,
+            target.tenant_id,
+            permissions_for(target.role or "user"),
+            minutes=8 * 60,
+            claims={
+                "impersonated_by": actor.id,
+                "impersonated_by_name": actor.name,
+                "impersonated_by_email": actor.email,
+            },
+        ),
+        user=SessionUser(**serialize_user(target)),
+    )
+    return runtime_result("impersonate", f"Now viewing as {target.name}.", result.model_dump())
+
+
 @router.get("/users", response_model=RuntimeEnvelope)
 def list_users(
     _: User = Depends(require_any("admin")),
@@ -387,7 +359,7 @@ def list_users(
 ) -> RuntimeEnvelope:
     actor = _
     query = db.query(User).filter(User.tenant_id == TENANT_ID)
-    if not has_override_scope(actor):
+    if not has_override_scope(actor) and not can_impersonate_others(actor):
         query = query.filter(User.company_id == actor.company_id)
     if search:
         pattern = f"%{search.lower()}%"
@@ -403,6 +375,8 @@ def create_user(payload: UserCreate, actor: User = Depends(require_any("admin"))
         raise HTTPException(status_code=409, detail="Email already exists")
     if payload.role in {"super_admin", "account_owner"} and actor.role != "super_admin":
         raise HTTPException(status_code=403, detail="Only super admin can create top-level override users")
+    if payload.can_impersonate and not has_override_scope(actor):
+        raise HTTPException(status_code=403, detail="Only a super admin or account owner can grant impersonation access")
     target_company_id = payload.company_id or actor.company_id or COMPANY_ID
     if not has_override_scope(actor) and target_company_id != actor.company_id:
         raise HTTPException(status_code=403, detail="Cannot create users for another company")
@@ -416,6 +390,7 @@ def create_user(payload: UserCreate, actor: User = Depends(require_any("admin"))
         password_hash="pending",
         role=payload.role,
         is_active=payload.is_active,
+        can_impersonate=payload.can_impersonate,
     )
     set_user_password(user, payload.password, force_change_on_login=True)
     db.add(user)
@@ -436,6 +411,8 @@ def update_user(user_id: str, payload: UserUpdate, actor: User = Depends(require
         raise HTTPException(status_code=403, detail="Only super admin can update top-level override users")
     if payload.role in {"super_admin", "account_owner"} and actor.role != "super_admin":
         raise HTTPException(status_code=403, detail="Only super admin can grant top-level override roles")
+    if payload.can_impersonate is not None and not has_override_scope(actor):
+        raise HTTPException(status_code=403, detail="Only a super admin or account owner can grant impersonation access")
     old_value = serialize_user(user)
     if payload.name is not None:
         user.name = payload.name
@@ -443,6 +420,8 @@ def update_user(user_id: str, payload: UserUpdate, actor: User = Depends(require
         user.role = payload.role
     if payload.is_active is not None:
         user.is_active = payload.is_active
+    if payload.can_impersonate is not None:
+        user.can_impersonate = payload.can_impersonate
     if payload.password:
         set_user_password(user, payload.password, force_change_on_login=True)
     audit(db, actor, "UPDATE", "user", user.id, old_value, serialize_user(user))

@@ -11,22 +11,26 @@ import {
   FileText,
   Factory,
   Gauge,
+  HelpCircle,
   LayoutDashboard,
+  LogOut,
   Menu,
   ShieldCheck,
   ShoppingCart,
   Truck,
+  UserCog,
   Wrench,
 } from 'lucide-react';
 
 import { LazyChunkBoundary } from '../components/LazyChunkBoundary';
 import { LoadingState } from '../components/LoadingState';
+import { PasswordField } from '../components/PasswordField';
+import { useClickOutside } from '../hooks/useClickOutside';
 import { canAccessModule, canAccessPage, canAccessSection, firstAllowedPath } from '../lib/rbac';
 import { apiConfig, backend } from '../services/api';
 import type { RuntimeUser } from '../types';
 import { PlatformProvider, usePlatform } from '../platform/PlatformContext';
-import { initialPlatformState } from '../platform/data';
-import type { PlatformClient, PlatformState, PlatformUser } from '../platform/types';
+import type { PlatformClient } from '../platform/types';
 
 const AdminCenterPage = lazy(() => import('../pages/AdminCenterPage').then((module) => ({ default: module.AdminCenterPage })));
 const DataHubPage = lazy(() => import('../pages/DataHubPage').then((module) => ({ default: module.DataHubPage })));
@@ -74,76 +78,6 @@ const platformNavItems = [
   { to: '/factorypulse', label: 'FactoryPulse', icon: Factory },
   { to: '/admin/performance', label: 'Performance', icon: Activity },
 ];
-
-const abcTestClientId = 'CLT-000001';
-
-const rolePermissions: Record<RuntimeUser['role'], string[]> = {
-  super_admin: ['platform.super_admin', 'platform.admin', 'account.override', 'organization.override', 'team.override', 'users.manage', 'roles.manage', 'data.write', 'data.read', 'audit.read', 'data.export', 'data.delete', 'approval.write'],
-  account_owner: ['account.override', 'organization.override', 'team.override', 'users.manage', 'roles.manage', 'data.write', 'data.read', 'audit.read', 'data.export', 'approval.write'],
-  organization_admin: ['organization.override', 'team.override', 'users.manage', 'data.write', 'data.read', 'audit.read', 'data.export', 'approval.write'],
-  admin: ['platform.admin', 'users.manage', 'data.write', 'data.read', 'audit.read', 'data.export', 'approval.write'],
-  team_manager: ['team.override', 'data.write', 'data.read', 'data.export', 'approval.write'],
-  supervisor: ['data.write', 'data.read', 'data.export'],
-  operator: ['data.read'],
-  auditor: ['data.read', 'audit.read', 'data.export'],
-  qa_tester: ['quality.write', 'data.read', 'data.export'],
-  custom: ['data.read'],
-  user: ['data.read'],
-};
-
-function platformRoleToRuntimeRole(platformUser: PlatformUser): RuntimeUser['role'] {
-  const roles = platformUser.roles.map((role) => role.toLowerCase());
-  if (roles.some((role) => role.includes('super'))) return 'super_admin';
-  if (roles.some((role) => role.includes('account owner'))) return 'account_owner';
-  if (roles.some((role) => role.includes('organization'))) return 'organization_admin';
-  if (roles.some((role) => role.includes('company admin') || role === 'admin')) return 'admin';
-  if (roles.some((role) => role.includes('manager'))) return 'team_manager';
-  if (roles.some((role) => role.includes('supervisor'))) return 'supervisor';
-  if (roles.some((role) => role.includes('operator') || role.includes('technician'))) return 'operator';
-  if (roles.some((role) => role.includes('auditor'))) return 'auditor';
-  if (roles.some((role) => role.includes('quality') || role.includes('qa'))) return 'qa_tester';
-  if (roles.some((role) => role.includes('custom'))) return 'custom';
-  return 'user';
-}
-
-function getPlatformUsersForImpersonation(): PlatformUser[] {
-  try {
-    const savedState = localStorage.getItem('metam.platform.demo.v1');
-    const state = savedState ? JSON.parse(savedState) as PlatformState : initialPlatformState;
-    const usersByEmail = new Map<string, PlatformUser>();
-    state.users.forEach((user) => usersByEmail.set(user.email.toLowerCase(), user));
-    initialPlatformState.users.forEach((user) => usersByEmail.set(user.email.toLowerCase(), user));
-    return Array.from(usersByEmail.values());
-  } catch {
-    return initialPlatformState.users;
-  }
-}
-
-function buildImpersonatedAbcUser(baseUser: RuntimeUser, impersonatedEmail: string | null): RuntimeUser {
-  if (baseUser.role !== 'super_admin' || !impersonatedEmail) return baseUser;
-  const platformUser = getPlatformUsersForImpersonation().find(
-    (user) => user.email.toLowerCase() === impersonatedEmail.toLowerCase() && user.clientId === abcTestClientId,
-  );
-  if (!platformUser) return baseUser;
-  const role = platformRoleToRuntimeRole(platformUser);
-  return {
-    ...baseUser,
-    id: platformUser.userId,
-    company_id: 'company-abc-manufacturing',
-    plant_id: platformUser.plant && platformUser.plant !== 'All Plants' ? `plant-abc-${platformUser.plant.toLowerCase().replace(/[^a-z0-9]+/g, '-')}` : null,
-    email: platformUser.email,
-    name: platformUser.fullName,
-    role,
-    permissions: rolePermissions[role],
-    demo_read_only: false,
-    demo_role: role,
-    assigned_modules: platformUser.assignedModules,
-    assigned_applications: platformUser.assignedApplications,
-    scope_plant_name: platformUser.plant,
-    scope_warehouse_name: platformUser.warehouse,
-    scope_department: platformUser.department,
-  };
-}
 
 function ClientContextSelector({
   clients,
@@ -230,43 +164,154 @@ function ClientContextSelector({
   );
 }
 
-function SuperAdminImpersonationAccess({
-  value,
-  activeName,
-  onChange,
-  onBack,
+// TODO: point this at the real ticketing/support page once its URL is known.
+const HELP_REQUEST_URL = 'https://example.com/help/raise-a-request';
+
+function UserAvatarMenu({
+  user,
+  onLogout,
+  onBackToProfile,
+  onImpersonationStarted,
 }: {
-  value: string;
-  activeName?: string;
-  onChange: (email: string | null) => void;
-  onBack: () => void;
+  user: RuntimeUser;
+  onLogout: () => void;
+  onBackToProfile: () => void;
+  onImpersonationStarted: () => void;
 }) {
-  const abcUsers = getPlatformUsersForImpersonation().filter((user) => user.clientId === abcTestClientId && user.status === 'Active');
+  const [open, setOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [impersonateError, setImpersonateError] = useState('');
+  const [impersonating, setImpersonating] = useState(false);
+  const containerRef = useClickOutside<HTMLDivElement>(open, () => {
+    setOpen(false);
+    setPickerOpen(false);
+    setSearch('');
+  });
+  const isImpersonated = Boolean(user.impersonated_by_id);
+  const canImpersonate = Boolean(user.can_impersonate) && !isImpersonated;
+
+  const candidates = useQuery({
+    queryKey: ['impersonation-candidates', search],
+    queryFn: () => backend.users({ search: search || undefined, limit: 8 }),
+    enabled: pickerOpen,
+  });
+
+  const initials = user.name.split(' ').filter(Boolean).slice(0, 2).map((part) => part[0]!.toUpperCase()).join('') || '?';
+
+  async function startImpersonating(targetId: string) {
+    setImpersonateError('');
+    setImpersonating(true);
+    try {
+      await backend.impersonate(targetId);
+      setOpen(false);
+      setPickerOpen(false);
+      setSearch('');
+      onImpersonationStarted();
+    } catch (error) {
+      setImpersonateError(error instanceof Error ? error.message : 'Unable to start impersonation.');
+    } finally {
+      setImpersonating(false);
+    }
+  }
+
   return (
-    <div className="hidden min-w-[300px] lg:block">
-      <div className="mb-1 flex items-center justify-between gap-3">
-        <span className="block text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-200">Impersonate by email</span>
-        {value ? (
-          <button
-            type="button"
-            className="text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-200 hover:text-amber-100"
-            onClick={onBack}
-          >
-            Back to my profile
-          </button>
-        ) : null}
-      </div>
-      <select
-        className="form-input w-full py-2 text-sm"
-        value={value}
-        onChange={(event) => onChange(event.target.value || null)}
+    <div ref={containerRef} className="relative">
+      <button
+        type="button"
+        className="focus-ring flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-cyan-400/15 text-xs font-semibold text-cyan-100 hover:bg-cyan-400/25"
+        onClick={() => setOpen((value) => !value)}
+        aria-label="Account menu"
       >
-        <option value="">Select user email...</option>
-        {abcUsers.map((item) => (
-          <option key={item.userId} value={item.email}>{item.email} - {item.fullName}</option>
-        ))}
-      </select>
-      {value ? <p className="mt-1 truncate text-xs text-amber-200">Acting as {activeName ?? value}</p> : null}
+        {initials}
+      </button>
+      {open ? (
+        <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-72 rounded-2xl border border-white/10 bg-slate-950/95 p-3 shadow-[0_24px_80px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+          <div className="flex items-center gap-3 border-b border-white/10 pb-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-cyan-400/15 text-sm font-semibold text-cyan-100">
+              {initials}
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-white">{user.name}</p>
+              <p className="truncate text-xs text-slate-400">{user.email}</p>
+            </div>
+          </div>
+
+          {isImpersonated ? (
+            <div className="mt-3 rounded-xl border border-amber-300/25 bg-amber-400/10 p-3 text-xs text-amber-100">
+              <p className="font-semibold uppercase tracking-[0.1em]">Impersonating</p>
+              <p className="mt-1 truncate">{user.email}</p>
+              <p className="mt-1 text-amber-200/80">Real admin: {user.impersonated_by_email}</p>
+              <button
+                type="button"
+                className="mt-2 w-full rounded-lg border border-amber-300/30 bg-amber-400/15 px-3 py-1.5 text-xs font-semibold text-amber-100 hover:bg-amber-400/25"
+                onClick={() => {
+                  setOpen(false);
+                  onBackToProfile();
+                }}
+              >
+                Back to my profile
+              </button>
+            </div>
+          ) : null}
+
+          <div className="mt-3 space-y-1">
+            {canImpersonate ? (
+              pickerOpen ? (
+                <div className="rounded-xl border border-white/10 bg-white/[0.04] p-2">
+                  <input
+                    autoFocus
+                    className="form-input w-full py-1.5 text-xs"
+                    placeholder="Search name or email..."
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                  />
+                  <div className="mt-2 max-h-48 overflow-y-auto">
+                    {candidates.isFetching ? <p className="px-2 py-1 text-xs text-slate-500">Searching...</p> : null}
+                    {!candidates.isFetching && candidates.data?.length === 0 ? (
+                      <p className="px-2 py-1 text-xs text-slate-500">No users matched.</p>
+                    ) : null}
+                    {(candidates.data ?? [])
+                      .filter((candidate) => candidate.id !== user.id)
+                      .map((candidate) => (
+                        <button
+                          key={candidate.id}
+                          type="button"
+                          disabled={impersonating}
+                          className="flex w-full flex-col rounded-lg px-2 py-1.5 text-left hover:bg-white/8 disabled:opacity-50"
+                          onClick={() => startImpersonating(candidate.id)}
+                        >
+                          <span className="truncate text-xs font-semibold text-white">{candidate.name}</span>
+                          <span className="truncate text-[11px] text-slate-400">{candidate.email} · {candidate.role.replace('_', ' ')}</span>
+                        </button>
+                      ))}
+                  </div>
+                  {impersonateError ? <p className="mt-1 px-2 text-xs text-rose-300">{impersonateError}</p> : null}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-slate-200 hover:bg-white/8"
+                  onClick={() => setPickerOpen(true)}
+                >
+                  <UserCog className="h-4 w-4" /> Impersonate
+                </button>
+              )
+            ) : null}
+            <button type="button" className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-slate-200 hover:bg-white/8" onClick={onLogout}>
+              <LogOut className="h-4 w-4" /> Sign out
+            </button>
+            <a
+              href={HELP_REQUEST_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-slate-200 hover:bg-white/8"
+            >
+              <HelpCircle className="h-4 w-4" /> Help
+            </a>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -275,7 +320,6 @@ export function App() {
   const baseUrl = useMemo(() => apiConfig.baseUrl, []);
   const [sessionVersion, setSessionVersion] = useState(0);
   const [passwordPromptSkippedFor, setPasswordPromptSkippedFor] = useState<string | null>(null);
-  const [impersonatedEmail, setImpersonatedEmail] = useState<string | null>(null);
   const session = useQuery({
     queryKey: ['runtime-session', sessionVersion],
     queryFn: backend.currentUser,
@@ -297,8 +341,7 @@ export function App() {
   }
 
   const user = session.data;
-  const effectiveUser = buildImpersonatedAbcUser(user, impersonatedEmail);
-  const shouldShowPasswordPrompt = !user.demo_read_only && (user.force_password_change || user.password_expiry_warning) && passwordPromptSkippedFor !== user.id;
+  const shouldShowPasswordPrompt = (user.force_password_change || user.password_expiry_warning) && passwordPromptSkippedFor !== user.id;
   if (shouldShowPasswordPrompt) {
     return (
       <PasswordChangeGate
@@ -312,16 +355,18 @@ export function App() {
     );
   }
   return (
-    <PlatformProvider key={effectiveUser.email} runtimeUser={effectiveUser}>
+    <PlatformProvider key={user.email} runtimeUser={user}>
       <AuthenticatedApp
-        user={effectiveUser}
-        canImpersonate={user.role === 'super_admin'}
-        impersonatedEmail={impersonatedEmail}
-        onImpersonationChange={setImpersonatedEmail}
+        user={user}
         onLogout={() => {
-          setImpersonatedEmail(null);
+          backend.logout();
           setSessionVersion((value) => value + 1);
         }}
+        onBackToProfile={() => {
+          backend.endImpersonation();
+          setSessionVersion((value) => value + 1);
+        }}
+        onImpersonationStarted={() => setSessionVersion((value) => value + 1)}
       />
     </PlatformProvider>
   );
@@ -329,16 +374,14 @@ export function App() {
 
 function AuthenticatedApp({
   user,
-  canImpersonate,
-  impersonatedEmail,
-  onImpersonationChange,
   onLogout,
+  onBackToProfile,
+  onImpersonationStarted,
 }: {
   user: RuntimeUser;
-  canImpersonate: boolean;
-  impersonatedEmail: string | null;
-  onImpersonationChange: (email: string | null) => void;
   onLogout: () => void;
+  onBackToProfile: () => void;
+  onImpersonationStarted: () => void;
 }) {
   const { state, selectedClientId, selectedClient, isPlatformContext, canSelectPlatform, selectClient, platformUser } = usePlatform();
   const location = useLocation();
@@ -356,10 +399,6 @@ function AuthenticatedApp({
   useEffect(() => {
     sessionStorage.setItem('metam-sidebar-expanded', String(sidebarExpanded));
   }, [sidebarExpanded]);
-
-  useEffect(() => {
-    if (selectedClientId !== abcTestClientId && impersonatedEmail) onImpersonationChange(null);
-  }, [impersonatedEmail, onImpersonationChange, selectedClientId]);
 
   useEffect(() => {
     if (!canAccessPage(permissionContext, location.pathname)) {
@@ -395,20 +434,7 @@ function AuthenticatedApp({
             </>
           ) : null}
         </div>
-        {sidebarExpanded ? (
-          <div className="px-4 pt-4">
-            <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Signed in</p>
-              <p className="mt-2 truncate text-sm font-semibold text-white">{platformUser.fullName}</p>
-              <p className="mt-1 text-sm text-slate-300">{user.email}</p>
-               <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/8 px-3 py-1 text-xs font-semibold uppercase tracking-[0.1em] text-cyan-100">
-                <BadgeCheck className="h-3.5 w-3.5" />
-                 {user.role.replace('_', ' ')}
-               </div>
-               {user.demo_read_only ? <div className="mt-2 text-xs font-semibold uppercase tracking-[0.12em] text-amber-200">Read-only demo</div> : null}
-            </div>
-          </div>
-        ) : (
+        {!sidebarExpanded ? (
           <div className="px-3 pt-4">
             <button
               type="button"
@@ -419,7 +445,7 @@ function AuthenticatedApp({
               <ChevronRight className="h-5 w-5" />
             </button>
           </div>
-        )}
+        ) : null}
         <nav className="space-y-1 p-3">
           {allowedNavItems.map((item) => (
             <NavLink
@@ -447,11 +473,6 @@ function AuthenticatedApp({
         <header className="sticky top-0 z-20 border-b border-white/10 bg-slate-950/70 backdrop-blur-xl">
           <div className="flex h-16 items-center justify-between gap-4 px-4 sm:px-6">
              <div className="flex items-center gap-3">
-               {user.demo_read_only ? (
-                 <div className="hidden rounded-full border border-amber-300/25 bg-amber-400/10 px-3 py-1.5 text-xs font-semibold text-amber-100 sm:block">
-                   Read-only role demo
-                 </div>
-               ) : null}
               <button className="focus-ring rounded-xl border border-white/10 bg-white/8 p-2 text-slate-100 xl:hidden" aria-label="Open navigation">
                 <Menu className="h-4 w-4" />
               </button>
@@ -472,29 +493,18 @@ function AuthenticatedApp({
                 />
                 <p className="hidden truncate text-xs text-slate-400 sm:block">{isPlatformContext ? 'Platform Context · USD' : `${selectedClient?.clientId} · ${selectedClient?.currency}`}</p>
               </div>
-              {selectedClientId === abcTestClientId && canImpersonate ? (
-                <SuperAdminImpersonationAccess
-                  value={impersonatedEmail ?? ''}
-                  activeName={impersonatedEmail ? user.name : undefined}
-                  onChange={onImpersonationChange}
-                  onBack={() => onImpersonationChange(null)}
-                />
-              ) : null}
             </div>
             <div className="flex items-center gap-3">
               <div className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/8 px-3 py-1.5 text-xs text-slate-300 sm:flex">
                 <Activity className="h-3.5 w-3.5 text-cyan-200" />
                 {allowedNavItems.length} sections
               </div>
-              <button
-                className="focus-ring rounded-xl border border-white/10 bg-white/8 px-3 py-2 text-xs font-semibold text-slate-100 hover:bg-white/12"
-                onClick={() => {
-                  backend.logout();
-                  onLogout();
-                }}
-              >
-                {user.demo_read_only ? 'Switch role' : 'Sign out'}
-              </button>
+              <UserAvatarMenu
+                user={user}
+                onLogout={onLogout}
+                onBackToProfile={onBackToProfile}
+                onImpersonationStarted={onImpersonationStarted}
+              />
             </div>
           </div>
           <nav className="flex gap-1 overflow-x-auto border-t border-white/10 px-3 py-2 xl:hidden">
@@ -615,13 +625,6 @@ function LoginScreen({ onLogin, baseUrl }: { onLogin: () => void; baseUrl: strin
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [forgotMode, setForgotMode] = useState(false);
-  const [demoSubmittingRole, setDemoSubmittingRole] = useState<RuntimeUser['role'] | null>(null);
-  const demoConfig = useQuery({
-    queryKey: ['public-demo-config'],
-    queryFn: backend.demoConfig,
-    retry: false,
-    staleTime: 5 * 60 * 1000,
-  });
 
   if (isResetPath && resetToken) {
     return <ResetPasswordScreen token={resetToken} onComplete={() => { window.history.replaceState({}, '', '/'); setForgotMode(false); }} />;
@@ -645,22 +648,9 @@ function LoginScreen({ onLogin, baseUrl }: { onLogin: () => void; baseUrl: strin
     }
   }
 
-  async function startDemo(role: RuntimeUser['role']) {
-    setDemoSubmittingRole(role);
-    setError('');
-    try {
-      await backend.demoLogin(role);
-      onLogin();
-    } catch (demoError) {
-      setError(demoError instanceof Error ? demoError.message : 'Unable to start the role demo');
-    } finally {
-      setDemoSubmittingRole(null);
-    }
-  }
-
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className={`w-full rounded-[36px] border border-white/12 bg-white/8 p-7 shadow-[0_30px_90px_rgba(15,23,42,0.24)] backdrop-blur-2xl ${demoConfig.data?.enabled ? 'max-w-4xl' : 'max-w-md'}`}>
+      <div className="w-full max-w-md rounded-[36px] border border-white/12 bg-white/8 p-7 shadow-[0_30px_90px_rgba(15,23,42,0.24)] backdrop-blur-2xl">
         <div className="mb-6 flex items-center gap-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-cyan-300/20 bg-cyan-400/15 text-cyan-100 shadow-[0_0_34px_rgba(34,211,238,0.24)]">
             <Boxes className="h-5 w-5" />
@@ -671,42 +661,14 @@ function LoginScreen({ onLogin, baseUrl }: { onLogin: () => void; baseUrl: strin
           </div>
         </div>
 
-        {demoConfig.data?.enabled && demoConfig.data.roles.length ? (
-          <section className="mb-6 rounded-3xl border border-cyan-300/20 bg-slate-950/35 p-5">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold text-white">Passwordless role preview</p>
-                <p className="mt-1 text-xs text-slate-400">Choose a role to document its real navigation and data. All changes are blocked by the backend.</p>
-              </div>
-              <span className="rounded-full border border-amber-300/25 bg-amber-400/10 px-3 py-1 text-xs font-semibold text-amber-100">Read-only · {demoConfig.data.session_minutes} min</span>
-            </div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {demoConfig.data.roles.map((item) => (
-                <button
-                  key={item.role}
-                  type="button"
-                  className="focus-ring rounded-2xl border border-white/10 bg-white/[0.05] p-4 text-left transition hover:border-cyan-300/30 hover:bg-cyan-400/10 disabled:opacity-60"
-                  disabled={demoSubmittingRole !== null}
-                  onClick={() => startDemo(item.role)}
-                >
-                  <span className="block text-sm font-semibold text-white">{demoSubmittingRole === item.role ? 'Opening...' : item.label}</span>
-                  <span className="mt-1 block text-xs leading-5 text-slate-400">{item.description}</span>
-                  <span className="mt-2 block truncate text-xs text-cyan-200">{item.username}</span>
-                </button>
-              ))}
-            </div>
-          </section>
-        ) : null}
-
         <form className="space-y-4" onSubmit={submit}>
-          {demoConfig.data?.enabled ? <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Authorized user sign in</p> : null}
           <label className="block text-sm font-medium text-slate-200">
             Email
             <input className="mt-1 w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm text-white shadow-sm outline-none placeholder:text-slate-500" value={email} onChange={(event) => setEmail(event.target.value)} />
           </label>
           <label className="block text-sm font-medium text-slate-200">
             Password
-            <input className="mt-1 w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm text-white shadow-sm outline-none placeholder:text-slate-500" type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
+            <PasswordField className="mt-1 w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm text-white shadow-sm outline-none placeholder:text-slate-500" value={password} onChange={setPassword} />
           </label>
           {error ? <div className="rounded-2xl border border-red-300/20 bg-red-400/10 px-4 py-3 text-sm text-red-100">{error}</div> : null}
           <button className="focus-ring w-full rounded-2xl border border-cyan-300/20 bg-cyan-400/15 px-4 py-3 text-sm font-semibold text-cyan-50 shadow-[0_0_30px_rgba(34,211,238,0.2)] disabled:opacity-60" disabled={submitting}>
@@ -716,8 +678,6 @@ function LoginScreen({ onLogin, baseUrl }: { onLogin: () => void; baseUrl: strin
             Forgot password?
           </button>
         </form>
-
-        <div className="mt-5 rounded-2xl border border-white/10 bg-white/8 p-4 text-xs text-slate-300">Passwords are never displayed. Documentation visitors should use the read-only role preview.</div>
       </div>
     </div>
   );
@@ -772,12 +732,12 @@ function PasswordChangeGate({ user, onChanged, onSkip }: { user: RuntimeUser; on
           {force ? 'Your administrator requires a password change before entering the platform.' : `Your password expires in ${user.password_days_to_expiry ?? 'a few'} days. You can update it now or skip this reminder.`}
         </p>
         <form className="mt-5 space-y-4" onSubmit={submit}>
-          <input className="form-input w-full" type="password" placeholder="Current password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} />
+          <PasswordField className="form-input w-full" placeholder="Current password" value={currentPassword} onChange={setCurrentPassword} />
           <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
-            <input className="form-input w-full" type="password" placeholder="New password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} />
+            <PasswordField className="form-input w-full" placeholder="New password" value={newPassword} onChange={setNewPassword} />
             <button type="button" className="form-button-subtle" onClick={generate}>Auto Generate</button>
           </div>
-          <input className="form-input w-full" type="password" placeholder="Re-enter new password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} />
+          <PasswordField className="form-input w-full" placeholder="Re-enter new password" value={confirmPassword} onChange={setConfirmPassword} />
           {generated ? <div className="rounded-2xl border border-amber-300/20 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">Generated password: <span className="font-mono font-semibold">{generated}</span></div> : null}
           <div className="grid gap-2 text-xs text-slate-300 sm:grid-cols-2">{criteria.map((item) => <span key={item.label} className={item.met ? 'text-emerald-200' : 'text-slate-500'}>{item.met ? '[OK]' : '[ ]'} {item.label}</span>)}</div>
           {error ? <div className="rounded-2xl border border-red-300/20 bg-red-400/10 px-4 py-3 text-sm text-red-100">{error}</div> : null}
@@ -841,8 +801,8 @@ function ResetPasswordScreen({ token, onComplete }: { token: string; onComplete:
   return (
     <AuthCard title="Create New Password" subtitle="Use the reset link to create a protected password.">
       <form className="space-y-4" onSubmit={submit}>
-        <input className="form-input w-full" type="password" placeholder="New password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} />
-        <input className="form-input w-full" type="password" placeholder="Re-enter new password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} />
+        <PasswordField className="form-input w-full" placeholder="New password" value={newPassword} onChange={setNewPassword} />
+        <PasswordField className="form-input w-full" placeholder="Re-enter new password" value={confirmPassword} onChange={setConfirmPassword} />
         <div className="grid gap-2 text-xs text-slate-300 sm:grid-cols-2">{loginPasswordCriteria(newPassword).map((item) => <span key={item.label} className={item.met ? 'text-emerald-200' : 'text-slate-500'}>{item.met ? '[OK]' : '[ ]'} {item.label}</span>)}</div>
         {message ? <div className="rounded-2xl border border-emerald-300/20 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-100">{message}</div> : null}
         {error ? <div className="rounded-2xl border border-red-300/20 bg-red-400/10 px-4 py-3 text-sm text-red-100">{error}</div> : null}

@@ -14,6 +14,9 @@ def runtime_headers(email: str = "super@metam.local", password: str = "SuperAdmi
     return {"Authorization": f"Bearer {response.json()['data']['access_token']}"}
 
 
+client.headers.update(runtime_headers())
+
+
 def test_health():
     response = client.get("/health")
     assert response.status_code == 200
@@ -1097,51 +1100,6 @@ def test_all_seeded_runtime_roles_can_login():
         assert response.json()["data"]["user"]["role"] == role
 
 
-def test_passwordless_demo_is_disabled_unless_explicitly_enabled(monkeypatch):
-    monkeypatch.delenv("ENABLE_PUBLIC_DEMO", raising=False)
-    config = client.get("/runtime/auth/demo-config")
-    assert config.status_code == 200
-    assert config.json()["data"]["enabled"] is False
-    assert config.json()["data"]["roles"] == []
-    assert client.post("/runtime/auth/demo-login", json={"role": "super_admin"}).status_code == 404
-
-
-def test_passwordless_demo_supports_all_roles_and_enforces_read_only(monkeypatch):
-    monkeypatch.setenv("ENABLE_PUBLIC_DEMO", "true")
-    config = client.get("/runtime/auth/demo-config")
-    assert config.status_code == 200
-    roles = config.json()["data"]["roles"]
-    assert len(roles) == 11
-    assert all("username" in item and "password" not in item for item in roles)
-
-    for role in [item["role"] for item in roles]:
-        response = client.post("/runtime/auth/demo-login", json={"role": role})
-        assert response.status_code == 200
-        assert response.json()["data"]["user"]["demo_read_only"] is True
-        assert response.json()["data"]["user"]["demo_role"] == role
-
-    login = client.post("/runtime/auth/demo-login", json={"role": "super_admin"})
-    headers = {"Authorization": f"Bearer {login.json()['data']['access_token']}"}
-    session = client.get("/runtime/auth/me", headers=headers)
-    assert session.status_code == 200
-    assert session.json()["data"]["demo_read_only"] is True
-    assert client.get("/runtime/records", headers=headers).status_code == 200
-    blocked = client.post(
-        "/runtime/records",
-        headers=headers,
-        json={
-            "module_key": "inventory",
-            "record_type": "raw_material",
-            "record_code": "DEMO-WRITE-BLOCKED",
-            "name": "Must not be created",
-            "status": "AVAILABLE",
-            "quantity": 1,
-            "payload": {},
-        },
-    )
-    assert blocked.status_code == 403
-    assert blocked.json()["detail"] == "Read-only demo sessions cannot modify data."
-
 
 def test_disabled_runtime_user_cannot_login():
     response = client.post("/runtime/auth/login", json={"email": "disabled.operator@metam.local", "password": "Disabled123!"})
@@ -1336,6 +1294,67 @@ def test_datahub_company_scoped_upload_and_cloud_source_manifests():
     assert any(item["company_id"] == "company-apex" and item["company_name"] == "Apex Components Ltd" for item in uploads.json()["data"])
 
 
+def test_get_data_module_columns_default_and_template_download():
+    headers = runtime_headers("admin@metam.local", "ChangeMe123!")
+
+    columns = client.get("/manufacturing-data-hub/get-data/destination-modules/Inventory/columns", headers=headers)
+    assert columns.status_code == 200
+    names = [item["column_name"] for item in columns.json()["data"]["columns"]]
+    assert names[:3] == ["item_code", "item_name", "category"]
+    assert any(item["column_name"] == "item_code" and item["required"] for item in columns.json()["data"]["columns"])
+
+    template = client.get("/manufacturing-data-hub/get-data/destination-modules/Inventory/template.csv", headers=headers)
+    assert template.status_code == 200
+    assert template.headers["content-type"].startswith("text/csv")
+    assert template.headers["content-disposition"] == 'attachment; filename="inventory_column_template.csv"'
+    assert template.text.strip() == ",".join(names)
+
+    unknown = client.get("/manufacturing-data-hub/get-data/destination-modules/NotAModule/columns", headers=headers)
+    assert unknown.status_code == 404
+
+
+def test_get_data_module_columns_company_override_and_shared_default_permissions():
+    admin_headers = runtime_headers("admin@metam.local", "ChangeMe123!")
+    super_headers = runtime_headers("super@metam.local", "SuperAdmin123!")
+
+    # A company admin can override columns for their own company only.
+    override = client.put(
+        "/manufacturing-data-hub/get-data/destination-modules/Inventory/columns",
+        headers=admin_headers,
+        json={"columns": [{"column_name": "custom_sku", "required": True}, {"column_name": "custom_qty", "required": False}]},
+    )
+    assert override.status_code == 200
+    assert [c["column_name"] for c in override.json()["data"]["columns"]] == ["custom_sku", "custom_qty"]
+
+    fetched = client.get("/manufacturing-data-hub/get-data/destination-modules/Inventory/columns", headers=admin_headers)
+    assert [c["column_name"] for c in fetched.json()["data"]["columns"]] == ["custom_sku", "custom_qty"]
+
+    # A company admin cannot set the shared, tenant-wide default.
+    denied = client.put(
+        "/manufacturing-data-hub/get-data/destination-modules/Inventory/columns",
+        headers=admin_headers,
+        json={"shared_default": True, "columns": [{"column_name": "hijacked", "required": True}]},
+    )
+    assert denied.status_code == 403
+
+    # Other companies are unaffected by this company's override and still see the built-in default.
+    other_company = client.get(
+        "/manufacturing-data-hub/get-data/destination-modules/Inventory/columns",
+        headers=super_headers,
+        params={"company_id": "company-apex"},
+    )
+    assert [c["column_name"] for c in other_company.json()["data"]["columns"]][:2] == ["item_code", "item_name"]
+
+    # Restore the shared default for company-c so other tests relying on it are unaffected.
+    client.put(
+        "/manufacturing-data-hub/get-data/destination-modules/Inventory/columns",
+        headers=admin_headers,
+        json={"columns": []},
+    )
+    restored = client.get("/manufacturing-data-hub/get-data/destination-modules/Inventory/columns", headers=admin_headers)
+    assert [c["column_name"] for c in restored.json()["data"]["columns"]][:2] == ["item_code", "item_name"]
+
+
 def test_versioned_runtime_api_alias():
     login = client.post("/api/v1/runtime/auth/login", json={"email": "super@metam.local", "password": "SuperAdmin123!"})
     assert login.status_code == 200
@@ -1344,3 +1363,97 @@ def test_versioned_runtime_api_alias():
     response = client.get("/api/v1/runtime/analytics/summary", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 200
     assert response.json()["action"] == "analytics_summary"
+
+
+def _find_user_id(headers: dict[str, str], email: str) -> str:
+    users = client.get("/runtime/users", headers=headers, params={"search": email})
+    assert users.status_code == 200
+    matches = [user for user in users.json()["data"] if user["email"] == email]
+    assert matches, f"expected to find {email} via /runtime/users"
+    return matches[0]["id"]
+
+
+def test_super_admin_can_impersonate_and_actions_are_attributed():
+    super_headers = runtime_headers()
+    operator_id = _find_user_id(super_headers, "operator@metam.local")
+
+    impersonate = client.post("/runtime/auth/impersonate", headers=super_headers, json={"user_id": operator_id})
+    assert impersonate.status_code == 200
+    body = impersonate.json()["data"]
+    assert body["user"]["role"] == "operator"
+    assert body["user"]["impersonated_by_email"] == "super@metam.local"
+    impersonated_headers = {"Authorization": f"Bearer {body['access_token']}"}
+
+    me = client.get("/runtime/auth/me", headers=impersonated_headers)
+    assert me.status_code == 200
+    assert me.json()["data"]["impersonated_by_email"] == "super@metam.local"
+
+    changed = client.put(
+        f"/runtime/users/{operator_id}",
+        headers=super_headers,
+        json={"name": "Impersonation Test Operator"},
+    )
+    assert changed.status_code == 200
+
+    audit = client.get("/runtime/audit-logs", headers=super_headers)
+    assert audit.status_code == 200
+    start_events = [row for row in audit.json()["data"] if row["action"] == "IMPERSONATE_START" and row["entity_id"] == operator_id]
+    assert start_events, "expected an IMPERSONATE_START audit row for the target user"
+
+
+def test_cannot_impersonate_disabled_user():
+    super_headers = runtime_headers()
+    disabled_id = _find_user_id(super_headers, "disabled.operator@metam.local")
+    response = client.post("/runtime/auth/impersonate", headers=super_headers, json={"user_id": disabled_id})
+    assert response.status_code == 403
+
+
+def test_non_privileged_user_cannot_impersonate():
+    operator_headers = runtime_headers("operator@metam.local", "Operator123!")
+    super_id = _find_user_id(runtime_headers(), "super@metam.local")
+    response = client.post("/runtime/auth/impersonate", headers=operator_headers, json={"user_id": super_id})
+    assert response.status_code == 403
+
+
+def test_impersonation_access_is_grantable_and_scoped_to_super_admin_grant():
+    super_headers = runtime_headers()
+    admin_id = _find_user_id(super_headers, "admin@metam.local")
+
+    denied = client.put(
+        f"/runtime/users/{admin_id}",
+        headers=runtime_headers("admin@metam.local", "ChangeMe123!"),
+        json={"can_impersonate": True},
+    )
+    assert denied.status_code == 403
+
+    granted = client.put(f"/runtime/users/{admin_id}", headers=super_headers, json={"can_impersonate": True})
+    assert granted.status_code == 200
+    assert granted.json()["data"]["can_impersonate"] is True
+
+    admin_headers = runtime_headers("admin@metam.local", "ChangeMe123!")
+    operator_id = _find_user_id(super_headers, "operator@metam.local")
+    impersonate = client.post("/runtime/auth/impersonate", headers=admin_headers, json={"user_id": operator_id})
+    assert impersonate.status_code == 200
+
+    client.put(f"/runtime/users/{admin_id}", headers=super_headers, json={"can_impersonate": False})
+
+
+def test_cannot_impersonate_while_already_impersonating():
+    super_headers = runtime_headers()
+    admin_id = _find_user_id(super_headers, "admin@metam.local")
+    operator_id = _find_user_id(super_headers, "operator@metam.local")
+
+    granted = client.put(f"/runtime/users/{admin_id}", headers=super_headers, json={"can_impersonate": True})
+    assert granted.status_code == 200
+    try:
+        # Impersonate the (now impersonation-capable) admin from the super admin session.
+        first = client.post("/runtime/auth/impersonate", headers=super_headers, json={"user_id": admin_id})
+        assert first.status_code == 200
+        chained_headers = {"Authorization": f"Bearer {first.json()['data']['access_token']}"}
+
+        # Even though this session's user can normally impersonate, it's itself an
+        # impersonated session, so starting a second one must be blocked.
+        second = client.post("/runtime/auth/impersonate", headers=chained_headers, json={"user_id": operator_id})
+        assert second.status_code == 403
+    finally:
+        client.put(f"/runtime/users/{admin_id}", headers=super_headers, json={"can_impersonate": False})

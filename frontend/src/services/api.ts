@@ -10,7 +10,6 @@ import type {
   DataMappingRule,
   DashboardAccessResult,
   DataQuality,
-  DemoConfig,
   Company,
   FeatureFlag,
   HealthResponse,
@@ -37,6 +36,7 @@ import type {
 const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL as string | undefined;
 const apiBaseUrl = configuredBaseUrl?.replace(/\/$/, '') ?? '';
 const tokenStorageKey = 'metam.runtime.token';
+const adminTokenStorageKey = 'metam.runtime.admin_token';
 const platformStateStorageKey = 'metam.platform.demo.v1';
 
 function clearPlatformSessionState() {
@@ -278,6 +278,26 @@ export const backend = {
     const response = await api.post<ApiEnvelope<{ valid: boolean; validation_results: Array<Record<string, unknown>> }>>('/manufacturing-data-hub/get-data/field-mapping/validate', payload);
     return response.data.data;
   },
+  getDataModuleColumns: (destinationModule: string, companyId?: string) =>
+    getEnvelope<{ destination_module: string; columns: Array<{ column_name: string; required: boolean }> }>(
+      `/manufacturing-data-hub/get-data/destination-modules/${encodeURIComponent(destinationModule)}/columns${companyId ? `?company_id=${encodeURIComponent(companyId)}` : ''}`,
+    ),
+  downloadGetDataModuleTemplate: async (destinationModule: string, companyId?: string) => {
+    const response = await api.get(
+      `/manufacturing-data-hub/get-data/destination-modules/${encodeURIComponent(destinationModule)}/template.csv${companyId ? `?company_id=${encodeURIComponent(companyId)}` : ''}`,
+      { responseType: 'blob' },
+    );
+    const disposition = String(response.headers['content-disposition'] ?? '');
+    const fileName = /filename="([^"]+)"/.exec(disposition)?.[1] ?? `${destinationModule.toLowerCase().replace(/\s+/g, '_')}_column_template.csv`;
+    const url = window.URL.createObjectURL(response.data as Blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  },
   createGetDataRelationship: async (payload: { company_id?: string; left_table: string; left_column: string; right_table: string; right_column: string; cardinality: string; direction: string; active: boolean }) => {
     const response = await api.post<ApiEnvelope<Record<string, unknown>>>('/manufacturing-data-hub/get-data/model/relationships', payload);
     return response.data.data;
@@ -307,13 +327,6 @@ export const backend = {
     window.localStorage.setItem(tokenStorageKey, response.data.data.access_token);
     return response.data.data;
   },
-  demoConfig: () => getEnvelope<DemoConfig>('/runtime/auth/demo-config'),
-  demoLogin: async (role: RuntimeUser['role']) => {
-    clearPlatformSessionState();
-    const response = await api.post<ApiEnvelope<RuntimeLoginResult>>('/runtime/auth/demo-login', { role });
-    window.localStorage.setItem(tokenStorageKey, response.data.data.access_token);
-    return response.data.data;
-  },
   passwordPolicy: () => getEnvelope<PasswordPolicy>('/runtime/auth/password-policy'),
   generatePassword: async () => {
     const response = await api.post<ApiEnvelope<{ password: string; criteria: PasswordPolicy }>>('/runtime/auth/generate-password');
@@ -333,6 +346,7 @@ export const backend = {
   },
   logout: () => {
     window.localStorage.removeItem(tokenStorageKey);
+    window.localStorage.removeItem(adminTokenStorageKey);
     clearPlatformSessionState();
   },
   currentUser: () => getEnvelope<RuntimeUser>('/runtime/auth/me'),
@@ -343,15 +357,34 @@ export const backend = {
     password: string;
     role: RuntimeUser['role'];
     is_active: boolean;
+    can_impersonate?: boolean;
     company_id?: string | null;
     plant_id?: string | null;
   }) => {
     const response = await api.post<ApiEnvelope<RuntimeUser>>('/runtime/users', payload);
     return response.data.data;
   },
-  updateUser: async (id: string, payload: Partial<Pick<RuntimeUser, 'name' | 'role' | 'is_active'>>) => {
+  updateUser: async (id: string, payload: Partial<Pick<RuntimeUser, 'name' | 'role' | 'is_active' | 'can_impersonate'>>) => {
     const response = await api.put<ApiEnvelope<RuntimeUser>>(`/runtime/users/${id}`, payload);
     return response.data.data;
+  },
+  isImpersonating: () => Boolean(window.localStorage.getItem(adminTokenStorageKey)),
+  impersonate: async (userId: string) => {
+    const response = await api.post<ApiEnvelope<RuntimeLoginResult>>('/runtime/auth/impersonate', { user_id: userId });
+    const adminToken = window.localStorage.getItem(tokenStorageKey);
+    if (adminToken && !window.localStorage.getItem(adminTokenStorageKey)) {
+      window.localStorage.setItem(adminTokenStorageKey, adminToken);
+    }
+    window.localStorage.setItem(tokenStorageKey, response.data.data.access_token);
+    clearPlatformSessionState();
+    return response.data.data;
+  },
+  endImpersonation: () => {
+    const adminToken = window.localStorage.getItem(adminTokenStorageKey);
+    if (!adminToken) return;
+    window.localStorage.setItem(tokenStorageKey, adminToken);
+    window.localStorage.removeItem(adminTokenStorageKey);
+    clearPlatformSessionState();
   },
   resetUserPassword: async (id: string, payload: { new_password: string; confirm_password: string; force_change_on_login: boolean }) => {
     const response = await api.post<ApiEnvelope<RuntimeUser>>(`/runtime/users/${id}/reset-password`, payload);

@@ -163,6 +163,18 @@ class DataHubErrorLog(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
+class DataHubModuleColumn(Base):
+    __tablename__ = "datahub_module_columns"
+
+    id = Column(String, primary_key=True)
+    company_id = Column(String, index=True, nullable=True)  # null = shared default for every company
+    destination_module = Column(String, index=True, nullable=False)
+    column_name = Column(String, nullable=False)
+    display_order = Column(Integer, nullable=False, default=0)
+    required = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
 class DataCatalogEntry(Base):
     __tablename__ = "data_catalog_entries"
 

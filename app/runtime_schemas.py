@@ -29,10 +29,6 @@ class LoginPayload(BaseModel):
     password: str = Field(min_length=1)
 
 
-class DemoLoginPayload(BaseModel):
-    role: RoleName
-
-
 class ForgotPasswordPayload(BaseModel):
     email: str
 
@@ -64,13 +60,15 @@ class SessionUser(BaseModel):
     name: str
     role: RoleName
     is_active: bool
+    can_impersonate: bool = False
     permissions: list[str]
     password_expires_at: str | None = None
     password_days_to_expiry: int | None = None
     password_expiry_warning: bool = False
     force_password_change: bool = False
-    demo_read_only: bool = False
-    demo_role: RoleName | None = None
+    impersonated_by_id: str | None = None
+    impersonated_by_name: str | None = None
+    impersonated_by_email: str | None = None
 
 
 class LoginResult(BaseModel):
@@ -85,6 +83,7 @@ class UserCreate(BaseModel):
     password: str = Field(min_length=8)
     role: RoleName = "user"
     is_active: bool = True
+    can_impersonate: bool = False
     company_id: str | None = None
     plant_id: str | None = None
 
@@ -93,7 +92,12 @@ class UserUpdate(BaseModel):
     name: str | None = None
     role: RoleName | None = None
     is_active: bool | None = None
+    can_impersonate: bool | None = None
     password: str | None = Field(default=None, min_length=8)
+
+
+class ImpersonatePayload(BaseModel):
+    user_id: str
 
 
 class ModuleRecordCreate(BaseModel):

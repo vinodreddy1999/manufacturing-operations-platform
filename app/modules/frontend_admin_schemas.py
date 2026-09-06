@@ -155,3 +155,14 @@ class GetDataRefreshRequest(BaseModel):
     refresh_mode: str = "Manual refresh"
     incremental_column: str | None = None
     schedule: dict[str, Any] = Field(default_factory=dict)
+
+
+class GetDataModuleColumn(BaseModel):
+    column_name: str = Field(min_length=1)
+    required: bool = False
+
+
+class GetDataModuleColumnsRequest(BaseModel):
+    company_id: str | None = None
+    shared_default: bool = False
+    columns: list[GetDataModuleColumn] = Field(default_factory=list)

@@ -1,5 +1,5 @@
 import { Download, Plus, Search } from 'lucide-react';
-import { Suspense, lazy, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
+import { Suspense, lazy, useEffect, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
 import { createPortal } from 'react-dom';
 
 import { platformApplications, platformModules, platformRoles } from '../platform/data';
@@ -7,6 +7,7 @@ import { usePlatform } from '../platform/PlatformContext';
 import { backend } from '../services/api';
 import type { ClientStatus, CurrencyCode, PlatformAuditLog, PlatformClient, PlatformState, PlatformUser } from '../platform/types';
 import { Panel } from './Panel';
+import { PasswordField } from './PasswordField';
 import { StatusBadge } from './StatusBadge';
 
 const LazyMultiSelectAccessGrid = lazy(() => import('./MultiSelectAccessGrid').then((module) => ({ default: module.MultiSelectAccessGrid })));
@@ -671,6 +672,7 @@ function UserCreateModal({ onClose }: { onClose: () => void }) {
     role: 'Viewer',
     password: '',
     confirmPassword: '',
+    canImpersonate: false,
     applications: [...initialClient.enabledApplications],
     modules: [...initialClient.enabledModules],
     reason: '',
@@ -701,6 +703,7 @@ function UserCreateModal({ onClose }: { onClose: () => void }) {
         password: form.password,
         role: mapPlatformRoleToRuntime(form.role),
         is_active: true,
+        can_impersonate: form.canImpersonate,
         company_id: client.clientId,
         plant_id: form.plant,
       });
@@ -753,12 +756,23 @@ function UserEditModal({ user, onClose }: { user: PlatformUser; onClose: () => v
     resetPassword: '',
     resetPasswordConfirm: '',
     forceChangeOnLogin: true,
+    canImpersonate: false,
     reason: '',
   });
   const [error, setError] = useState('');
   const client = state.clients.find((item) => item.clientId === form.clientId) ?? initialClient;
   const emailExists = Boolean(form.email.trim()) && state.users.some((item) => item.userId !== user.userId && item.email.toLowerCase() === form.email.trim().toLowerCase());
   const loginExists = Boolean(form.loginName.trim()) && state.users.some((item) => item.userId !== user.userId && item.loginName.toLowerCase() === form.loginName.trim().toLowerCase());
+
+  useEffect(() => {
+    let cancelled = false;
+    backend.users({ search: user.email }).then((runtimeUsers) => {
+      if (cancelled) return;
+      const match = runtimeUsers.find((item) => item.email.toLowerCase() === user.email.toLowerCase());
+      if (match) setForm((current) => ({ ...current, canImpersonate: Boolean(match.can_impersonate) }));
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [user.email]);
 
   function changeClient(clientId: string) {
     const next = state.clients.find((item) => item.clientId === clientId)!;
@@ -779,17 +793,20 @@ function UserEditModal({ user, onClose }: { user: PlatformUser; onClose: () => v
     if (!form.roles.length) { setError('Assign at least one role.'); return; }
     if (!form.applications.length || !form.modules.length) { setError('Assign at least one application and one module.'); return; }
     if (!form.reason.trim()) { setError('A change reason is required.'); return; }
-    if (form.resetPassword) {
-      try {
-        const runtimeUsers = await backend.users();
-        const runtimeUser = runtimeUsers.find((item) => item.email.toLowerCase() === user.email.toLowerCase());
-        if (runtimeUser) {
+    try {
+      const runtimeUsers = await backend.users({ search: user.email });
+      const runtimeUser = runtimeUsers.find((item) => item.email.toLowerCase() === user.email.toLowerCase());
+      if (runtimeUser) {
+        if (Boolean(runtimeUser.can_impersonate) !== form.canImpersonate) {
+          await backend.updateUser(runtimeUser.id, { can_impersonate: form.canImpersonate });
+        }
+        if (form.resetPassword) {
           await backend.resetUserPassword(runtimeUser.id, { new_password: form.resetPassword, confirm_password: form.resetPasswordConfirm, force_change_on_login: form.forceChangeOnLogin });
         }
-      } catch (apiError) {
-        setError(apiError instanceof Error ? apiError.message : 'Backend password reset failed.');
-        return;
       }
+    } catch (apiError) {
+      setError(apiError instanceof Error ? apiError.message : 'Backend user update failed.');
+      return;
     }
     updateUser(user.userId, {
       firstName: form.firstName.trim(),
@@ -887,8 +904,8 @@ function PasswordSetupFields({ title = 'Manual Password Setup', description = 'C
         <button type="button" className="form-button-subtle py-2 text-xs" onClick={generate} disabled={generating}>{generating ? 'Generating...' : 'Auto Generate'}</button>
       </div>
       <div className="mt-4 grid gap-3 md:grid-cols-2">
-        <Field label="New Password"><input className="form-input mt-1 w-full" type="password" value={password} onChange={(event) => onPasswordChange(event.target.value)} /></Field>
-        <Field label="Re-enter New Password"><input className="form-input mt-1 w-full" type="password" value={confirmPassword} onChange={(event) => onConfirmPasswordChange(event.target.value)} /></Field>
+        <Field label="New Password"><PasswordField className="form-input mt-1 w-full" value={password} onChange={onPasswordChange} /></Field>
+        <Field label="Re-enter New Password"><PasswordField className="form-input mt-1 w-full" value={confirmPassword} onChange={onConfirmPasswordChange} /></Field>
       </div>
       {generated && (
         <div className="mt-3 rounded-xl border border-amber-300/20 bg-amber-400/10 p-3 text-sm text-amber-100">
@@ -933,6 +950,7 @@ type UserFormState = {
   plant: string;
   role?: string;
   status?: PlatformUser['status'];
+  canImpersonate?: boolean;
 };
 
 function UserFormFields<T extends UserFormState>({ form, setForm, clients, client, changeClient, mode, emailExists = false, loginExists = false }: {
@@ -959,6 +977,14 @@ function UserFormFields<T extends UserFormState>({ form, setForm, clients, clien
       <Field label="Plant"><select className="form-input mt-1 w-full" value={form.plant} onChange={(event) => setForm({ ...form, plant: event.target.value })}>{plants.map((plant) => <option key={plant.plantId} value={plant.plantName}>{plant.plantName}</option>)}</select></Field>
       {mode === 'create' && <Field label="Role"><select className="form-input mt-1 w-full" value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value })}>{platformRoles.filter((item) => item !== 'Super Admin').map((item) => <option key={item}>{item}</option>)}</select></Field>}
       {mode === 'edit' && <Field label="Status"><select className="form-input mt-1 w-full" value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as PlatformUser['status'] })}><option>Active</option><option>Disabled</option></select></Field>}
+      <label className="flex items-center gap-2 text-sm text-slate-300 md:col-span-2">
+        <input
+          type="checkbox"
+          checked={Boolean(form.canImpersonate)}
+          onChange={(event) => setForm({ ...form, canImpersonate: event.target.checked })}
+        />
+        Can impersonate other users (requires super admin or account owner to grant)
+      </label>
     </div>
   );
 }
@@ -1188,7 +1214,7 @@ function IntegrationsWorkspace() {
         <Select value={client} onChange={setClient} label="All clients" options={state.clients.map((item) => [item.clientId, item.clientName])} />
         <Select value={module} onChange={setModule} label="All modules" options={moduleNames} />
       </div>
-      <Notice>{summary}. Open DataHub for Power BI-style Get Data, transformation, mapping, validation, approval, refresh history, error logs, and audit logs.</Notice>
+      <Notice>{summary}. Open DataHub for Get Data, transformation, mapping, validation, approval, refresh history, error logs, and audit logs.</Notice>
       <Table headers={['Client', 'Module', 'Source', 'Connector', 'Refresh', 'Data Quality', 'Last Sync', 'Status', 'Action']} minWidth="min-w-[1250px]" count={rows.length}>
         {rows.map((row) => (
           <tr key={`${row.clientId}-${row.moduleName}-${row.source}`} className="border-b border-white/10 hover:bg-white/[0.04]">

@@ -3,13 +3,12 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 import jwt
-from jwt import PyJWTError as JWTError
 
 from .auth_router import router as auth_router
 from .core_router import create_module_router, router as core_router
@@ -97,27 +96,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-DEMO_SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
-DEMO_LOGIN_PATHS = {"/runtime/auth/demo-login", "/api/v1/runtime/auth/demo-login"}
-
-
-@app.middleware("http")
-async def enforce_read_only_demo_sessions(request: Request, call_next):
-    if request.method.upper() in DEMO_SAFE_METHODS or request.url.path in DEMO_LOGIN_PATHS:
-        return await call_next(request)
-    header = request.headers.get("authorization", "")
-    if header.lower().startswith("bearer "):
-        try:
-            claims = jwt.decode(header.split(" ", 1)[1], RUNTIME_JWT_SECRET, algorithms=[RUNTIME_JWT_ALGORITHM])
-        except JWTError:
-            claims = {}
-        if claims.get("demo_read_only") is True:
-            return JSONResponse(
-                status_code=403,
-                content={"detail": "Read-only demo sessions cannot modify data."},
-            )
-    return await call_next(request)
 
 if env_flag("ENABLE_STARTUP_SCHEMA_SYNC"):
     Base.metadata.create_all(bind=engine)

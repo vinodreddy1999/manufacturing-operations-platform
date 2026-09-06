@@ -1,12 +1,14 @@
+import csv
 from datetime import datetime, timezone
 from statistics import mean
 from typing import Any
 from uuid import uuid4
-from io import BytesIO
+from io import BytesIO, StringIO
 from pathlib import Path
 
 import pandas as pd
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from . import frontend_admin_models  # noqa: F401
@@ -27,6 +29,7 @@ from .frontend_admin_schemas import (
     FrontendAdminApiResult,
     GetDataConnectionRequest,
     GetDataFieldMappingRequest,
+    GetDataModuleColumnsRequest,
     GetDataRefreshRequest,
     GetDataRelationshipRequest,
     GetDataSelectionRequest,
@@ -341,6 +344,83 @@ GET_DATA_TRANSFORMS = [
 ]
 
 GET_DATA_DESTINATIONS = ["Inventory", "Planning", "Production", "Maintenance", "Finance", "Reports", "Admin master data"]
+
+# Baseline column set offered as a downloadable template for each destination module.
+# Companies can override this per module via PUT .../destination-modules/{module}/columns;
+# a company override always wins over these shared defaults.
+DEFAULT_MODULE_COLUMNS: dict[str, list[dict[str, Any]]] = {
+    "Inventory": [
+        {"column_name": "item_code", "required": True},
+        {"column_name": "item_name", "required": True},
+        {"column_name": "category", "required": False},
+        {"column_name": "uom", "required": False},
+        {"column_name": "quantity", "required": True},
+        {"column_name": "unit_cost", "required": False},
+        {"column_name": "warehouse_location", "required": False},
+        {"column_name": "reorder_point", "required": False},
+        {"column_name": "batch_number", "required": False},
+        {"column_name": "expiry_date", "required": False},
+    ],
+    "Planning": [
+        {"column_name": "plan_id", "required": True},
+        {"column_name": "material_code", "required": True},
+        {"column_name": "demand_quantity", "required": True},
+        {"column_name": "plan_period", "required": False},
+        {"column_name": "planning_unit", "required": False},
+        {"column_name": "supply_source", "required": False},
+        {"column_name": "safety_stock", "required": False},
+        {"column_name": "planner_name", "required": False},
+    ],
+    "Production": [
+        {"column_name": "order_id", "required": True},
+        {"column_name": "material_code", "required": True},
+        {"column_name": "planned_qty", "required": True},
+        {"column_name": "work_center", "required": False},
+        {"column_name": "start_date", "required": False},
+        {"column_name": "end_date", "required": False},
+        {"column_name": "actual_qty", "required": False},
+        {"column_name": "scrap_qty", "required": False},
+        {"column_name": "status", "required": False},
+    ],
+    "Maintenance": [
+        {"column_name": "work_order", "required": True},
+        {"column_name": "asset_id", "required": True},
+        {"column_name": "status", "required": True},
+        {"column_name": "asset_name", "required": False},
+        {"column_name": "maintenance_type", "required": False},
+        {"column_name": "priority", "required": False},
+        {"column_name": "scheduled_date", "required": False},
+        {"column_name": "completed_date", "required": False},
+        {"column_name": "technician", "required": False},
+        {"column_name": "downtime_hours", "required": False},
+    ],
+    "Finance": [
+        {"column_name": "account", "required": True},
+        {"column_name": "amount", "required": True},
+        {"column_name": "currency", "required": True},
+        {"column_name": "transaction_date", "required": False},
+        {"column_name": "cost_center", "required": False},
+        {"column_name": "description", "required": False},
+        {"column_name": "vendor_name", "required": False},
+        {"column_name": "invoice_number", "required": False},
+    ],
+    "Reports": [
+        {"column_name": "metric_name", "required": True},
+        {"column_name": "metric_value", "required": True},
+        {"column_name": "period", "required": False},
+        {"column_name": "unit", "required": False},
+        {"column_name": "category", "required": False},
+        {"column_name": "source_system", "required": False},
+    ],
+    "Admin master data": [
+        {"column_name": "name", "required": True},
+        {"column_name": "status", "required": True},
+        {"column_name": "code", "required": False},
+        {"column_name": "description", "required": False},
+        {"column_name": "owner", "required": False},
+        {"column_name": "effective_date", "required": False},
+    ],
+}
 
 
 def connector_lookup() -> dict[str, dict[str, Any]]:
@@ -811,6 +891,96 @@ def get_data_transform_preview(
     return result("get_data_transform_preview", "Power Query-style transformation preview generated and saved.", {"id": row.id, "operations": operations, "preview_rows": preview})
 
 
+def resolve_module_columns(db: Session, destination_module: str, company_id: str | None) -> list[dict[str, Any]]:
+    """Column list for a destination module: a company's own override if it has one,
+    else the shared tenant-wide override if set, else the built-in defaults."""
+    for scope in ([company_id] if company_id else []) + [None]:
+        rows = (
+            db.query(frontend_admin_models.DataHubModuleColumn)
+            .filter(
+                frontend_admin_models.DataHubModuleColumn.destination_module == destination_module,
+                frontend_admin_models.DataHubModuleColumn.company_id == scope,
+            )
+            .order_by(frontend_admin_models.DataHubModuleColumn.display_order)
+            .all()
+        )
+        if rows:
+            return [{"column_name": row.column_name, "required": row.required} for row in rows]
+    return DEFAULT_MODULE_COLUMNS.get(destination_module, [])
+
+
+@data_hub_router.get("/get-data/destination-modules/{destination_module}/columns", response_model=FrontendAdminApiResult)
+def get_destination_module_columns(
+    destination_module: str,
+    company_id: str | None = None,
+    actor: User = Depends(require_any("admin")),
+    db: Session = Depends(get_db),
+) -> FrontendAdminApiResult:
+    if destination_module not in GET_DATA_DESTINATIONS:
+        raise HTTPException(status_code=404, detail="Unknown destination module")
+    resolved_company_id = resolve_datahub_company_id(company_id, actor, db)
+    columns = resolve_module_columns(db, destination_module, resolved_company_id)
+    return result("get_data_module_columns", "Expected columns for the destination module.", {"destination_module": destination_module, "columns": columns})
+
+
+@data_hub_router.get("/get-data/destination-modules/{destination_module}/template.csv")
+def download_destination_module_template(
+    destination_module: str,
+    company_id: str | None = None,
+    actor: User = Depends(require_any("admin")),
+    db: Session = Depends(get_db),
+) -> Response:
+    if destination_module not in GET_DATA_DESTINATIONS:
+        raise HTTPException(status_code=404, detail="Unknown destination module")
+    resolved_company_id = resolve_datahub_company_id(company_id, actor, db)
+    columns = resolve_module_columns(db, destination_module, resolved_company_id)
+    buffer = StringIO()
+    csv.writer(buffer).writerow([column["column_name"] for column in columns])
+    file_name = f"{destination_module.lower().replace(' ', '_')}_column_template.csv"
+    return Response(
+        content=buffer.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{file_name}"'},
+    )
+
+
+@data_hub_router.put("/get-data/destination-modules/{destination_module}/columns", response_model=FrontendAdminApiResult)
+def set_destination_module_columns(
+    destination_module: str,
+    request: GetDataModuleColumnsRequest,
+    actor: User = Depends(require_any("admin")),
+    db: Session = Depends(get_db),
+) -> FrontendAdminApiResult:
+    if destination_module not in GET_DATA_DESTINATIONS:
+        raise HTTPException(status_code=404, detail="Unknown destination module")
+    if request.shared_default:
+        if not has_override_scope(actor):
+            raise HTTPException(status_code=403, detail="Only a super admin or account owner can set the shared default columns")
+        target_company_id = None
+    else:
+        target_company_id = resolve_datahub_company_id(request.company_id, actor, db)
+    db.query(frontend_admin_models.DataHubModuleColumn).filter(
+        frontend_admin_models.DataHubModuleColumn.destination_module == destination_module,
+        frontend_admin_models.DataHubModuleColumn.company_id == target_company_id,
+    ).delete()
+    for index, column in enumerate(request.columns):
+        db.add(
+            frontend_admin_models.DataHubModuleColumn(
+                id=f"dhc-{uuid4()}",
+                company_id=target_company_id,
+                destination_module=destination_module,
+                column_name=column.column_name,
+                display_order=index,
+                required=column.required,
+            )
+        )
+    audit_scope_id = target_company_id or "shared-default"
+    datahub_audit(db, actor, target_company_id or "shared-default", "set_module_columns", "get_data_module_columns", f"{destination_module}:{audit_scope_id}", {"destination_module": destination_module, "columns": [c.model_dump() for c in request.columns]})
+    db.commit()
+    columns = resolve_module_columns(db, destination_module, target_company_id)
+    return result("set_get_data_module_columns", "Destination module columns updated.", {"destination_module": destination_module, "columns": columns})
+
+
 @data_hub_router.post("/get-data/field-mapping/validate", response_model=FrontendAdminApiResult)
 def validate_get_data_mapping(
     request: GetDataFieldMappingRequest,
@@ -819,17 +989,9 @@ def validate_get_data_mapping(
 ) -> FrontendAdminApiResult:
     payload = request.model_dump()
     company_id = resolve_datahub_company_id(payload.pop("company_id", None), actor, db)
-    required_by_module = {
-        "Inventory": ["item_code", "item_name", "quantity"],
-        "Planning": ["plan_id", "material_code", "demand_quantity"],
-        "Production": ["order_id", "material_code", "planned_qty"],
-        "Maintenance": ["work_order", "asset_id", "status"],
-        "Finance": ["account", "amount", "currency"],
-        "Reports": ["metric_name", "metric_value"],
-        "Admin master data": ["name", "status"],
-    }
+    required_fields = [column["column_name"] for column in resolve_module_columns(db, request.destination_module, company_id) if column["required"]]
     mapped_targets = {item.get("target_field") for item in request.mappings}
-    missing = [field for field in required_by_module.get(request.destination_module, []) if field not in mapped_targets]
+    missing = [field for field in required_fields if field not in mapped_targets]
     validation = [
         {"rule": "Required destination fields mapped", "status": "Failed" if missing else "Passed", "severity": "Error" if missing else "Info", "details": missing},
         {"rule": "Preview before load", "status": "Passed", "severity": "Info", "details": "Preview generated from selected assets."},

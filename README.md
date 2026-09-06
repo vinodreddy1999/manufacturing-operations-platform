@@ -1,7 +1,5 @@
 # Metam Services (Python)
 
-Role-by-role documentation can use the passwordless, backend-enforced read-only workflow in [docs/passwordless-role-demo.md](docs/passwordless-role-demo.md).
-
 This repository is now a Python-only implementation of the Metam Services backend.
 
 It uses FastAPI and includes runnable backend modules for Metam Services:

@@ -1,23 +1,46 @@
+name: manufacturing-platform-inventory-ai-local
+
 services:
   inventory-ai-postgres:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_USER: inventory_ai
       POSTGRES_PASSWORD: inventory_ai
       POSTGRES_DB: inventory_ai
     ports:
-      - "5433:5432"
+      - "${MOP_INVENTORY_AI_DB_PORT:-5433}:5432"
     volumes:
       - inventory_ai_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U inventory_ai -d inventory_ai"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - inventory-ai-network
 
   inventory-ai-service:
     build: .
+    restart: unless-stopped
     environment:
       DATABASE_URL: postgresql+psycopg2://inventory_ai:inventory_ai@inventory-ai-postgres:5432/inventory_ai
     ports:
-      - "8100:8100"
+      - "${MOP_INVENTORY_AI_PORT:-8100}:8100"
     depends_on:
-      - inventory-ai-postgres
+      inventory-ai-postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8100/health').read()"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - inventory-ai-network
 
 volumes:
   inventory_ai_postgres_data:
+
+networks:
+  inventory-ai-network:
+    driver: bridge
