@@ -1458,3 +1458,59 @@ def test_cannot_impersonate_while_already_impersonating():
         assert second.status_code == 403
     finally:
         client.put(f"/runtime/users/{admin_id}", headers=super_headers, json={"can_impersonate": False})
+
+
+def test_super_admin_can_create_and_reset_a_client_sandbox():
+    super_headers = runtime_headers()
+    company_id = "company-abc-manufacturing"
+
+    missing = client.get(f"/companies/{company_id}/sandbox", headers=super_headers)
+    assert missing.status_code == 404
+
+    created = client.post(f"/companies/{company_id}/sandbox", headers=super_headers)
+    assert created.status_code == 200
+    sandbox = created.json()
+    assert sandbox["id"] == f"{company_id}-sandbox"
+    assert sandbox["is_sandbox"] is True
+    assert sandbox["sandbox_of_company_id"] == company_id
+
+    duplicate = client.post(f"/companies/{company_id}/sandbox", headers=super_headers)
+    assert duplicate.status_code == 409
+
+    cannot_nest = client.post(f"/companies/{sandbox['id']}/sandbox", headers=super_headers)
+    assert cannot_nest.status_code == 400
+
+    seeded = client.post(
+        "/manufacturing-data-hub/connected-systems",
+        headers=super_headers,
+        json={"company_id": sandbox["id"], "system_name": "Sandbox Test ERP", "system_type": "ERP", "connection_status": "Healthy", "health_score": 90},
+    )
+    assert seeded.status_code == 200
+
+    reset = client.post(f"/companies/{company_id}/sandbox/reset", headers=super_headers)
+    assert reset.status_code == 200
+    assert reset.json()["id"] == sandbox["id"]
+
+    remaining = client.get("/manufacturing-data-hub/connected-systems", headers=super_headers)
+    assert not any(system["company_id"] == sandbox["id"] and system["system_name"] == "Sandbox Test ERP" for system in remaining.json()["data"])
+
+
+def test_organization_admin_can_manage_only_their_own_company_sandbox():
+    super_headers = runtime_headers()
+    org_admin_headers = runtime_headers("orgadmin@metam.local", "OrgAdmin123!")
+
+    own_sandbox = client.post("/companies/company-c/sandbox", headers=org_admin_headers)
+    assert own_sandbox.status_code == 200
+    assert own_sandbox.json()["sandbox_of_company_id"] == "company-c"
+
+    other_company = client.get("/companies", headers=super_headers).json()
+    other_company_id = next(row["id"] for row in other_company if row["id"] not in {"company-c", "company-c-sandbox"} and not row["is_sandbox"])
+
+    denied = client.post(f"/companies/{other_company_id}/sandbox", headers=org_admin_headers)
+    assert denied.status_code == 403
+
+
+def test_operator_cannot_manage_sandboxes():
+    operator_headers = runtime_headers("operator@metam.local", "Operator123!")
+    denied = client.post("/companies/company-c/sandbox", headers=operator_headers)
+    assert denied.status_code == 403

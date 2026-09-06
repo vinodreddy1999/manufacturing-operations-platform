@@ -88,6 +88,13 @@ def ensure_runtime_schema() -> None:
         if "impersonated_by_id" not in audit_columns:
             with engine.begin() as connection:
                 connection.execute(text("ALTER TABLE audit_logs ADD COLUMN impersonated_by_id VARCHAR(80)"))
+    if "companies" in inspector.get_table_names():
+        company_columns = {column["name"] for column in inspector.get_columns("companies")}
+        with engine.begin() as connection:
+            if "is_sandbox" not in company_columns:
+                connection.execute(text("ALTER TABLE companies ADD COLUMN is_sandbox BOOLEAN DEFAULT FALSE"))
+            if "sandbox_of_company_id" not in company_columns:
+                connection.execute(text("ALTER TABLE companies ADD COLUMN sandbox_of_company_id VARCHAR(80)"))
 
 
 def runtime_result(action: str, message: str, data: Any) -> RuntimeEnvelope:

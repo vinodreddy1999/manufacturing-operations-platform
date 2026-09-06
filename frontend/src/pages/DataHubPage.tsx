@@ -1,6 +1,6 @@
 import { ClipboardEvent, Dispatch, FormEvent, SetStateAction, useEffect, useMemo, useRef, useState } from 'react';
-import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query';
-import { Cable, CheckCircle2, Database, Download, Route, ShieldCheck, Trash2, UploadCloud } from 'lucide-react';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Cable, CheckCircle2, Database, Download, FlaskConical, Route, ShieldCheck, Trash2, UploadCloud } from 'lucide-react';
 
 import { DataTable } from '../components/DataTable';
 import { ErrorState } from '../components/ErrorState';
@@ -8,7 +8,7 @@ import { LoadingState } from '../components/LoadingState';
 import { Panel } from '../components/Panel';
 import { StatusBadge } from '../components/StatusBadge';
 import { useClickOutside } from '../hooks/useClickOutside';
-import { canManagePlatform, canPerformAction, canUseDataHubUploads } from '../lib/rbac';
+import { canCreateCompanies, canManagePlatform, canPerformAction, canUseDataHubUploads } from '../lib/rbac';
 import { computeTrimmedPasteValue } from '../lib/trimPaste';
 import { usePlatform } from '../platform/PlatformContext';
 import type { PlatformClient } from '../platform/types';
@@ -1819,6 +1819,8 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
   const [selectedModuleFilter, setSelectedModuleFilter] = useState('');
   const [selectedGetDataConnectionId, setSelectedGetDataConnectionId] = useState('');
   const [selectedCompanyId, setSelectedCompanyId] = useState(user.company_id ?? '');
+  const [sandboxManageCompanyId, setSandboxManageCompanyId] = useState(user.company_id ?? '');
+  const [sandboxActionError, setSandboxActionError] = useState('');
   const [selectedPlantId, setSelectedPlantId] = useState('');
   const [sourceCategory, setSourceCategory] = useState('erp');
   const [catalogSourceCategory, setCatalogSourceCategory] = useState('erp');
@@ -1889,6 +1891,38 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
   const platformSelectedCompanyId = platformSelectedClient ? companyIdForPlatformClient(platformSelectedClient, backendCompanyRows) : '';
   const targetCompanyId = selectedCompanyId || platformSelectedCompanyId || user.company_id || companyRows[0]?.id || '';
   const targetCompany = companyRows.find((company) => company.id === targetCompanyId);
+  const activeCompanyRecord = backendCompanyRows.find((company) => company.id === targetCompanyId);
+
+  const canManageSandboxes = canManagePlatform(user);
+  const canManageAnyClientSandbox = canCreateCompanies(user);
+  const sandboxManageableCompanies = useMemo(() => {
+    const rows = backendCompanyRows.filter((company) => !company.is_sandbox);
+    return canManageAnyClientSandbox ? rows : rows.filter((company) => company.id === user.company_id);
+  }, [backendCompanyRows, canManageAnyClientSandbox, user.company_id]);
+  const effectiveSandboxManageCompanyId = sandboxManageCompanyId || sandboxManageableCompanies[0]?.id || '';
+  const sandboxManageCompany = sandboxManageableCompanies.find((company) => company.id === effectiveSandboxManageCompanyId);
+  const companySandbox = useQuery({
+    queryKey: ['company-sandbox', effectiveSandboxManageCompanyId],
+    queryFn: () => backend.getCompanySandbox(effectiveSandboxManageCompanyId),
+    enabled: canManageSandboxes && Boolean(effectiveSandboxManageCompanyId),
+  });
+  const createSandbox = useMutation({
+    mutationFn: () => backend.createCompanySandbox(effectiveSandboxManageCompanyId),
+    onSuccess: () => {
+      setSandboxActionError('');
+      queryClient.invalidateQueries({ queryKey: ['company-sandbox', effectiveSandboxManageCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ['companies'] });
+    },
+    onError: (error: unknown) => setSandboxActionError(error instanceof Error ? error.message : 'Unable to create sandbox.'),
+  });
+  const resetSandbox = useMutation({
+    mutationFn: () => backend.resetCompanySandbox(effectiveSandboxManageCompanyId),
+    onSuccess: () => {
+      setSandboxActionError('');
+      queryClient.invalidateQueries({ queryKey: ['company-sandbox', effectiveSandboxManageCompanyId] });
+    },
+    onError: (error: unknown) => setSandboxActionError(error instanceof Error ? error.message : 'Unable to reset sandbox.'),
+  });
   const targetPlatformClient = platformState.clients.find((client) => companyIdForPlatformClient(client, backendCompanyRows) === targetCompanyId || normalizeCompanyName(client.clientName) === normalizeCompanyName(targetCompany?.name ?? ''));
   const targetPlantOptions = useMemo<DataHubPlantOption[]>(() => {
     const platformPlants = targetPlatformClient?.plants ?? [];
@@ -2342,6 +2376,74 @@ export function DataHubPage({ user }: { user: RuntimeUser }) {
             <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2">{scopedAiReadinessScore}% AI ready</span>
           </div>
         </div>
+
+        {activeCompanyRecord?.is_sandbox ? (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-300/30 bg-amber-400/10 px-4 py-3 text-xs text-amber-100">
+            <span className="flex items-center gap-2 font-semibold uppercase tracking-[0.16em]">
+              <FlaskConical className="h-4 w-4" /> Sandbox mode — changes here do not affect {backendCompanyRows.find((company) => company.id === activeCompanyRecord.sandbox_of_company_id)?.name ?? 'production'} data
+            </span>
+            <button
+              type="button"
+              className="rounded-full border border-amber-200/40 bg-amber-300/10 px-3 py-1.5 font-semibold normal-case tracking-normal text-amber-50 hover:bg-amber-300/20"
+              onClick={() => activeCompanyRecord.sandbox_of_company_id && changeTargetCompany(activeCompanyRecord.sandbox_of_company_id)}
+            >
+              Back to production
+            </button>
+          </div>
+        ) : null}
+
+        {canManageSandboxes ? (
+          <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+            <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+              <FlaskConical className="h-3.5 w-3.5" /> Client sandboxes
+            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <select
+                className={`${selectClass} w-auto min-w-[220px]`}
+                value={effectiveSandboxManageCompanyId}
+                onChange={(event) => setSandboxManageCompanyId(event.target.value)}
+              >
+                {sandboxManageableCompanies.map((company) => <option key={company.id} value={company.id}>{company.name}</option>)}
+              </select>
+              {companySandbox.isLoading ? (
+                <span className="text-xs text-slate-400">Checking sandbox status...</span>
+              ) : companySandbox.data ? (
+                <>
+                  <span className="rounded-full border border-emerald-300/30 bg-emerald-400/10 px-3 py-1.5 text-xs text-emerald-200">Sandbox ready</span>
+                  <button
+                    type="button"
+                    className="rounded-full border border-cyan-300/20 bg-cyan-400/[0.06] px-3 py-1.5 text-xs font-semibold text-cyan-100 hover:bg-cyan-400/15"
+                    onClick={() => companySandbox.data && changeTargetCompany(companySandbox.data.id)}
+                  >
+                    Enter sandbox
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-slate-200 hover:bg-white/10 disabled:opacity-60"
+                    disabled={resetSandbox.isPending}
+                    onClick={() => {
+                      if (window.confirm(`Reset the sandbox for ${sandboxManageCompany?.name ?? 'this client'}? All sandbox data will be permanently deleted.`)) {
+                        resetSandbox.mutate();
+                      }
+                    }}
+                  >
+                    {resetSandbox.isPending ? 'Resetting...' : 'Reset sandbox'}
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className="rounded-full border border-cyan-300/20 bg-cyan-400/[0.06] px-3 py-1.5 text-xs font-semibold text-cyan-100 hover:bg-cyan-400/15 disabled:opacity-60"
+                  disabled={createSandbox.isPending || !effectiveSandboxManageCompanyId}
+                  onClick={() => createSandbox.mutate()}
+                >
+                  {createSandbox.isPending ? 'Creating sandbox...' : `Create sandbox for ${sandboxManageCompany?.name ?? 'this client'}`}
+                </button>
+              )}
+            </div>
+            {sandboxActionError ? <p className="mt-2 text-xs text-rose-300">{sandboxActionError}</p> : null}
+          </div>
+        ) : null}
 
         <div className="mt-4 grid gap-3 xl:grid-cols-[1.1fr_1fr_0.8fr_0.8fr]">
           <CompanySelector companies={companyRows} selectedCompanyId={targetCompanyId} user={user} onChange={changeTargetCompany} />

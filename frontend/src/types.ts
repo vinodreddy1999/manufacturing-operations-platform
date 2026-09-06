@@ -124,6 +124,8 @@ export type Company = {
   name: string;
   code: string;
   is_active: boolean;
+  is_sandbox?: boolean;
+  sandbox_of_company_id?: string | null;
   created_at?: string;
 };
 

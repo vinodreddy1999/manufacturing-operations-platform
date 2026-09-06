@@ -135,6 +135,23 @@ export const backend = {
     });
     return response.data;
   },
+  getCompanySandbox: async (companyId: string) => {
+    try {
+      const response = await api.get<Company>(`/companies/${encodeURIComponent(companyId)}/sandbox`);
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.status === 404) return null;
+      throw error;
+    }
+  },
+  createCompanySandbox: async (companyId: string) => {
+    const response = await api.post<Company>(`/companies/${encodeURIComponent(companyId)}/sandbox`);
+    return response.data;
+  },
+  resetCompanySandbox: async (companyId: string) => {
+    const response = await api.post<Company>(`/companies/${encodeURIComponent(companyId)}/sandbox/reset`);
+    return response.data;
+  },
   featureFlags: async () => {
     const response = await api.get<FeatureFlag[]>('/feature-flags');
     return response.data;

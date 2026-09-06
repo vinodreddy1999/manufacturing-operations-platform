@@ -20,6 +20,8 @@ class Company(Base):
     name: Mapped[str] = mapped_column(String(200))
     code: Mapped[str] = mapped_column(String(80))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_sandbox: Mapped[bool] = mapped_column(Boolean, default=False)
+    sandbox_of_company_id: Mapped[str | None] = mapped_column(String(80), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     __table_args__ = (UniqueConstraint("tenant_id", "code"),)

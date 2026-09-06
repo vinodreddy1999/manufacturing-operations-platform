@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from .audit import audit
-from .database import get_db
+from .database import Base, get_db
 from .feature_flags import module_enabled
 from .platform_models import Approval, Company, Department, Document, FeatureFlag, ModuleRecord, Permission, Plant, Role, Task, User
 from .platform_schemas import (
@@ -61,6 +61,75 @@ def list_companies(db: Session = Depends(get_db), actor: User = Depends(current_
     if not has_override_scope(actor):
         query = query.filter(Company.id == actor.company_id)
     return [as_dict(row) for row in query.all()]
+
+
+SANDBOX_MANAGER_ROLES = {"admin", "organization_admin"}
+SANDBOX_EXCLUDED_TABLES = {"companies", "users", "audit_logs"}
+
+
+def _require_sandbox_manager(company_id: str, db: Session, actor: User) -> Company:
+    company = db.get(Company, company_id)
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+    is_own_company_admin = actor.company_id == company_id and (actor.role or "user") in SANDBOX_MANAGER_ROLES
+    if not has_override_scope(actor) and not is_own_company_admin:
+        raise HTTPException(status_code=403, detail="Insufficient access to manage this company's sandbox")
+    return company
+
+
+def _copy_feature_flags(db: Session, source_company_id: str, target_company: Company) -> None:
+    for flag in db.query(FeatureFlag).filter(FeatureFlag.company_id == source_company_id).all():
+        db.add(FeatureFlag(id=str(uuid4()), tenant_id=target_company.tenant_id, company_id=target_company.id, module_key=flag.module_key, enabled=flag.enabled))
+
+
+@router.get("/companies/{company_id}/sandbox")
+def get_company_sandbox(company_id: str, db: Session = Depends(get_db), actor: User = Depends(current_user)):
+    _require_sandbox_manager(company_id, db, actor)
+    sandbox = db.query(Company).filter(Company.sandbox_of_company_id == company_id).first()
+    if not sandbox:
+        raise HTTPException(status_code=404, detail="No sandbox exists for this company yet")
+    return as_dict(sandbox)
+
+
+@router.post("/companies/{company_id}/sandbox")
+def create_company_sandbox(company_id: str, db: Session = Depends(get_db), actor: User = Depends(current_user)):
+    parent = _require_sandbox_manager(company_id, db, actor)
+    if parent.is_sandbox:
+        raise HTTPException(status_code=400, detail="Cannot create a sandbox of a sandbox")
+    if db.query(Company).filter(Company.sandbox_of_company_id == company_id).first():
+        raise HTTPException(status_code=409, detail="A sandbox already exists for this company")
+    sandbox = Company(
+        id=f"{parent.id}-sandbox",
+        tenant_id=parent.tenant_id,
+        name=f"{parent.name} (Sandbox)",
+        code=f"{parent.code}-SBX",
+        is_sandbox=True,
+        sandbox_of_company_id=parent.id,
+    )
+    db.add(sandbox)
+    _copy_feature_flags(db, parent.id, sandbox)
+    db.commit()
+    db.refresh(sandbox)
+    sandbox_payload = as_dict(sandbox)
+    audit(db, action="CREATE_SANDBOX", entity_type="Company", entity_id=sandbox.id, tenant_id=parent.tenant_id, company_id=parent.id, actor_id=actor.id, new_value=sandbox_payload)
+    return sandbox_payload
+
+
+@router.post("/companies/{company_id}/sandbox/reset")
+def reset_company_sandbox(company_id: str, db: Session = Depends(get_db), actor: User = Depends(current_user)):
+    parent = _require_sandbox_manager(company_id, db, actor)
+    sandbox = db.query(Company).filter(Company.sandbox_of_company_id == company_id).first()
+    if not sandbox:
+        raise HTTPException(status_code=404, detail="No sandbox exists for this company yet")
+    for table in reversed(Base.metadata.sorted_tables):
+        if table.name in SANDBOX_EXCLUDED_TABLES or "company_id" not in table.columns:
+            continue
+        db.execute(table.delete().where(table.c.company_id == sandbox.id))
+    _copy_feature_flags(db, parent.id, sandbox)
+    sandbox_payload = as_dict(sandbox)
+    db.commit()
+    audit(db, action="RESET_SANDBOX", entity_type="Company", entity_id=sandbox.id, tenant_id=parent.tenant_id, company_id=parent.id, actor_id=actor.id)
+    return sandbox_payload
 
 
 @router.post("/plants")
