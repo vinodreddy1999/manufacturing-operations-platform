@@ -9,7 +9,7 @@ ARG VITE_API_BASE_URL=
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 RUN npm run lint && npm run build
 
-FROM python:3.12-slim AS backend-base
+FROM python:3.14-slim AS backend-base
 
 WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1
