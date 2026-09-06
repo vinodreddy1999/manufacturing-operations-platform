@@ -1107,8 +1107,9 @@ def test_disabled_runtime_user_cannot_login():
 
 
 def test_core_platform_endpoints_require_auth_and_admin():
-    assert client.get("/companies").status_code == 401
-    assert client.get("/feature-flags").status_code == 401
+    anonymous_client = TestClient(app)
+    assert anonymous_client.get("/companies").status_code == 401
+    assert anonymous_client.get("/feature-flags").status_code == 401
 
     operator_login = client.post("/runtime/auth/login", json={"email": "operator@metam.local", "password": "Operator123!"})
     assert operator_login.status_code == 200
