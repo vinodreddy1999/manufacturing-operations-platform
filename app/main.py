@@ -97,9 +97,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-if env_flag("ENABLE_STARTUP_SCHEMA_SYNC"):
-    Base.metadata.create_all(bind=engine)
-    ensure_runtime_schema()
+# Create missing schema and apply compatibility updates before serving requests.
+# Demo data seeding remains a separate opt-in operation below.
+Base.metadata.create_all(bind=engine)
+ensure_runtime_schema()
 
 if env_flag("ENABLE_STARTUP_PLATFORM_SEED"):
     with SessionLocal() as bootstrap_db:
